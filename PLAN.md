@@ -642,6 +642,52 @@ Each milestone is:
 
 ---
 
+## GitHub Project Integration
+
+### Project Structure
+
+```
+GitHub Project: "BlazeLog Development"
+├── 📋 Backlog (all milestones start here)
+├── 🎯 Ready (prioritized, ready to start)
+├── 🚧 In Progress (currently being worked on)
+├── 👀 In Review (PR open, awaiting review)
+└── ✅ Done (merged and completed)
+```
+
+### Issue Labels
+
+| Label | Color | Description |
+|-------|-------|-------------|
+| `stage-a` | `#1D76DB` | CLI Foundation |
+| `stage-b` | `#0E8A16` | Real-time & Alerting |
+| `stage-c` | `#D93F0B` | Distributed Collection |
+| `stage-d` | `#FBCA04` | SSH Collection |
+| `stage-e` | `#6F42C1` | Storage |
+| `stage-f` | `#E99695` | REST API |
+| `stage-g` | `#C2E0C6` | Web UI |
+| `stage-h` | `#BFD4F2` | Batch & Production |
+| `effort-small` | `#C5DEF5` | Small effort |
+| `effort-medium` | `#FEF2C0` | Medium effort |
+
+### Workflow
+
+1. **Create Issue** for each milestone with checklist of tasks
+2. **Create Branch** from issue: `feature/milestone-XX-description`
+3. **Create PR** linking to issue: `Closes #XX`
+4. **Auto-close** issue when PR is merged
+5. **Auto-move** in project board via GitHub Actions
+
+### Setup Script
+
+Run `./scripts/setup-github-project.sh` to create:
+- GitHub Project board
+- All 30 milestone issues
+- Labels for stages and effort
+- Milestones for each stage
+
+---
+
 ## Security Architecture
 
 ### Agent-Server Communication
