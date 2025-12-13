@@ -74,33 +74,93 @@ func runParse(cmd *cobra.Command, args []string) {
 	}
 	defer file.Close()
 
+	// Check if this is a multiline parser
+	multiParser, isMultiLine := p.(parser.MultiLineParser)
+
 	// Parse the file
 	entries := make([]*models.LogEntry, 0)
 	scanner := bufio.NewScanner(file)
 	lineNum := int64(0)
 
-	for scanner.Scan() {
-		lineNum++
-		line := scanner.Text()
+	if isMultiLine {
+		// Multiline parsing mode (for Magento logs with stack traces)
+		var currentLines []string
+		var startLineNum int64
 
-		if line == "" {
-			continue
-		}
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
 
-		entry, err := p.Parse(line)
-		if err != nil {
-			if IsVerbose() {
-				PrintVerbose("Line %d: parse error: %v", lineNum, err)
+			if line == "" {
+				continue
 			}
-			continue
+
+			if multiParser.IsStartOfEntry(line) {
+				// Process previous entry if exists
+				if len(currentLines) > 0 {
+					entry, err := multiParser.ParseMultiLine(currentLines)
+					if err != nil {
+						if IsVerbose() {
+							PrintVerbose("Line %d: parse error: %v", startLineNum, err)
+						}
+					} else {
+						entry.LineNumber = startLineNum
+						entry.FilePath = filePath
+						entries = append(entries, entry)
+
+						if parseLimit > 0 && len(entries) >= parseLimit {
+							break
+						}
+					}
+				}
+
+				// Start new entry
+				currentLines = []string{line}
+				startLineNum = lineNum
+			} else if len(currentLines) > 0 {
+				// Continuation line (part of stack trace)
+				currentLines = append(currentLines, line)
+			}
 		}
 
-		entry.LineNumber = lineNum
-		entry.FilePath = filePath
-		entries = append(entries, entry)
+		// Process last entry
+		if len(currentLines) > 0 && (parseLimit == 0 || len(entries) < parseLimit) {
+			entry, err := multiParser.ParseMultiLine(currentLines)
+			if err != nil {
+				if IsVerbose() {
+					PrintVerbose("Line %d: parse error: %v", startLineNum, err)
+				}
+			} else {
+				entry.LineNumber = startLineNum
+				entry.FilePath = filePath
+				entries = append(entries, entry)
+			}
+		}
+	} else {
+		// Single-line parsing mode (default)
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
 
-		if parseLimit > 0 && len(entries) >= parseLimit {
-			break
+			if line == "" {
+				continue
+			}
+
+			entry, err := p.Parse(line)
+			if err != nil {
+				if IsVerbose() {
+					PrintVerbose("Line %d: parse error: %v", lineNum, err)
+				}
+				continue
+			}
+
+			entry.LineNumber = lineNum
+			entry.FilePath = filePath
+			entries = append(entries, entry)
+
+			if parseLimit > 0 && len(entries) >= parseLimit {
+				break
+			}
 		}
 	}
 
@@ -124,7 +184,7 @@ func getParser(logType string) (parser.Parser, bool) {
 	case "apache-error":
 		return parser.NewApacheErrorParser(nil), true
 	case "magento":
-		return nil, false // Will be implemented in Milestone 4
+		return parser.NewMagentoParser(nil), true
 	case "prestashop":
 		return nil, false // Will be implemented in Milestone 5
 	case "wordpress":
