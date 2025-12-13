@@ -1,0 +1,135 @@
+# BlazeLog Alert Rules Configuration
+#
+# This file defines alert rules that are evaluated against log entries.
+# Rules can be pattern-based (regex matching) or threshold-based (count in time window).
+#
+# Rule Schema:
+#   name: string (required) - Unique identifier for the rule
+#   description: string - Human-readable description
+#   type: "pattern" | "threshold" (required) - Type of rule
+#   condition: object (required) - Trigger conditions
+#   severity: "low" | "medium" | "high" | "critical" - Alert severity (default: medium)
+#   notify: list of strings - Notification channels (slack, email, teams)
+#   cooldown: duration string - Minimum time between repeated alerts (e.g., "5m", "1h")
+#   labels: map - Filter which logs this rule applies to
+#   enabled: boolean - Whether the rule is active (default: true)
+#
+# Pattern Condition Fields:
+#   pattern: string (required) - Regex pattern to match
+#   case_sensitive: boolean - Case-sensitive matching (default: false)
+#   log_type: string - Only match specific log types (nginx, apache, magento, etc.)
+#
+# Threshold Condition Fields:
+#   field: string - Log field to check (level, status, message, or custom field)
+#   value: any - Value to match against
+#   operator: "==" | "!=" | ">" | ">=" | "<" | "<=" - Comparison operator (default: ==)
+#   threshold: integer (required) - Count that triggers the alert
+#   window: duration string (required) - Time window for counting (e.g., "5m", "1h")
+#   log_type: string - Only match specific log types
+
+rules:
+  # Threshold-based rule example: High error rate detection
+  - name: "High Error Rate"
+    description: "More than 100 errors in 5 minutes"
+    type: "threshold"
+    condition:
+      field: "level"
+      value: "error"
+      threshold: 100
+      window: "5m"
+    severity: "critical"
+    notify:
+      - "slack"
+      - "email"
+    labels:
+      project: "*"
+
+  # Pattern-based rule example: Fatal error detection
+  - name: "Fatal Error Detected"
+    description: "FATAL or CRITICAL error in logs"
+    type: "pattern"
+    condition:
+      pattern: "FATAL|CRITICAL"
+      case_sensitive: false
+    severity: "critical"
+    notify:
+      - "slack"
+      - "teams"
+      - "email"
+    cooldown: "15m"
+
+  # WordPress-specific pattern rule
+  - name: "WordPress Database Error"
+    description: "Database connection issues in WordPress"
+    type: "pattern"
+    condition:
+      pattern: "Error establishing a database connection"
+      log_type: "wordpress"
+    severity: "high"
+    notify:
+      - "slack"
+    cooldown: "5m"
+
+  # Nginx-specific threshold rule
+  - name: "Nginx 5xx Spike"
+    description: "High rate of 5xx errors from Nginx"
+    type: "threshold"
+    condition:
+      field: "status"
+      operator: ">="
+      value: 500
+      threshold: 50
+      window: "1m"
+      log_type: "nginx"
+    severity: "high"
+    notify:
+      - "slack"
+
+  # Magento-specific pattern rule
+  - name: "Magento Exception"
+    description: "Exception detected in Magento logs"
+    type: "pattern"
+    condition:
+      pattern: "Exception|Stack trace"
+      log_type: "magento"
+    severity: "medium"
+    notify:
+      - "email"
+    cooldown: "10m"
+
+  # High latency detection (using custom field)
+  - name: "Slow Requests"
+    description: "Requests taking more than 5 seconds"
+    type: "threshold"
+    condition:
+      field: "request_time"
+      operator: ">"
+      value: 5.0
+      threshold: 20
+      window: "5m"
+      log_type: "nginx"
+    severity: "medium"
+    notify:
+      - "slack"
+
+  # Security-related pattern
+  - name: "Authentication Failure"
+    description: "Multiple authentication failures detected"
+    type: "pattern"
+    condition:
+      pattern: "authentication failed|invalid password|access denied"
+      case_sensitive: false
+    severity: "high"
+    notify:
+      - "slack"
+      - "email"
+    cooldown: "5m"
+
+  # Disabled rule example
+  - name: "Debug Messages"
+    description: "Track debug messages (disabled by default)"
+    type: "pattern"
+    condition:
+      pattern: "DEBUG"
+    severity: "low"
+    enabled: false
