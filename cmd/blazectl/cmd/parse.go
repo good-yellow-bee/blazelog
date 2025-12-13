@@ -186,7 +186,7 @@ func getParser(logType string) (parser.Parser, bool) {
 	case "magento":
 		return parser.NewMagentoParser(nil), true
 	case "prestashop":
-		return nil, false // Will be implemented in Milestone 5
+		return parser.NewPrestaShopParser(nil), true
 	case "wordpress":
 		return nil, false // Will be implemented in Milestone 6
 	case "auto":

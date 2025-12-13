@@ -18,4 +18,8 @@ func init() {
 	// Register Magento parser for auto-detection
 	// Magento uses Monolog format and handles system.log, exception.log, debug.log
 	Register(NewMagentoParser(nil))
+
+	// Register PrestaShop parser for auto-detection
+	// PrestaShop uses Symfony/Monolog format and handles dev.log, prod.log
+	Register(NewPrestaShopParser(nil))
 }
