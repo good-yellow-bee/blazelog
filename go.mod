@@ -1,6 +1,6 @@
 module github.com/good-yellow-bee/blazelog
 
-go 1.25.5
+go 1.24.7
 
 require github.com/spf13/cobra v1.10.2
 

@@ -119,8 +119,10 @@ func getParser(logType string) (parser.Parser, bool) {
 		return parser.NewNginxAccessParser(nil), true
 	case "nginx-error":
 		return parser.NewNginxErrorParser(nil), true
-	case "apache":
-		return nil, false // Will be implemented in Milestone 3
+	case "apache", "apache-access":
+		return parser.NewApacheAccessParser(nil), true
+	case "apache-error":
+		return parser.NewApacheErrorParser(nil), true
 	case "magento":
 		return nil, false // Will be implemented in Milestone 4
 	case "prestashop":
