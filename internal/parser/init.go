@@ -8,4 +8,10 @@ func init() {
 	// return the same LogType (nginx). The error parser can be explicitly
 	// requested via the CLI with "nginx-error".
 	Register(NewNginxAccessParser(nil))
+
+	// Register Apache access parser for auto-detection
+	// Note: We only register the access parser by default since both parsers
+	// return the same LogType (apache). The error parser can be explicitly
+	// requested via the CLI with "apache-error".
+	Register(NewApacheAccessParser(nil))
 }
