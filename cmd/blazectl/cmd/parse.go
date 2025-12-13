@@ -114,11 +114,11 @@ func runParse(cmd *cobra.Command, args []string) {
 }
 
 func getParser(logType string) (parser.Parser, bool) {
-	// For now, return a placeholder parser
-	// This will be implemented in Milestone 2+
 	switch logType {
-	case "nginx":
-		return nil, false // Will be implemented in Milestone 2
+	case "nginx", "nginx-access":
+		return parser.NewNginxAccessParser(nil), true
+	case "nginx-error":
+		return parser.NewNginxErrorParser(nil), true
 	case "apache":
 		return nil, false // Will be implemented in Milestone 3
 	case "magento":
