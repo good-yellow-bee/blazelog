@@ -173,209 +173,472 @@ blazelog/
 
 ---
 
-## Implementation Phases
+## Implementation Milestones
 
-### Phase 1: Core Foundation
-**Goal:** Basic log parsing and local file analysis
-
-**Tasks:**
-1. Initialize Go module and project structure
-2. Implement log parser interface
-3. Implement Nginx access/error log parser
-4. Implement Apache access/error log parser
-5. Implement basic CLI for local file analysis
-6. Add pattern matching (regex) support
-7. Add structured output (JSON, table)
-8. Write unit tests for parsers
-
-**Deliverable:** CLI that can parse Nginx/Apache logs locally
+Small, incremental milestones that each deliver usable value.
 
 ---
 
-### Phase 2: Application Log Parsers
-**Goal:** Support for Magento, PrestaShop, WordPress logs
+### STAGE A: CLI Foundation (Milestones 1-6)
+*Goal: Working CLI that parses all log types locally*
 
+---
+
+#### Milestone 1: Project Setup & Parser Interface
+**Tasks:**
+1. Initialize Go module with `go mod init`
+2. Create project directory structure
+3. Set up Makefile with build targets
+4. Implement `Parser` interface
+5. Create `LogEntry` model
+6. Set up basic CLI with cobra/urfave
+
+**Deliverable:** Empty CLI skeleton with parser interface
+**Effort:** Small
+
+---
+
+#### Milestone 2: Nginx Parser
+**Tasks:**
+1. Research Nginx log formats (combined, custom)
+2. Implement Nginx access log parser
+3. Implement Nginx error log parser
+4. Add CLI command: `blazelog parse nginx <file>`
+5. Write unit tests
+
+**Deliverable:** `blazelog parse nginx /var/log/nginx/access.log`
+**Effort:** Small
+
+---
+
+#### Milestone 3: Apache Parser
+**Tasks:**
+1. Research Apache log formats (common, combined, error)
+2. Implement Apache access log parser
+3. Implement Apache error log parser
+4. Add CLI command: `blazelog parse apache <file>`
+5. Write unit tests
+
+**Deliverable:** `blazelog parse apache /var/log/apache2/access.log`
+**Effort:** Small
+
+---
+
+#### Milestone 4: Magento Parser
 **Tasks:**
 1. Research Magento log formats (system.log, exception.log, debug.log)
-2. Implement Magento log parser
-3. Research PrestaShop log formats
-4. Implement PrestaShop log parser
-5. Research WordPress log formats (debug.log, PHP errors)
-6. Implement WordPress log parser
-7. Add auto-detection of log format
-8. Write unit tests for all parsers
+2. Implement Magento log parser (handles multiline stack traces)
+3. Add CLI command: `blazelog parse magento <file>`
+4. Write unit tests
 
-**Deliverable:** CLI supports all 5 log types
+**Deliverable:** `blazelog parse magento /var/www/magento/var/log/system.log`
+**Effort:** Small
 
 ---
 
-### Phase 3: Real-time Streaming & Alerting
-**Goal:** Tail logs and trigger alerts
-
+#### Milestone 5: PrestaShop Parser
 **Tasks:**
-1. Implement file tailing (follow mode) with fsnotify
-2. Implement in-memory sliding window for aggregations
-3. Design alert rule schema (YAML)
-4. Implement threshold-based alerts (e.g., >100 errors/5min)
-5. Implement pattern-based alerts (e.g., "FATAL" detected)
-6. Add alert cooldown/deduplication
-7. Implement alert state management
-8. Write integration tests
+1. Research PrestaShop log formats
+2. Implement PrestaShop log parser
+3. Add CLI command: `blazelog parse prestashop <file>`
+4. Write unit tests
 
-**Deliverable:** CLI can tail logs and trigger alerts based on rules
+**Deliverable:** `blazelog parse prestashop /var/www/prestashop/var/logs/*.log`
+**Effort:** Small
 
 ---
 
-### Phase 4: Notification System
-**Goal:** Send alerts via Email, Slack, Teams
+#### Milestone 6: WordPress Parser & Auto-Detection
+**Tasks:**
+1. Research WordPress log formats (debug.log, PHP errors)
+2. Implement WordPress log parser
+3. Implement auto-detection of log format
+4. Add CLI command: `blazelog parse auto <file>`
+5. Add output formats (JSON, table, plain)
+6. Write unit tests
 
+**Deliverable:** `blazelog parse auto /var/log/*.log --format json`
+**Effort:** Small
+
+---
+
+### STAGE B: Real-time & Alerting (Milestones 7-11)
+*Goal: CLI can tail logs and send notifications*
+
+---
+
+#### Milestone 7: File Tailing
+**Tasks:**
+1. Implement file tailing with fsnotify
+2. Handle log rotation gracefully
+3. Add CLI command: `blazelog tail <file>`
+4. Support multiple files with glob patterns
+5. Write integration tests
+
+**Deliverable:** `blazelog tail /var/log/nginx/*.log --follow`
+**Effort:** Small
+
+---
+
+#### Milestone 8: Alert Rules Engine
+**Tasks:**
+1. Design alert rule YAML schema
+2. Implement rule parser
+3. Implement pattern-based matching (regex)
+4. Implement threshold detection (count in window)
+5. Add sliding window aggregation
+6. Add alert cooldown/deduplication
+
+**Deliverable:** Alert rules loaded from YAML, evaluated in memory
+**Effort:** Medium
+
+---
+
+#### Milestone 9: Email Notifications
 **Tasks:**
 1. Design notifier interface
-2. Implement Email notifier (SMTP with TLS)
-3. Implement Slack notifier (webhook + API)
-4. Implement Microsoft Teams notifier (webhook)
-5. Add notification templates (customizable messages)
-6. Add notification rate limiting
-7. Add notification history/audit log
-8. Write integration tests with mocks
+2. Implement SMTP client with TLS
+3. Implement email templates (HTML + plain text)
+4. Add CLI flag: `--notify-email`
+5. Write tests with mock SMTP
 
-**Deliverable:** Alerts can be sent via Email, Slack, or Teams
+**Deliverable:** `blazelog tail ... --notify-email admin@example.com`
+**Effort:** Small
 
 ---
 
-### Phase 5: Agent-Server Architecture
-**Goal:** Distributed log collection with agents
-
+#### Milestone 10: Slack Notifications
 **Tasks:**
-1. Define gRPC protocol (protobuf schemas)
-2. Implement gRPC server in central server
-3. Implement gRPC client in agent
-4. Implement mTLS for agent-server communication
-5. Implement certificate generation CLI (blazectl)
-6. Add agent registration and authentication
-7. Implement log buffering in agent (for network outages)
-8. Add heartbeat/health monitoring
-9. Write integration tests
+1. Implement Slack webhook notifier
+2. Implement Slack message formatting (blocks)
+3. Add CLI flag: `--notify-slack`
+4. Write tests
 
-**Deliverable:** Agents can securely stream logs to central server
+**Deliverable:** `blazelog tail ... --notify-slack webhook-url`
+**Effort:** Small
 
 ---
 
-### Phase 6: SSH Connector
-**Goal:** Pull logs from servers via SSH
-
+#### Milestone 11: Teams Notifications
 **Tasks:**
-1. Implement SSH client with key-based authentication
-2. Implement secure credential storage (encrypted at rest)
-3. Add support for jump hosts/bastion
-4. Implement remote file tailing over SSH
-5. Implement batch file download over SSH (SCP/SFTP)
-6. Add connection pooling and retry logic
-7. Add SSH host key verification
-8. Write security tests
+1. Implement Microsoft Teams webhook notifier
+2. Implement Teams adaptive card formatting
+3. Add CLI flag: `--notify-teams`
+4. Add notification rate limiting (all channels)
+5. Write tests
 
-**Security Features:**
-- SSH key-based auth only (no passwords)
-- Encrypted credential storage (AES-256-GCM)
-- Host key fingerprint verification
-- Connection timeout and rate limiting
-- Audit logging for all SSH operations
-
-**Deliverable:** Server can securely pull logs via SSH
+**Deliverable:** `blazelog tail ... --notify-teams webhook-url`
+**Effort:** Small
 
 ---
 
-### Phase 7: Storage Layer
-**Goal:** Persist logs and metadata
-
-**Tasks:**
-1. Design storage interface
-2. Implement SQLite storage for config/metadata (users, projects, alerts)
-3. Implement ClickHouse storage for logs (handles billions of rows)
-4. Design ClickHouse schema optimized for time-series log data
-5. Create materialized views for fast dashboard queries
-6. Implement full-text search using ClickHouse FTS
-7. Implement log retention policies (TTL)
-8. Add database migrations
-9. Write storage tests
-
-**Deliverable:** Logs persisted in ClickHouse with fast search and configurable retention
+### STAGE C: Distributed Collection (Milestones 12-16)
+*Goal: Agent-server architecture with secure communication*
 
 ---
 
-### Phase 8: REST API
-**Goal:** API for Web UI and integrations
-
+#### Milestone 12: gRPC Protocol Definition
 **Tasks:**
-1. Design REST API schema (OpenAPI)
-2. Implement authentication (JWT)
-3. Implement authorization (RBAC)
-4. Implement log query endpoints
-5. Implement alert management endpoints
-6. Implement project/connection endpoints
-7. Implement user management endpoints
-8. Implement WebSocket for real-time log streaming
-9. Add API rate limiting
-10. Write API tests
+1. Define protobuf schemas (LogEntry, AgentInfo, etc.)
+2. Generate Go code from protos
+3. Design streaming protocol
+4. Document protocol
 
-**Deliverable:** Full REST API for all operations
+**Deliverable:** `.proto` files and generated Go code
+**Effort:** Small
 
 ---
 
-### Phase 9: Web UI
-**Goal:** Web-based dashboard using Go-native stack
-
+#### Milestone 13: Agent Basic Implementation
 **Tasks:**
-1. Set up Templ templates structure
-2. Configure Tailwind CSS build pipeline
+1. Create agent CLI binary (`blazelog-agent`)
+2. Implement config file loading
+3. Implement log collection from local files
+4. Implement gRPC client (insecure for now)
+5. Write integration tests
+
+**Deliverable:** Agent that sends logs to server (no TLS yet)
+**Effort:** Medium
+
+---
+
+#### Milestone 14: Server Log Receiver
+**Tasks:**
+1. Create server binary (`blazelog-server`)
+2. Implement gRPC server
+3. Implement log receiver and processor pipeline
+4. Add basic console output for received logs
+5. Write integration tests
+
+**Deliverable:** Server receives and displays logs from agents
+**Effort:** Medium
+
+---
+
+#### Milestone 15: mTLS Security
+**Tasks:**
+1. Implement CA certificate generation (`blazectl ca init`)
+2. Implement agent certificate generation (`blazectl cert agent`)
+3. Implement server certificate generation (`blazectl cert server`)
+4. Add mTLS to gRPC client/server
+5. Implement certificate validation
+6. Write security tests
+
+**Deliverable:** Secure agent-server communication with mTLS
+**Effort:** Medium
+
+---
+
+#### Milestone 16: Agent Reliability
+**Tasks:**
+1. Implement local buffer for network outages
+2. Implement reconnection with backoff
+3. Implement heartbeat/health check
+4. Add agent registration flow
+5. Write chaos tests (network failures)
+
+**Deliverable:** Agent handles network issues gracefully
+**Effort:** Medium
+
+---
+
+### STAGE D: SSH Collection (Milestones 17-18)
+*Goal: Server can pull logs via SSH*
+
+---
+
+#### Milestone 17: SSH Connector Base
+**Tasks:**
+1. Implement SSH client with key authentication
+2. Implement remote file reading
+3. Implement remote file tailing
+4. Add connection management in config
+5. Write integration tests
+
+**Deliverable:** Server can read logs from remote servers via SSH
+**Effort:** Medium
+
+---
+
+#### Milestone 18: SSH Security Hardening
+**Tasks:**
+1. Implement encrypted credential storage (AES-256-GCM)
+2. Implement host key verification
+3. Add jump host/bastion support
+4. Add connection pooling
+5. Add audit logging for SSH operations
+6. Write security tests
+
+**Deliverable:** Production-ready secure SSH connector
+**Effort:** Medium
+
+---
+
+### STAGE E: Storage (Milestones 19-21)
+*Goal: Persistent storage with search*
+
+---
+
+#### Milestone 19: SQLite for Config
+**Tasks:**
+1. Design SQLite schema (users, projects, alerts, connections)
+2. Implement SQLite storage layer
+3. Implement database migrations
+4. Add config persistence to server
+5. Write storage tests
+
+**Deliverable:** Server persists configuration in SQLite
+**Effort:** Small
+
+---
+
+#### Milestone 20: ClickHouse Setup
+**Tasks:**
+1. Design ClickHouse schema for logs
+2. Implement ClickHouse client
+3. Implement log insertion (batched)
+4. Implement basic log queries
+5. Write integration tests
+
+**Deliverable:** Logs stored in ClickHouse
+**Effort:** Medium
+
+---
+
+#### Milestone 21: ClickHouse Advanced
+**Tasks:**
+1. Create materialized views for dashboards
+2. Implement full-text search
+3. Implement TTL retention policies
+4. Implement log aggregation queries
+5. Performance tuning
+6. Write performance tests
+
+**Deliverable:** Fast search and analytics on billions of logs
+**Effort:** Medium
+
+---
+
+### STAGE F: REST API (Milestones 22-24)
+*Goal: Full API for web UI*
+
+---
+
+#### Milestone 22: API Auth & Users
+**Tasks:**
+1. Set up HTTP router (chi)
+2. Implement JWT authentication
+3. Implement user registration/login endpoints
+4. Implement RBAC (Admin, Operator, Viewer)
+5. Add API rate limiting
+6. Write API tests
+
+**Deliverable:** `/api/v1/auth/*` and `/api/v1/users/*` endpoints
+**Effort:** Medium
+
+---
+
+#### Milestone 23: API Logs & Search
+**Tasks:**
+1. Implement log query endpoint
+2. Implement log search with filters
+3. Implement SSE for real-time streaming
+4. Add pagination
+5. Write API tests
+
+**Deliverable:** `/api/v1/logs/*` endpoints with real-time streaming
+**Effort:** Medium
+
+---
+
+#### Milestone 24: API Alerts & Projects
+**Tasks:**
+1. Implement alert rules CRUD endpoints
+2. Implement alert history endpoint
+3. Implement projects CRUD endpoints
+4. Implement connections CRUD endpoints
+5. Generate OpenAPI spec
+6. Write API tests
+
+**Deliverable:** Full REST API complete
+**Effort:** Medium
+
+---
+
+### STAGE G: Web UI (Milestones 25-28)
+*Goal: Complete web dashboard*
+
+---
+
+#### Milestone 25: Web UI Setup
+**Tasks:**
+1. Set up Templ templates
+2. Configure Tailwind CSS
 3. Integrate HTMX and Alpine.js
-4. Implement authentication pages (login, register)
-5. Implement dashboard with metrics/charts (ECharts)
-6. Implement log viewer with search and filters (HTMX partials)
-7. Implement real-time log streaming view (SSE + HTMX)
-8. Implement alert configuration UI
-9. Implement project/connection management UI
-10. Implement user management UI
-11. Add responsive design
-12. Embed static assets in Go binary
-13. Write E2E tests
+4. Create base layout template
+5. Implement login/register pages
+6. Embed static assets in binary
 
-**Deliverable:** Fully functional Web UI embedded in single Go binary
+**Deliverable:** Login page working
+**Effort:** Medium
 
 ---
 
-### Phase 10: Batch Processing
-**Goal:** Analyze historical logs
-
+#### Milestone 26: Dashboard
 **Tasks:**
-1. Implement batch processing mode in CLI
-2. Add support for date range queries
-3. Implement parallel file processing
-4. Add report generation (summary, top errors, etc.)
-5. Implement export (CSV, JSON)
-6. Add scheduled batch jobs (cron-like)
-7. Write performance tests
+1. Create dashboard layout
+2. Implement metrics cards (log counts, error rates)
+3. Implement charts (ECharts)
+4. Add time range selector
+5. Add auto-refresh
 
-**Deliverable:** Batch analysis of historical logs
+**Deliverable:** Dashboard with real-time metrics
+**Effort:** Medium
 
 ---
 
-### Phase 11: Production Hardening
-**Goal:** Production-ready deployment
-
+#### Milestone 27: Log Viewer
 **Tasks:**
-1. Add comprehensive logging and metrics (Prometheus)
-2. Implement graceful shutdown
-3. Add health check endpoints
+1. Implement log list view with pagination
+2. Implement search and filters
+3. Implement log detail view
+4. Implement real-time tail view (SSE)
+5. Add export functionality
+
+**Deliverable:** Full log viewer with search
+**Effort:** Medium
+
+---
+
+#### Milestone 28: Settings & Management
+**Tasks:**
+1. Implement alert rules management UI
+2. Implement projects management UI
+3. Implement connections management UI
+4. Implement user management UI (admin only)
+5. Add responsive design
+6. Write E2E tests
+
+**Deliverable:** Complete Web UI
+**Effort:** Medium
+
+---
+
+### STAGE H: Batch & Production (Milestones 29-30)
+*Goal: Production-ready system*
+
+---
+
+#### Milestone 29: Batch Processing
+**Tasks:**
+1. Implement batch analysis mode
+2. Add date range support
+3. Implement parallel processing
+4. Add report generation
+5. Add export (CSV, JSON)
+6. Write performance tests
+
+**Deliverable:** `blazelog analyze --from 2024-01-01 --to 2024-01-31`
+**Effort:** Medium
+
+---
+
+#### Milestone 30: Production Hardening
+**Tasks:**
+1. Add Prometheus metrics
+2. Add health check endpoints
+3. Implement graceful shutdown
 4. Create Docker images
 5. Create systemd service files
-6. Create Kubernetes manifests
-7. Write deployment documentation
-8. Security audit
-9. Performance optimization
-10. Load testing
+6. Write deployment documentation
+7. Security audit
+8. Load testing
 
-**Deliverable:** Production-ready deployment artifacts
+**Deliverable:** Production-ready deployment
+**Effort:** Medium
+
+---
+
+## Milestone Summary
+
+| Stage | Milestones | Description |
+|-------|------------|-------------|
+| A | 1-6 | CLI parses all log types |
+| B | 7-11 | Real-time tailing + notifications |
+| C | 12-16 | Agent-server with mTLS |
+| D | 17-18 | SSH log collection |
+| E | 19-21 | ClickHouse storage |
+| F | 22-24 | REST API |
+| G | 25-28 | Web UI |
+| H | 29-30 | Batch + Production |
+
+**Total: 30 milestones** (vs 11 large phases before)
+
+Each milestone is:
+- Self-contained and testable
+- Delivers usable functionality
+- Can be completed independently
+- Small enough to review easily
 
 ---
 
