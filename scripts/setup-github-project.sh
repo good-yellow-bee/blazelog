@@ -3,6 +3,7 @@ set -e
 
 # BlazeLog GitHub Project Setup Script
 # Creates project board, labels, milestones, and issues
+# Compatible with bash 3.2+ (macOS default)
 
 REPO="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 echo "Setting up GitHub Project for: $REPO"
@@ -11,7 +12,7 @@ echo "Setting up GitHub Project for: $REPO"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
@@ -33,84 +34,59 @@ fi
 # ============================================================================
 log_info "Creating labels..."
 
-declare -A LABELS=(
-    ["stage-a"]="1D76DB:Stage A - CLI Foundation"
-    ["stage-b"]="0E8A16:Stage B - Real-time & Alerting"
-    ["stage-c"]="D93F0B:Stage C - Distributed Collection"
-    ["stage-d"]="FBCA04:Stage D - SSH Collection"
-    ["stage-e"]="6F42C1:Stage E - Storage"
-    ["stage-f"]="E99695:Stage F - REST API"
-    ["stage-g"]="C2E0C6:Stage G - Web UI"
-    ["stage-h"]="BFD4F2:Stage H - Batch & Production"
-    ["effort-small"]="C5DEF5:Small effort milestone"
-    ["effort-medium"]="FEF2C0:Medium effort milestone"
-    ["parser"]="5319E7:Log parser related"
-    ["security"]="B60205:Security related"
-    ["infrastructure"]="006B75:Infrastructure/DevOps"
-)
-
-for label in "${!LABELS[@]}"; do
-    IFS=':' read -r color description <<< "${LABELS[$label]}"
-    if gh label create "$label" --color "$color" --description "$description" --repo "$REPO" 2>/dev/null; then
-        log_info "Created label: $label"
+create_label() {
+    local name=$1
+    local color=$2
+    local desc=$3
+    if gh label create "$name" --color "$color" --description "$desc" --repo "$REPO" 2>/dev/null; then
+        log_info "Created label: $name"
     else
-        log_warn "Label already exists: $label"
-    fi
-done
-
-# ============================================================================
-# CREATE GITHUB MILESTONES (for grouping)
-# ============================================================================
-log_info "Creating GitHub milestones..."
-
-declare -A MILESTONES=(
-    ["Stage A: CLI Foundation"]="Working CLI that parses all log types locally"
-    ["Stage B: Real-time & Alerting"]="CLI can tail logs and send notifications"
-    ["Stage C: Distributed Collection"]="Agent-server architecture with secure communication"
-    ["Stage D: SSH Collection"]="Server can pull logs via SSH"
-    ["Stage E: Storage"]="Persistent storage with search"
-    ["Stage F: REST API"]="Full API for web UI"
-    ["Stage G: Web UI"]="Complete web dashboard"
-    ["Stage H: Batch & Production"]="Production-ready system"
-)
-
-for milestone in "${!MILESTONES[@]}"; do
-    if gh api repos/$REPO/milestones --method POST -f title="$milestone" -f description="${MILESTONES[$milestone]}" 2>/dev/null; then
-        log_info "Created milestone: $milestone"
-    else
-        log_warn "Milestone may already exist: $milestone"
-    fi
-done
-
-# ============================================================================
-# CREATE ISSUES FOR EACH MILESTONE
-# ============================================================================
-log_info "Creating issues for all 30 milestones..."
-
-create_issue() {
-    local number=$1
-    local title=$2
-    local stage_label=$3
-    local effort_label=$4
-    local milestone=$5
-    local body=$6
-
-    if gh issue create \
-        --repo "$REPO" \
-        --title "[Milestone $number] $title" \
-        --body "$body" \
-        --label "$stage_label" \
-        --label "$effort_label" \
-        --milestone "$milestone" 2>/dev/null; then
-        log_info "Created issue: Milestone $number - $title"
-    else
-        log_warn "Issue may already exist: Milestone $number"
+        log_warn "Label already exists: $name"
     fi
 }
 
-# Stage A: CLI Foundation
-create_issue 1 "Project Setup & Parser Interface" "stage-a" "effort-small" "Stage A: CLI Foundation" \
-"## Milestone 1: Project Setup & Parser Interface
+create_label "stage-a" "1D76DB" "Stage A - CLI Foundation"
+create_label "stage-b" "0E8A16" "Stage B - Real-time & Alerting"
+create_label "stage-c" "D93F0B" "Stage C - Distributed Collection"
+create_label "stage-d" "FBCA04" "Stage D - SSH Collection"
+create_label "stage-e" "6F42C1" "Stage E - Storage"
+create_label "stage-f" "E99695" "Stage F - REST API"
+create_label "stage-g" "C2E0C6" "Stage G - Web UI"
+create_label "stage-h" "BFD4F2" "Stage H - Batch & Production"
+create_label "effort-small" "C5DEF5" "Small effort milestone"
+create_label "effort-medium" "FEF2C0" "Medium effort milestone"
+
+# ============================================================================
+# CREATE GITHUB MILESTONES
+# ============================================================================
+log_info "Creating GitHub milestones..."
+
+create_milestone() {
+    local title=$1
+    local desc=$2
+    if gh api "repos/$REPO/milestones" --method POST -f title="$title" -f description="$desc" 2>/dev/null; then
+        log_info "Created milestone: $title"
+    else
+        log_warn "Milestone may already exist: $title"
+    fi
+}
+
+create_milestone "Stage A: CLI Foundation" "Working CLI that parses all log types locally"
+create_milestone "Stage B: Real-time & Alerting" "CLI can tail logs and send notifications"
+create_milestone "Stage C: Distributed Collection" "Agent-server architecture with secure communication"
+create_milestone "Stage D: SSH Collection" "Server can pull logs via SSH"
+create_milestone "Stage E: Storage" "Persistent storage with search"
+create_milestone "Stage F: REST API" "Full API for web UI"
+create_milestone "Stage G: Web UI" "Complete web dashboard"
+create_milestone "Stage H: Batch & Production" "Production-ready system"
+
+# ============================================================================
+# CREATE ISSUES
+# ============================================================================
+log_info "Creating issues for all 30 milestones..."
+
+# Stage A Issues
+gh issue create --repo "$REPO" --title "[Milestone 1] Project Setup & Parser Interface" --label "stage-a" --label "effort-small" --milestone "Stage A: CLI Foundation" --body "## Milestone 1: Project Setup & Parser Interface
 
 ### Tasks
 - [ ] Initialize Go module with \`go mod init\`
@@ -126,11 +102,9 @@ Empty CLI skeleton with parser interface
 ### Acceptance Criteria
 - [ ] \`go build ./...\` succeeds
 - [ ] \`blazelog --help\` shows usage
-- [ ] Parser interface defined in \`internal/parser/parser.go\`
-"
+- [ ] Parser interface defined in \`internal/parser/parser.go\`" && log_info "Created: Milestone 1" || log_warn "Issue may exist: Milestone 1"
 
-create_issue 2 "Nginx Parser" "stage-a" "effort-small" "Stage A: CLI Foundation" \
-"## Milestone 2: Nginx Parser
+gh issue create --repo "$REPO" --title "[Milestone 2] Nginx Parser" --label "stage-a" --label "effort-small" --milestone "Stage A: CLI Foundation" --body "## Milestone 2: Nginx Parser
 
 ### Tasks
 - [ ] Research Nginx log formats (combined, custom)
@@ -146,11 +120,9 @@ create_issue 2 "Nginx Parser" "stage-a" "effort-small" "Stage A: CLI Foundation"
 - [ ] Parses standard combined format
 - [ ] Parses error log format
 - [ ] Unit tests pass with >80% coverage
-- [ ] Handles malformed lines gracefully
-"
+- [ ] Handles malformed lines gracefully" && log_info "Created: Milestone 2" || log_warn "Issue may exist: Milestone 2"
 
-create_issue 3 "Apache Parser" "stage-a" "effort-small" "Stage A: CLI Foundation" \
-"## Milestone 3: Apache Parser
+gh issue create --repo "$REPO" --title "[Milestone 3] Apache Parser" --label "stage-a" --label "effort-small" --milestone "Stage A: CLI Foundation" --body "## Milestone 3: Apache Parser
 
 ### Tasks
 - [ ] Research Apache log formats (common, combined, error)
@@ -165,11 +137,9 @@ create_issue 3 "Apache Parser" "stage-a" "effort-small" "Stage A: CLI Foundation
 ### Acceptance Criteria
 - [ ] Parses common and combined formats
 - [ ] Parses error log format
-- [ ] Unit tests pass
-"
+- [ ] Unit tests pass" && log_info "Created: Milestone 3" || log_warn "Issue may exist: Milestone 3"
 
-create_issue 4 "Magento Parser" "stage-a" "effort-small" "Stage A: CLI Foundation" \
-"## Milestone 4: Magento Parser
+gh issue create --repo "$REPO" --title "[Milestone 4] Magento Parser" --label "stage-a" --label "effort-small" --milestone "Stage A: CLI Foundation" --body "## Milestone 4: Magento Parser
 
 ### Tasks
 - [ ] Research Magento log formats (system.log, exception.log, debug.log)
@@ -183,11 +153,9 @@ create_issue 4 "Magento Parser" "stage-a" "effort-small" "Stage A: CLI Foundatio
 ### Acceptance Criteria
 - [ ] Parses system.log format
 - [ ] Parses exception.log with stack traces
-- [ ] Handles multiline entries correctly
-"
+- [ ] Handles multiline entries correctly" && log_info "Created: Milestone 4" || log_warn "Issue may exist: Milestone 4"
 
-create_issue 5 "PrestaShop Parser" "stage-a" "effort-small" "Stage A: CLI Foundation" \
-"## Milestone 5: PrestaShop Parser
+gh issue create --repo "$REPO" --title "[Milestone 5] PrestaShop Parser" --label "stage-a" --label "effort-small" --milestone "Stage A: CLI Foundation" --body "## Milestone 5: PrestaShop Parser
 
 ### Tasks
 - [ ] Research PrestaShop log formats
@@ -200,11 +168,9 @@ create_issue 5 "PrestaShop Parser" "stage-a" "effort-small" "Stage A: CLI Founda
 
 ### Acceptance Criteria
 - [ ] Parses PrestaShop log format
-- [ ] Unit tests pass
-"
+- [ ] Unit tests pass" && log_info "Created: Milestone 5" || log_warn "Issue may exist: Milestone 5"
 
-create_issue 6 "WordPress Parser & Auto-Detection" "stage-a" "effort-small" "Stage A: CLI Foundation" \
-"## Milestone 6: WordPress Parser & Auto-Detection
+gh issue create --repo "$REPO" --title "[Milestone 6] WordPress Parser & Auto-Detection" --label "stage-a" --label "effort-small" --milestone "Stage A: CLI Foundation" --body "## Milestone 6: WordPress Parser & Auto-Detection
 
 ### Tasks
 - [ ] Research WordPress log formats (debug.log, PHP errors)
@@ -220,12 +186,10 @@ create_issue 6 "WordPress Parser & Auto-Detection" "stage-a" "effort-small" "Sta
 ### Acceptance Criteria
 - [ ] Parses WordPress debug.log
 - [ ] Auto-detects log format correctly
-- [ ] Outputs JSON, table, plain text
-"
+- [ ] Outputs JSON, table, plain text" && log_info "Created: Milestone 6" || log_warn "Issue may exist: Milestone 6"
 
-# Stage B: Real-time & Alerting
-create_issue 7 "File Tailing" "stage-b" "effort-small" "Stage B: Real-time & Alerting" \
-"## Milestone 7: File Tailing
+# Stage B Issues
+gh issue create --repo "$REPO" --title "[Milestone 7] File Tailing" --label "stage-b" --label "effort-small" --milestone "Stage B: Real-time & Alerting" --body "## Milestone 7: File Tailing
 
 ### Tasks
 - [ ] Implement file tailing with fsnotify
@@ -240,11 +204,9 @@ create_issue 7 "File Tailing" "stage-b" "effort-small" "Stage B: Real-time & Ale
 ### Acceptance Criteria
 - [ ] Tails file and outputs new lines
 - [ ] Handles log rotation (file recreated)
-- [ ] Supports glob patterns
-"
+- [ ] Supports glob patterns" && log_info "Created: Milestone 7" || log_warn "Issue may exist: Milestone 7"
 
-create_issue 8 "Alert Rules Engine" "stage-b" "effort-medium" "Stage B: Real-time & Alerting" \
-"## Milestone 8: Alert Rules Engine
+gh issue create --repo "$REPO" --title "[Milestone 8] Alert Rules Engine" --label "stage-b" --label "effort-medium" --milestone "Stage B: Real-time & Alerting" --body "## Milestone 8: Alert Rules Engine
 
 ### Tasks
 - [ ] Design alert rule YAML schema
@@ -261,11 +223,9 @@ Alert rules loaded from YAML, evaluated in memory
 - [ ] YAML schema documented
 - [ ] Pattern alerts trigger on match
 - [ ] Threshold alerts trigger correctly
-- [ ] Cooldown prevents alert spam
-"
+- [ ] Cooldown prevents alert spam" && log_info "Created: Milestone 8" || log_warn "Issue may exist: Milestone 8"
 
-create_issue 9 "Email Notifications" "stage-b" "effort-small" "Stage B: Real-time & Alerting" \
-"## Milestone 9: Email Notifications
+gh issue create --repo "$REPO" --title "[Milestone 9] Email Notifications" --label "stage-b" --label "effort-small" --milestone "Stage B: Real-time & Alerting" --body "## Milestone 9: Email Notifications
 
 ### Tasks
 - [ ] Design notifier interface
@@ -280,11 +240,9 @@ create_issue 9 "Email Notifications" "stage-b" "effort-small" "Stage B: Real-tim
 ### Acceptance Criteria
 - [ ] Sends email via SMTP/TLS
 - [ ] HTML and plain text templates
-- [ ] Tests pass with mock SMTP
-"
+- [ ] Tests pass with mock SMTP" && log_info "Created: Milestone 9" || log_warn "Issue may exist: Milestone 9"
 
-create_issue 10 "Slack Notifications" "stage-b" "effort-small" "Stage B: Real-time & Alerting" \
-"## Milestone 10: Slack Notifications
+gh issue create --repo "$REPO" --title "[Milestone 10] Slack Notifications" --label "stage-b" --label "effort-small" --milestone "Stage B: Real-time & Alerting" --body "## Milestone 10: Slack Notifications
 
 ### Tasks
 - [ ] Implement Slack webhook notifier
@@ -298,11 +256,9 @@ create_issue 10 "Slack Notifications" "stage-b" "effort-small" "Stage B: Real-ti
 ### Acceptance Criteria
 - [ ] Sends to Slack webhook
 - [ ] Uses Block Kit formatting
-- [ ] Tests pass
-"
+- [ ] Tests pass" && log_info "Created: Milestone 10" || log_warn "Issue may exist: Milestone 10"
 
-create_issue 11 "Teams Notifications" "stage-b" "effort-small" "Stage B: Real-time & Alerting" \
-"## Milestone 11: Teams Notifications
+gh issue create --repo "$REPO" --title "[Milestone 11] Teams Notifications" --label "stage-b" --label "effort-small" --milestone "Stage B: Real-time & Alerting" --body "## Milestone 11: Teams Notifications
 
 ### Tasks
 - [ ] Implement Microsoft Teams webhook notifier
@@ -317,12 +273,10 @@ create_issue 11 "Teams Notifications" "stage-b" "effort-small" "Stage B: Real-ti
 ### Acceptance Criteria
 - [ ] Sends to Teams webhook
 - [ ] Uses Adaptive Card formatting
-- [ ] Rate limiting works across all channels
-"
+- [ ] Rate limiting works across all channels" && log_info "Created: Milestone 11" || log_warn "Issue may exist: Milestone 11"
 
-# Stage C: Distributed Collection
-create_issue 12 "gRPC Protocol Definition" "stage-c" "effort-small" "Stage C: Distributed Collection" \
-"## Milestone 12: gRPC Protocol Definition
+# Stage C Issues
+gh issue create --repo "$REPO" --title "[Milestone 12] gRPC Protocol Definition" --label "stage-c" --label "effort-small" --milestone "Stage C: Distributed Collection" --body "## Milestone 12: gRPC Protocol Definition
 
 ### Tasks
 - [ ] Define protobuf schemas (LogEntry, AgentInfo, etc.)
@@ -336,11 +290,9 @@ create_issue 12 "gRPC Protocol Definition" "stage-c" "effort-small" "Stage C: Di
 ### Acceptance Criteria
 - [ ] Protobuf schemas in \`proto/\` directory
 - [ ] Generated Go code compiles
-- [ ] Protocol documented
-"
+- [ ] Protocol documented" && log_info "Created: Milestone 12" || log_warn "Issue may exist: Milestone 12"
 
-create_issue 13 "Agent Basic Implementation" "stage-c" "effort-medium" "Stage C: Distributed Collection" \
-"## Milestone 13: Agent Basic Implementation
+gh issue create --repo "$REPO" --title "[Milestone 13] Agent Basic Implementation" --label "stage-c" --label "effort-medium" --milestone "Stage C: Distributed Collection" --body "## Milestone 13: Agent Basic Implementation
 
 ### Tasks
 - [ ] Create agent CLI binary (\`blazelog-agent\`)
@@ -355,11 +307,9 @@ Agent that sends logs to server (no TLS yet)
 ### Acceptance Criteria
 - [ ] Agent binary builds
 - [ ] Loads config from YAML
-- [ ] Connects to server and streams logs
-"
+- [ ] Connects to server and streams logs" && log_info "Created: Milestone 13" || log_warn "Issue may exist: Milestone 13"
 
-create_issue 14 "Server Log Receiver" "stage-c" "effort-medium" "Stage C: Distributed Collection" \
-"## Milestone 14: Server Log Receiver
+gh issue create --repo "$REPO" --title "[Milestone 14] Server Log Receiver" --label "stage-c" --label "effort-medium" --milestone "Stage C: Distributed Collection" --body "## Milestone 14: Server Log Receiver
 
 ### Tasks
 - [ ] Create server binary (\`blazelog-server\`)
@@ -374,11 +324,9 @@ Server receives and displays logs from agents
 ### Acceptance Criteria
 - [ ] Server binary builds
 - [ ] Accepts agent connections
-- [ ] Outputs received logs to console
-"
+- [ ] Outputs received logs to console" && log_info "Created: Milestone 14" || log_warn "Issue may exist: Milestone 14"
 
-create_issue 15 "mTLS Security" "stage-c" "effort-medium" "Stage C: Distributed Collection" \
-"## Milestone 15: mTLS Security
+gh issue create --repo "$REPO" --title "[Milestone 15] mTLS Security" --label "stage-c" --label "effort-medium" --milestone "Stage C: Distributed Collection" --body "## Milestone 15: mTLS Security
 
 ### Tasks
 - [ ] Implement CA certificate generation (\`blazectl ca init\`)
@@ -395,11 +343,9 @@ Secure agent-server communication with mTLS
 - [ ] CA can be initialized
 - [ ] Certificates can be generated
 - [ ] mTLS connection works
-- [ ] Invalid certs rejected
-"
+- [ ] Invalid certs rejected" && log_info "Created: Milestone 15" || log_warn "Issue may exist: Milestone 15"
 
-create_issue 16 "Agent Reliability" "stage-c" "effort-medium" "Stage C: Distributed Collection" \
-"## Milestone 16: Agent Reliability
+gh issue create --repo "$REPO" --title "[Milestone 16] Agent Reliability" --label "stage-c" --label "effort-medium" --milestone "Stage C: Distributed Collection" --body "## Milestone 16: Agent Reliability
 
 ### Tasks
 - [ ] Implement local buffer for network outages
@@ -414,12 +360,10 @@ Agent handles network issues gracefully
 ### Acceptance Criteria
 - [ ] Buffers logs when disconnected
 - [ ] Reconnects with exponential backoff
-- [ ] Sends buffered logs after reconnect
-"
+- [ ] Sends buffered logs after reconnect" && log_info "Created: Milestone 16" || log_warn "Issue may exist: Milestone 16"
 
-# Stage D: SSH Collection
-create_issue 17 "SSH Connector Base" "stage-d" "effort-medium" "Stage D: SSH Collection" \
-"## Milestone 17: SSH Connector Base
+# Stage D Issues
+gh issue create --repo "$REPO" --title "[Milestone 17] SSH Connector Base" --label "stage-d" --label "effort-medium" --milestone "Stage D: SSH Collection" --body "## Milestone 17: SSH Connector Base
 
 ### Tasks
 - [ ] Implement SSH client with key authentication
@@ -434,11 +378,9 @@ Server can read logs from remote servers via SSH
 ### Acceptance Criteria
 - [ ] Connects via SSH key
 - [ ] Reads remote files
-- [ ] Tails remote files
-"
+- [ ] Tails remote files" && log_info "Created: Milestone 17" || log_warn "Issue may exist: Milestone 17"
 
-create_issue 18 "SSH Security Hardening" "stage-d" "effort-medium" "Stage D: SSH Collection" \
-"## Milestone 18: SSH Security Hardening
+gh issue create --repo "$REPO" --title "[Milestone 18] SSH Security Hardening" --label "stage-d" --label "effort-medium" --milestone "Stage D: SSH Collection" --body "## Milestone 18: SSH Security Hardening
 
 ### Tasks
 - [ ] Implement encrypted credential storage (AES-256-GCM)
@@ -455,12 +397,10 @@ Production-ready secure SSH connector
 - [ ] Credentials encrypted at rest
 - [ ] Host keys verified
 - [ ] Jump hosts work
-- [ ] All SSH ops logged
-"
+- [ ] All SSH ops logged" && log_info "Created: Milestone 18" || log_warn "Issue may exist: Milestone 18"
 
-# Stage E: Storage
-create_issue 19 "SQLite for Config" "stage-e" "effort-small" "Stage E: Storage" \
-"## Milestone 19: SQLite for Config
+# Stage E Issues
+gh issue create --repo "$REPO" --title "[Milestone 19] SQLite for Config" --label "stage-e" --label "effort-small" --milestone "Stage E: Storage" --body "## Milestone 19: SQLite for Config
 
 ### Tasks
 - [ ] Design SQLite schema (users, projects, alerts, connections)
@@ -475,11 +415,9 @@ Server persists configuration in SQLite
 ### Acceptance Criteria
 - [ ] Schema created
 - [ ] Migrations work
-- [ ] Config persists across restarts
-"
+- [ ] Config persists across restarts" && log_info "Created: Milestone 19" || log_warn "Issue may exist: Milestone 19"
 
-create_issue 20 "ClickHouse Setup" "stage-e" "effort-medium" "Stage E: Storage" \
-"## Milestone 20: ClickHouse Setup
+gh issue create --repo "$REPO" --title "[Milestone 20] ClickHouse Setup" --label "stage-e" --label "effort-medium" --milestone "Stage E: Storage" --body "## Milestone 20: ClickHouse Setup
 
 ### Tasks
 - [ ] Design ClickHouse schema for logs
@@ -494,11 +432,9 @@ Logs stored in ClickHouse
 ### Acceptance Criteria
 - [ ] Schema optimized for time-series
 - [ ] Batch inserts work
-- [ ] Basic queries work
-"
+- [ ] Basic queries work" && log_info "Created: Milestone 20" || log_warn "Issue may exist: Milestone 20"
 
-create_issue 21 "ClickHouse Advanced" "stage-e" "effort-medium" "Stage E: Storage" \
-"## Milestone 21: ClickHouse Advanced
+gh issue create --repo "$REPO" --title "[Milestone 21] ClickHouse Advanced" --label "stage-e" --label "effort-medium" --milestone "Stage E: Storage" --body "## Milestone 21: ClickHouse Advanced
 
 ### Tasks
 - [ ] Create materialized views for dashboards
@@ -515,12 +451,10 @@ Fast search and analytics on billions of logs
 - [ ] Materialized views for common queries
 - [ ] Full-text search works
 - [ ] TTL auto-deletes old logs
-- [ ] Query performance acceptable
-"
+- [ ] Query performance acceptable" && log_info "Created: Milestone 21" || log_warn "Issue may exist: Milestone 21"
 
-# Stage F: REST API
-create_issue 22 "API Auth & Users" "stage-f" "effort-medium" "Stage F: REST API" \
-"## Milestone 22: API Auth & Users
+# Stage F Issues
+gh issue create --repo "$REPO" --title "[Milestone 22] API Auth & Users" --label "stage-f" --label "effort-medium" --milestone "Stage F: REST API" --body "## Milestone 22: API Auth & Users
 
 ### Tasks
 - [ ] Set up HTTP router (chi)
@@ -536,11 +470,9 @@ create_issue 22 "API Auth & Users" "stage-f" "effort-medium" "Stage F: REST API"
 ### Acceptance Criteria
 - [ ] JWT auth works
 - [ ] RBAC enforced
-- [ ] Rate limiting works
-"
+- [ ] Rate limiting works" && log_info "Created: Milestone 22" || log_warn "Issue may exist: Milestone 22"
 
-create_issue 23 "API Logs & Search" "stage-f" "effort-medium" "Stage F: REST API" \
-"## Milestone 23: API Logs & Search
+gh issue create --repo "$REPO" --title "[Milestone 23] API Logs & Search" --label "stage-f" --label "effort-medium" --milestone "Stage F: REST API" --body "## Milestone 23: API Logs & Search
 
 ### Tasks
 - [ ] Implement log query endpoint
@@ -555,11 +487,9 @@ create_issue 23 "API Logs & Search" "stage-f" "effort-medium" "Stage F: REST API
 ### Acceptance Criteria
 - [ ] Log queries work
 - [ ] Filters work (level, source, time)
-- [ ] SSE streams logs in real-time
-"
+- [ ] SSE streams logs in real-time" && log_info "Created: Milestone 23" || log_warn "Issue may exist: Milestone 23"
 
-create_issue 24 "API Alerts & Projects" "stage-f" "effort-medium" "Stage F: REST API" \
-"## Milestone 24: API Alerts & Projects
+gh issue create --repo "$REPO" --title "[Milestone 24] API Alerts & Projects" --label "stage-f" --label "effort-medium" --milestone "Stage F: REST API" --body "## Milestone 24: API Alerts & Projects
 
 ### Tasks
 - [ ] Implement alert rules CRUD endpoints
@@ -575,12 +505,10 @@ Full REST API complete
 ### Acceptance Criteria
 - [ ] All CRUD endpoints work
 - [ ] OpenAPI spec generated
-- [ ] API tests pass
-"
+- [ ] API tests pass" && log_info "Created: Milestone 24" || log_warn "Issue may exist: Milestone 24"
 
-# Stage G: Web UI
-create_issue 25 "Web UI Setup" "stage-g" "effort-medium" "Stage G: Web UI" \
-"## Milestone 25: Web UI Setup
+# Stage G Issues
+gh issue create --repo "$REPO" --title "[Milestone 25] Web UI Setup" --label "stage-g" --label "effort-medium" --milestone "Stage G: Web UI" --body "## Milestone 25: Web UI Setup
 
 ### Tasks
 - [ ] Set up Templ templates
@@ -597,11 +525,9 @@ Login page working
 - [ ] Templ templates compile
 - [ ] Tailwind CSS works
 - [ ] Login/register functional
-- [ ] Assets embedded in binary
-"
+- [ ] Assets embedded in binary" && log_info "Created: Milestone 25" || log_warn "Issue may exist: Milestone 25"
 
-create_issue 26 "Dashboard" "stage-g" "effort-medium" "Stage G: Web UI" \
-"## Milestone 26: Dashboard
+gh issue create --repo "$REPO" --title "[Milestone 26] Dashboard" --label "stage-g" --label "effort-medium" --milestone "Stage G: Web UI" --body "## Milestone 26: Dashboard
 
 ### Tasks
 - [ ] Create dashboard layout
@@ -617,11 +543,9 @@ Dashboard with real-time metrics
 - [ ] Shows log counts
 - [ ] Shows error rates
 - [ ] Charts render
-- [ ] Auto-refreshes
-"
+- [ ] Auto-refreshes" && log_info "Created: Milestone 26" || log_warn "Issue may exist: Milestone 26"
 
-create_issue 27 "Log Viewer" "stage-g" "effort-medium" "Stage G: Web UI" \
-"## Milestone 27: Log Viewer
+gh issue create --repo "$REPO" --title "[Milestone 27] Log Viewer" --label "stage-g" --label "effort-medium" --milestone "Stage G: Web UI" --body "## Milestone 27: Log Viewer
 
 ### Tasks
 - [ ] Implement log list view with pagination
@@ -637,11 +561,9 @@ Full log viewer with search
 - [ ] Pagination works
 - [ ] Search works
 - [ ] Real-time tail works
-- [ ] Export to JSON/CSV
-"
+- [ ] Export to JSON/CSV" && log_info "Created: Milestone 27" || log_warn "Issue may exist: Milestone 27"
 
-create_issue 28 "Settings & Management" "stage-g" "effort-medium" "Stage G: Web UI" \
-"## Milestone 28: Settings & Management
+gh issue create --repo "$REPO" --title "[Milestone 28] Settings & Management" --label "stage-g" --label "effort-medium" --milestone "Stage G: Web UI" --body "## Milestone 28: Settings & Management
 
 ### Tasks
 - [ ] Implement alert rules management UI
@@ -657,12 +579,10 @@ Complete Web UI
 ### Acceptance Criteria
 - [ ] All management UIs work
 - [ ] Responsive on mobile
-- [ ] E2E tests pass
-"
+- [ ] E2E tests pass" && log_info "Created: Milestone 28" || log_warn "Issue may exist: Milestone 28"
 
-# Stage H: Batch & Production
-create_issue 29 "Batch Processing" "stage-h" "effort-medium" "Stage H: Batch & Production" \
-"## Milestone 29: Batch Processing
+# Stage H Issues
+gh issue create --repo "$REPO" --title "[Milestone 29] Batch Processing" --label "stage-h" --label "effort-medium" --milestone "Stage H: Batch & Production" --body "## Milestone 29: Batch Processing
 
 ### Tasks
 - [ ] Implement batch analysis mode
@@ -679,11 +599,9 @@ create_issue 29 "Batch Processing" "stage-h" "effort-medium" "Stage H: Batch & P
 - [ ] Batch mode works
 - [ ] Date range filtering
 - [ ] Reports generated
-- [ ] Export works
-"
+- [ ] Export works" && log_info "Created: Milestone 29" || log_warn "Issue may exist: Milestone 29"
 
-create_issue 30 "Production Hardening" "stage-h" "effort-medium" "Stage H: Batch & Production" \
-"## Milestone 30: Production Hardening
+gh issue create --repo "$REPO" --title "[Milestone 30] Production Hardening" --label "stage-h" --label "effort-medium" --milestone "Stage H: Batch & Production" --body "## Milestone 30: Production Hardening
 
 ### Tasks
 - [ ] Add Prometheus metrics
@@ -703,33 +621,7 @@ Production-ready deployment
 - [ ] Health checks work
 - [ ] Docker images built
 - [ ] Systemd services work
-- [ ] Documentation complete
-"
-
-# ============================================================================
-# CREATE GITHUB PROJECT (Projects V2)
-# ============================================================================
-log_info "Creating GitHub Project board..."
-
-# Get owner from repo
-OWNER=$(echo "$REPO" | cut -d'/' -f1)
-
-# Create project using GraphQL API
-PROJECT_ID=$(gh api graphql -f query='
-mutation($owner: String!, $title: String!) {
-  createProjectV2(input: {ownerId: $owner, title: $title}) {
-    projectV2 {
-      id
-      url
-    }
-  }
-}' -f owner="$OWNER" -f title="BlazeLog Development" --jq '.data.createProjectV2.projectV2.id' 2>/dev/null || echo "")
-
-if [ -n "$PROJECT_ID" ]; then
-    log_info "Created GitHub Project: BlazeLog Development"
-else
-    log_warn "Could not create project (may already exist or need org permissions)"
-fi
+- [ ] Documentation complete" && log_info "Created: Milestone 30" || log_warn "Issue may exist: Milestone 30"
 
 # ============================================================================
 # SUMMARY
@@ -740,14 +632,15 @@ echo "GitHub Project Setup Complete!"
 echo "=============================================="
 echo ""
 echo "Created:"
-echo "  - 12 labels (stages + effort)"
+echo "  - 10 labels (stages + effort)"
 echo "  - 8 GitHub milestones (stages A-H)"
 echo "  - 30 issues (one per milestone)"
 echo ""
 echo "Next steps:"
 echo "  1. Go to your repo's Projects tab"
-echo "  2. Add all issues to the project board"
-echo "  3. Organize into columns (Backlog, Ready, In Progress, etc.)"
+echo "  2. Create a new project 'BlazeLog Development'"
+echo "  3. Add all issues to the project board"
+echo "  4. Organize into columns (Backlog, Ready, In Progress, etc.)"
 echo ""
 echo "Workflow:"
 echo "  1. Pick an issue from 'Ready'"
