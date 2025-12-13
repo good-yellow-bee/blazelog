@@ -56,6 +56,21 @@ BlazeLog is a fast, powerful, and secure universal log analyzer built in Go with
 ### 1. BlazeLog Agent (CLI)
 Lightweight binary installed on remote servers for local log collection.
 
+**Zero-Dependency Design:**
+- Single static binary (~5-10MB)
+- No runtime dependencies (no Java, Python, Node.js)
+- No external packages required
+- Just copy binary and run
+- Cross-compiled for Linux (amd64, arm64), macOS, Windows
+
+**Security Hardening:**
+- Pure Go (no CGO) = no C vulnerabilities
+- No shell execution, no external commands
+- Outbound connections only (no listeners)
+- Runs as unprivileged user
+- Read-only log file access
+- Built with: `-trimpath -ldflags="-s -w"` + PIE/RELRO
+
 **Responsibilities:**
 - Read logs from local filesystem
 - Parse logs based on configured format (Magento, PrestaShop, WordPress, Nginx, Apache)
@@ -578,6 +593,43 @@ rules:
 - **Containers:** Docker
 - **Orchestration:** Docker Compose, Kubernetes
 - **CI/CD:** GitHub Actions
+
+### Agent Build (Zero-Dependency)
+```makefile
+# Build static binary with all security flags
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+  -trimpath \
+  -ldflags="-s -w -extldflags '-static'" \
+  -tags netgo \
+  -o blazelog-agent-linux-amd64 \
+  ./cmd/agent
+
+# Optional: compress with UPX (3-4MB final size)
+upx --best blazelog-agent-linux-amd64
+```
+
+**Supported Platforms:**
+- `linux/amd64` - Standard servers
+- `linux/arm64` - ARM servers, Raspberry Pi
+- `darwin/amd64` - macOS Intel
+- `darwin/arm64` - macOS Apple Silicon
+- `windows/amd64` - Windows servers
+
+### Agent Deployment (One-Liner)
+```bash
+# Install agent on any Linux server (no dependencies!)
+curl -fsSL https://blazelog.example.com/install-agent.sh | sh
+
+# Or manual installation:
+wget https://releases.blazelog.example.com/agent/latest/linux-amd64/blazelog-agent
+chmod +x blazelog-agent
+sudo mv blazelog-agent /usr/local/bin/
+sudo blazelog-agent init --server blazelog.example.com:9443
+
+# Systemd service (optional)
+sudo blazelog-agent install-service
+sudo systemctl enable --now blazelog-agent
+```
 
 ---
 
