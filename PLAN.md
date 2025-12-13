@@ -127,9 +127,8 @@ blazelog/
 │   │   └── user.go
 │   ├── storage/            # Storage layer
 │   │   ├── storage.go      # Interface
-│   │   ├── sqlite.go       # SQLite (default)
-│   │   ├── postgres.go     # PostgreSQL (production)
-│   │   └── clickhouse.go   # ClickHouse (high volume)
+│   │   ├── sqlite.go       # SQLite (config/metadata)
+│   │   └── clickhouse.go   # ClickHouse (logs - primary)
 │   └── security/           # Security utilities
 │       ├── tls.go          # mTLS management
 │       ├── ssh.go          # SSH key management
@@ -138,9 +137,10 @@ blazelog/
 ├── pkg/                    # Public packages
 │   ├── config/             # Configuration management
 │   └── logger/             # Structured logging
-├── web/                    # Web UI (SvelteKit or React)
-│   ├── src/
-│   └── build/
+├── web/                    # Web UI (Templ + HTMX)
+│   ├── templates/          # Templ templates
+│   ├── static/             # CSS, JS (Alpine.js, HTMX)
+│   └── handlers/           # HTTP handlers for UI
 ├── configs/                # Example configurations
 │   ├── agent.yaml
 │   ├── server.yaml
@@ -275,15 +275,16 @@ blazelog/
 
 **Tasks:**
 1. Design storage interface
-2. Implement SQLite storage (default, single-node)
-3. Implement PostgreSQL storage (production)
-4. Design database schema (logs, alerts, projects, users)
-5. Implement log retention policies
-6. Implement log indexing for search
-7. Add database migrations
-8. Write storage tests
+2. Implement SQLite storage for config/metadata (users, projects, alerts)
+3. Implement ClickHouse storage for logs (handles billions of rows)
+4. Design ClickHouse schema optimized for time-series log data
+5. Create materialized views for fast dashboard queries
+6. Implement full-text search using ClickHouse FTS
+7. Implement log retention policies (TTL)
+8. Add database migrations
+9. Write storage tests
 
-**Deliverable:** Logs are persisted with configurable retention
+**Deliverable:** Logs persisted in ClickHouse with fast search and configurable retention
 
 ---
 
@@ -307,21 +308,24 @@ blazelog/
 ---
 
 ### Phase 9: Web UI
-**Goal:** Web-based dashboard
+**Goal:** Web-based dashboard using Go-native stack
 
 **Tasks:**
-1. Set up frontend project (SvelteKit or React)
-2. Implement authentication pages (login, register)
-3. Implement dashboard with metrics/charts
-4. Implement log viewer with search and filters
-5. Implement real-time log streaming view
-6. Implement alert configuration UI
-7. Implement project/connection management UI
-8. Implement user management UI
-9. Add responsive design
-10. Write E2E tests
+1. Set up Templ templates structure
+2. Configure Tailwind CSS build pipeline
+3. Integrate HTMX and Alpine.js
+4. Implement authentication pages (login, register)
+5. Implement dashboard with metrics/charts (ECharts)
+6. Implement log viewer with search and filters (HTMX partials)
+7. Implement real-time log streaming view (SSE + HTMX)
+8. Implement alert configuration UI
+9. Implement project/connection management UI
+10. Implement user management UI
+11. Add responsive design
+12. Embed static assets in Go binary
+13. Write E2E tests
 
-**Deliverable:** Fully functional Web UI
+**Deliverable:** Fully functional Web UI embedded in single Go binary
 
 ---
 
@@ -557,17 +561,18 @@ rules:
 - **Language:** Go 1.22+
 - **gRPC:** google.golang.org/grpc
 - **HTTP Router:** chi or gin
-- **Database:** SQLite (dev), PostgreSQL (prod), ClickHouse (high volume)
+- **Database:** SQLite (dev/config), ClickHouse (logs - handles billions of rows with full-text search)
 - **SSH:** golang.org/x/crypto/ssh
 - **File Watching:** fsnotify
 - **Config:** viper
 - **Logging:** zerolog or slog
 
-### Frontend
-- **Framework:** SvelteKit (recommended) or React
-- **UI Library:** Tailwind CSS + shadcn/ui
-- **Charts:** Chart.js or Apache ECharts
-- **State:** Svelte stores or Zustand
+### Frontend (Go-Native Stack)
+- **Templating:** Templ (type-safe Go templates)
+- **Interactivity:** HTMX + Alpine.js
+- **Styling:** Tailwind CSS
+- **Charts:** Apache ECharts (via HTMX partials)
+- **Benefit:** Single binary deployment, SSR, minimal JS
 
 ### DevOps
 - **Containers:** Docker
@@ -657,19 +662,19 @@ GET    /api/v1/metrics                 # Prometheus metrics
 
 ---
 
+## Decisions Made
+
+1. **Storage:** ClickHouse for logs (handles billions of rows, built-in FTS, SQL-like)
+2. **Frontend:** Templ + HTMX + Alpine.js (Go-native, single binary deployment)
+3. **Notifications:** Email, Slack, Teams only (additional channels deferred)
+
 ## Open Questions
 
-1. **Storage for high-volume deployments:**
-   - ClickHouse vs Elasticsearch vs TimescaleDB?
-
-2. **Frontend framework:**
-   - SvelteKit (lighter, faster) vs React (more common)?
-
-3. **Additional notification channels:**
-   - PagerDuty, Discord, Telegram, webhook?
-
-4. **Additional log sources (future):**
+1. **Additional log sources (future):**
    - Kubernetes, Docker, CloudWatch, journald?
+
+2. **ClickHouse deployment:**
+   - Embedded (chDB) vs external ClickHouse server?
 
 ---
 
