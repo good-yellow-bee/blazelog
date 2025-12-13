@@ -24,9 +24,47 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Environment files
 .env
+.env.*
+*.env
+
+# Build output
+build/
+dist/
+bin/
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS-specific
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Log files (for testing)
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Security - certificates and keys (never commit!)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+!configs/*.example.pem
+
+# Debug files
+*.prof
+__debug_bin*
