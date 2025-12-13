@@ -14,4 +14,8 @@ func init() {
 	// return the same LogType (apache). The error parser can be explicitly
 	// requested via the CLI with "apache-error".
 	Register(NewApacheAccessParser(nil))
+
+	// Register Magento parser for auto-detection
+	// Magento uses Monolog format and handles system.log, exception.log, debug.log
+	Register(NewMagentoParser(nil))
 }
