@@ -22,4 +22,8 @@ func init() {
 	// Register PrestaShop parser for auto-detection
 	// PrestaShop uses Symfony/Monolog format and handles dev.log, prod.log
 	Register(NewPrestaShopParser(nil))
+
+	// Register WordPress parser for auto-detection
+	// WordPress uses PHP debug.log format with timestamps like [DD-Mon-YYYY HH:MM:SS TZ]
+	Register(NewWordPressParser(nil))
 }

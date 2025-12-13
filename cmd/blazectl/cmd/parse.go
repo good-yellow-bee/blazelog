@@ -59,13 +59,6 @@ func runParse(cmd *cobra.Command, args []string) {
 	logType := args[0]
 	filePath := args[1]
 
-	// Get parser for the log type
-	p, ok := getParser(logType)
-	if !ok {
-		PrintError(fmt.Sprintf("unknown log type: %s", logType), true)
-		return
-	}
-
 	// Open the file
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -73,6 +66,52 @@ func runParse(cmd *cobra.Command, args []string) {
 		return
 	}
 	defer file.Close()
+
+	// Get parser for the log type (handle auto-detection)
+	var p parser.Parser
+	var ok bool
+
+	if logType == "auto" {
+		// Auto-detect: read first non-empty line and detect format
+		scanner := bufio.NewScanner(file)
+		var firstLine string
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line != "" {
+				firstLine = line
+				break
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			PrintError(fmt.Sprintf("error reading file: %v", err), true)
+			return
+		}
+		if firstLine == "" {
+			PrintError("file is empty or contains only blank lines", true)
+			return
+		}
+
+		p, ok = parser.AutoDetect(firstLine)
+		if !ok {
+			PrintError(fmt.Sprintf("could not auto-detect log format from line: %s", firstLine), true)
+			return
+		}
+		if IsVerbose() {
+			PrintVerbose("Auto-detected format: %s", p.Name())
+		}
+
+		// Reset file to beginning for full parsing
+		if _, err := file.Seek(0, 0); err != nil {
+			PrintError(fmt.Sprintf("failed to reset file position: %v", err), true)
+			return
+		}
+	} else {
+		p, ok = getParser(logType)
+		if !ok {
+			PrintError(fmt.Sprintf("unknown log type: %s", logType), true)
+			return
+		}
+	}
 
 	// Check if this is a multiline parser
 	multiParser, isMultiLine := p.(parser.MultiLineParser)
@@ -188,9 +227,7 @@ func getParser(logType string) (parser.Parser, bool) {
 	case "prestashop":
 		return parser.NewPrestaShopParser(nil), true
 	case "wordpress":
-		return nil, false // Will be implemented in Milestone 6
-	case "auto":
-		return nil, false // Will be implemented in Milestone 6
+		return parser.NewWordPressParser(nil), true
 	default:
 		return nil, false
 	}
