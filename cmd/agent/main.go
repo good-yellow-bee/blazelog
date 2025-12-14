@@ -86,6 +86,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 
 		// Reliability settings
 		BufferDir:         cfg.Reliability.BufferDir,
+		BufferMaxSize:     parseBufferSize(cfg.Reliability.BufferMaxSize),
 		HeartbeatInterval: cfg.Reliability.HeartbeatInterval,
 		ReconnectInitial:  cfg.Reliability.ReconnectInitial,
 		ReconnectMax:      cfg.Reliability.ReconnectMax,
