@@ -76,3 +76,8 @@ internal/proto/
 .claude
 .serena
 .history
+
+# Built binaries
+agent
+server
+blazectl
