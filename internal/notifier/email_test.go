@@ -163,7 +163,7 @@ func TestAlertToTemplateData(t *testing.T) {
 		Window:      "5m",
 		TriggeringEntry: &models.LogEntry{
 			Timestamp: now,
-			Level:     models.LogLevelError,
+			Level:     models.LevelError,
 			Message:   "Database connection failed",
 			FilePath:  "/var/log/app/error.log",
 		},

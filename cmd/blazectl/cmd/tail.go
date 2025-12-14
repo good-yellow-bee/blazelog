@@ -32,6 +32,9 @@ var (
 	tailSMTPPort    int
 	tailSMTPUser    string
 	tailSMTPFrom    string
+
+	// Slack notification flags
+	tailNotifySlack string
 )
 
 var tailCmd = &cobra.Command{
@@ -64,7 +67,12 @@ Examples:
     --notify-email admin@example.com \
     --smtp-host smtp.gmail.com \
     --smtp-port 587 \
-    --smtp-from "BlazeLog <alerts@example.com>"`,
+    --smtp-from "BlazeLog <alerts@example.com>"
+
+  # Tail with Slack notifications
+  blazelog tail /var/log/nginx/*.log \
+    --alert-rules ./alerts.yaml \
+    --notify-slack https://hooks.slack.com/services/T00/B00/xxx`,
 	Args: cobra.MinimumNArgs(1),
 	Run:  runTail,
 }
@@ -85,6 +93,9 @@ func init() {
 	tailCmd.Flags().IntVar(&tailSMTPPort, "smtp-port", 587, "SMTP server port (587 for STARTTLS, 465 for implicit TLS)")
 	tailCmd.Flags().StringVar(&tailSMTPUser, "smtp-user", "", "SMTP username (optional)")
 	tailCmd.Flags().StringVar(&tailSMTPFrom, "smtp-from", "", "sender email address")
+
+	// Slack notification flags
+	tailCmd.Flags().StringVar(&tailNotifySlack, "notify-slack", "", "Slack webhook URL for notifications")
 }
 
 func runTail(cmd *cobra.Command, args []string) {
@@ -169,6 +180,25 @@ func runTail(cmd *cobra.Command, args []string) {
 		}
 		dispatcher.Register(emailNotifier)
 		PrintVerbose("Email notifications enabled for: %v", tailNotifyEmail)
+	}
+
+	// Set up Slack notifications
+	if tailNotifySlack != "" {
+		if dispatcher == nil {
+			dispatcher = notifier.NewDispatcher()
+		}
+
+		slackConfig := notifier.SlackConfig{
+			WebhookURL: tailNotifySlack,
+		}
+
+		slackNotifier, err := notifier.NewSlackNotifier(slackConfig)
+		if err != nil {
+			PrintError(fmt.Sprintf("failed to create slack notifier: %v", err), true)
+			return
+		}
+		dispatcher.Register(slackNotifier)
+		PrintVerbose("Slack notifications enabled")
 	}
 
 	// Create multi-tailer
