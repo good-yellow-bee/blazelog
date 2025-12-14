@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	blazelogv1 "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1"
 	"github.com/good-yellow-bee/blazelog/internal/security"
@@ -17,6 +18,32 @@ type Config struct {
 	GRPCAddress string
 	Verbose     bool
 	TLS         *TLSConfig // nil = insecure mode
+	LogBuffer   LogBuffer  // nil = no ClickHouse storage
+}
+
+// LogBuffer interface for log buffering (implemented by storage.LogBuffer).
+type LogBuffer interface {
+	AddBatch(entries []*LogRecord) error
+	Close() error
+}
+
+// LogRecord represents a log entry for storage.
+type LogRecord struct {
+	ID         string
+	Timestamp  time.Time
+	Level      string
+	Message    string
+	Source     string
+	Type       string
+	Raw        string
+	AgentID    string
+	FilePath   string
+	LineNumber int64
+	Fields     map[string]interface{}
+	Labels     map[string]string
+	HTTPStatus int
+	HTTPMethod string
+	URI        string
 }
 
 // TLSConfig holds TLS configuration for the server.
@@ -36,7 +63,7 @@ type Server struct {
 
 // New creates a new BlazeLog server.
 func New(cfg *Config) (*Server, error) {
-	processor := NewProcessor(cfg.Verbose)
+	processor := NewProcessor(cfg.Verbose, cfg.LogBuffer)
 	handler := NewHandler(processor, cfg.Verbose)
 
 	var opts []grpc.ServerOption

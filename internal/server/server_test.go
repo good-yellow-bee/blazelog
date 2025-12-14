@@ -175,7 +175,7 @@ func TestServerIntegration(t *testing.T) {
 }
 
 func TestHandler_RegisterWithoutAgentInfo(t *testing.T) {
-	processor := NewProcessor(false)
+	processor := NewProcessor(false, nil)
 	handler := NewHandler(processor, false)
 
 	resp, err := handler.Register(context.Background(), &blazelogv1.RegisterRequest{})
@@ -191,7 +191,7 @@ func TestHandler_RegisterWithoutAgentInfo(t *testing.T) {
 }
 
 func TestHandler_RegisterGeneratesAgentID(t *testing.T) {
-	processor := NewProcessor(false)
+	processor := NewProcessor(false, nil)
 	handler := NewHandler(processor, false)
 
 	resp, err := handler.Register(context.Background(), &blazelogv1.RegisterRequest{
@@ -212,7 +212,7 @@ func TestHandler_RegisterGeneratesAgentID(t *testing.T) {
 }
 
 func TestProcessor_FormatEntry(t *testing.T) {
-	processor := NewProcessor(false)
+	processor := NewProcessor(false, nil)
 
 	entry := &blazelogv1.LogEntry{
 		Timestamp: timestamppb.Now(),
