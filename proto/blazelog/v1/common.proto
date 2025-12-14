@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package blazelog.v1;
+
+option go_package = "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1;blazelogv1";
+
+// LogLevel represents the severity level of a log entry.
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_DEBUG = 1;
+  LOG_LEVEL_INFO = 2;
+  LOG_LEVEL_WARNING = 3;
+  LOG_LEVEL_ERROR = 4;
+  LOG_LEVEL_FATAL = 5;
+}
+
+// LogType represents the type/source of the log.
+enum LogType {
+  LOG_TYPE_UNSPECIFIED = 0;
+  LOG_TYPE_NGINX = 1;
+  LOG_TYPE_APACHE = 2;
+  LOG_TYPE_MAGENTO = 3;
+  LOG_TYPE_PRESTASHOP = 4;
+  LOG_TYPE_WORDPRESS = 5;
+}
+
+// Severity represents the severity level of an alert.
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_LOW = 1;
+  SEVERITY_MEDIUM = 2;
+  SEVERITY_HIGH = 3;
+  SEVERITY_CRITICAL = 4;
+}

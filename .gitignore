@@ -68,3 +68,6 @@ temp/
 # Debug files
 *.prof
 __debug_bin*
+
+# Generated proto files
+internal/proto/

@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+package blazelog.v1;
+
+option go_package = "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1;blazelogv1";
+
+import "google/protobuf/timestamp.proto";
+
+// AgentInfo contains information about a BlazeLog agent.
+message AgentInfo {
+  // Unique identifier for the agent.
+  string agent_id = 1;
+
+  // Human-readable name for the agent.
+  string name = 2;
+
+  // Hostname where agent is running.
+  string hostname = 3;
+
+  // Agent version string.
+  string version = 4;
+
+  // Operating system (linux, darwin, windows).
+  string os = 5;
+
+  // CPU architecture (amd64, arm64).
+  string arch = 6;
+
+  // Labels for grouping/filtering agents.
+  map<string, string> labels = 7;
+
+  // List of log sources configured on this agent.
+  repeated LogSource sources = 8;
+}
+
+// LogSource describes a log file being monitored.
+message LogSource {
+  // Name of this source.
+  string name = 1;
+
+  // Path pattern (may include globs).
+  string path = 2;
+
+  // Log type for parsing.
+  string type = 3;
+
+  // Whether tailing is enabled.
+  bool follow = 4;
+}
+
+// RegisterRequest is sent when an agent connects.
+message RegisterRequest {
+  AgentInfo agent = 1;
+}
+
+// RegisterResponse confirms registration.
+message RegisterResponse {
+  // Whether registration was successful.
+  bool success = 1;
+
+  // Error message if registration failed.
+  string error_message = 2;
+
+  // Server-assigned agent ID (may differ from requested).
+  string agent_id = 3;
+
+  // Stream configuration from server.
+  StreamConfig config = 4;
+}
+
+// StreamConfig contains server-side stream configuration.
+message StreamConfig {
+  // Maximum batch size for log entries.
+  int32 max_batch_size = 1;
+
+  // Maximum time to buffer before sending (milliseconds).
+  int32 flush_interval_ms = 2;
+
+  // Whether compression is enabled.
+  bool compression_enabled = 3;
+}
+
+// HeartbeatRequest is sent periodically by agents.
+message HeartbeatRequest {
+  // Agent sending the heartbeat.
+  string agent_id = 1;
+
+  // When this heartbeat was generated.
+  google.protobuf.Timestamp timestamp = 2;
+
+  // Agent status metrics.
+  AgentStatus status = 3;
+}
+
+// AgentStatus contains runtime status of an agent.
+message AgentStatus {
+  // Number of log entries processed since last heartbeat.
+  uint64 entries_processed = 1;
+
+  // Number of entries currently buffered.
+  uint64 buffer_size = 2;
+
+  // Number of active file watchers.
+  int32 active_sources = 3;
+
+  // Any errors encountered.
+  repeated string errors = 4;
+
+  // Memory usage in bytes.
+  uint64 memory_bytes = 5;
+
+  // CPU usage percentage (0-100).
+  float cpu_percent = 6;
+}
+
+// HeartbeatResponse acknowledges heartbeat and may include commands.
+message HeartbeatResponse {
+  // Whether heartbeat was acknowledged.
+  bool acknowledged = 1;
+
+  // Optional command for agent to execute.
+  ServerCommand command = 2;
+}
+
+// ServerCommand represents a command from server to agent.
+message ServerCommand {
+  // Type of command.
+  CommandType type = 1;
+
+  // Command-specific payload.
+  map<string, string> parameters = 2;
+}
+
+// CommandType defines types of server-to-agent commands.
+enum CommandType {
+  COMMAND_TYPE_UNSPECIFIED = 0;
+  COMMAND_TYPE_RELOAD_CONFIG = 1;
+  COMMAND_TYPE_PAUSE = 2;
+  COMMAND_TYPE_RESUME = 3;
+  COMMAND_TYPE_SHUTDOWN = 4;
+}

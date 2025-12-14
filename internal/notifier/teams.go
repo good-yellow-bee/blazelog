@@ -139,7 +139,7 @@ type container struct {
 func (t *TeamsNotifier) buildPayload(alert *alerting.Alert) teamsMessage {
 	timestamp := alert.Timestamp.Format("2006-01-02 15:04:05 MST")
 	emoji := severityEmoji(alert.Severity)
-	color := severityColor(alert.Severity)
+	color := teamsSeverityStyle(alert.Severity)
 
 	body := []interface{}{}
 
@@ -248,8 +248,8 @@ func (t *TeamsNotifier) buildPayload(alert *alerting.Alert) teamsMessage {
 	}
 }
 
-// severityColor returns an Adaptive Card container style for the severity level.
-func severityColor(severity alerting.Severity) string {
+// teamsSeverityStyle returns an Adaptive Card container style for the severity level.
+func teamsSeverityStyle(severity alerting.Severity) string {
 	switch severity {
 	case alerting.SeverityCritical:
 		return "attention" // red
