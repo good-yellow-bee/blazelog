@@ -11,8 +11,14 @@ import (
 // Config represents the server configuration.
 type Config struct {
 	Server         ServerConfig    `yaml:"server"`
+	Database       DatabaseConfig  `yaml:"database"`        // Database configuration
 	SSHConnections []SSHConnection `yaml:"ssh_connections"` // SSH connections for remote log collection
 	Verbose        bool            `yaml:"-"`               // set via CLI flag
+}
+
+// DatabaseConfig contains database settings.
+type DatabaseConfig struct {
+	Path string `yaml:"path"` // SQLite database file path (default: ./data/blazelog.db)
 }
 
 // ServerConfig contains server settings.
@@ -83,6 +89,9 @@ func (c *Config) setDefaults() {
 	}
 	if c.Server.HTTPAddress == "" {
 		c.Server.HTTPAddress = ":8080"
+	}
+	if c.Database.Path == "" {
+		c.Database.Path = "./data/blazelog.db"
 	}
 }
 
