@@ -1,0 +1,68 @@
+# BlazeLog Agent Configuration
+# Copy this file and modify for your environment
+
+# Server connection settings
+server:
+  # BlazeLog server address (host:port)
+  address: "localhost:9443"
+
+# Agent settings
+agent:
+  # Agent name (defaults to hostname if empty)
+  name: "my-server"
+
+  # Number of log entries per batch (default: 100)
+  batch_size: 100
+
+  # Interval to flush batches (default: 1s)
+  flush_interval: 1s
+
+# Log sources to collect
+sources:
+  # Nginx access logs
+  - name: "nginx-access"
+    type: "nginx"
+    path: "/var/log/nginx/access.log"
+    follow: true
+
+  # Nginx error logs
+  - name: "nginx-error"
+    type: "nginx"
+    path: "/var/log/nginx/error.log"
+    follow: true
+
+  # Magento system logs
+  # - name: "magento-system"
+  #   type: "magento"
+  #   path: "/var/www/html/var/log/system.log"
+  #   follow: true
+
+  # Magento exception logs
+  # - name: "magento-exception"
+  #   type: "magento"
+  #   path: "/var/www/html/var/log/exception.log"
+  #   follow: true
+
+  # PrestaShop logs
+  # - name: "prestashop-logs"
+  #   type: "prestashop"
+  #   path: "/var/www/prestashop/var/logs/*.log"
+  #   follow: true
+
+  # WordPress debug logs
+  # - name: "wordpress-debug"
+  #   type: "wordpress"
+  #   path: "/var/www/wordpress/wp-content/debug.log"
+  #   follow: true
+
+  # Apache access logs
+  # - name: "apache-access"
+  #   type: "apache"
+  #   path: "/var/log/apache2/access.log"
+  #   follow: true
+
+# Labels for categorization and filtering
+labels:
+  environment: "production"
+  project: "my-project"
+  team: "ops"

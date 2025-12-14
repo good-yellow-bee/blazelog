@@ -22,6 +22,7 @@ type MultiTailer struct {
 	done  chan struct{}
 
 	mu     sync.Mutex
+	wg     sync.WaitGroup
 	closed bool
 }
 
@@ -82,6 +83,7 @@ func (mt *MultiTailer) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		mt.wg.Add(1)
 		go mt.forwardLines(t)
 	}
 
@@ -91,12 +93,12 @@ func (mt *MultiTailer) Start(ctx context.Context) error {
 // Stop stops all tailers and cleans up resources.
 func (mt *MultiTailer) Stop() {
 	mt.mu.Lock()
-	defer mt.mu.Unlock()
-
 	if mt.closed {
+		mt.mu.Unlock()
 		return
 	}
 	mt.closed = true
+	mt.mu.Unlock()
 
 	close(mt.done)
 	mt.watcher.Close()
@@ -105,6 +107,8 @@ func (mt *MultiTailer) Stop() {
 		t.Stop()
 	}
 
+	// Wait for all forwardLines goroutines to exit before closing the channel
+	mt.wg.Wait()
 	close(mt.lines)
 }
 
@@ -217,6 +221,7 @@ func (mt *MultiTailer) handleNewFile(ctx context.Context, filePath string) {
 				if err := tailer.StartFromEnd(ctx); err != nil {
 					continue
 				}
+				mt.wg.Add(1)
 				go mt.forwardLines(tailer)
 			}
 			break
@@ -225,6 +230,7 @@ func (mt *MultiTailer) handleNewFile(ctx context.Context, filePath string) {
 }
 
 func (mt *MultiTailer) forwardLines(t *Tailer) {
+	defer mt.wg.Done()
 	for line := range t.Lines() {
 		select {
 		case mt.lines <- line:
