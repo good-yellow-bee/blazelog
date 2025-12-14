@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/server"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
@@ -103,10 +104,26 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	log.Printf("database initialized at %s", cfg.Database.Path)
 
+	// Initialize ClickHouse storage (if enabled)
+	var logBuffer *storage.LogBuffer
+	if cfg.ClickHouse.Enabled {
+		var chErr error
+		logBuffer, chErr = initClickHouse(cfg)
+		if chErr != nil {
+			return fmt.Errorf("init clickhouse: %w", chErr)
+		}
+		defer logBuffer.Close()
+	}
+
 	// Build server config
 	serverCfg := &server.Config{
 		GRPCAddress: cfg.Server.GRPCAddress,
 		Verbose:     cfg.Verbose,
+	}
+
+	// Pass LogBuffer to server if ClickHouse enabled
+	if logBuffer != nil {
+		serverCfg.LogBuffer = &logBufferAdapter{logBuffer}
 	}
 
 	// Configure TLS if enabled
@@ -147,4 +164,89 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	log.Printf("server stopped")
 	return nil
+}
+
+// initClickHouse initializes ClickHouse storage and returns a LogBuffer.
+func initClickHouse(cfg *Config) (*storage.LogBuffer, error) {
+	// Parse flush interval
+	flushInterval, err := time.ParseDuration(cfg.ClickHouse.FlushInterval)
+	if err != nil {
+		return nil, fmt.Errorf("parse flush_interval: %w", err)
+	}
+
+	// Get password from env if specified
+	password := cfg.ClickHouse.Password
+	if cfg.ClickHouse.PasswordEnv != "" {
+		password = os.Getenv(cfg.ClickHouse.PasswordEnv)
+	}
+
+	// Create ClickHouse config
+	chConfig := &storage.ClickHouseConfig{
+		Addresses:     cfg.ClickHouse.Addresses,
+		Database:      cfg.ClickHouse.Database,
+		Username:      cfg.ClickHouse.Username,
+		Password:      password,
+		MaxOpenConns:  cfg.ClickHouse.MaxOpenConns,
+		MaxIdleConns:  cfg.ClickHouse.MaxOpenConns,
+		DialTimeout:   5 * time.Second,
+		Compression:   true,
+		RetentionDays: cfg.ClickHouse.RetentionDays,
+	}
+
+	// Initialize ClickHouse storage
+	logStorage := storage.NewClickHouseStorage(chConfig)
+	if err := logStorage.Open(); err != nil {
+		return nil, fmt.Errorf("open clickhouse: %w", err)
+	}
+
+	if err := logStorage.Migrate(); err != nil {
+		logStorage.Close()
+		return nil, fmt.Errorf("migrate clickhouse: %w", err)
+	}
+
+	log.Printf("clickhouse initialized at %v (database: %s)", cfg.ClickHouse.Addresses, cfg.ClickHouse.Database)
+
+	// Create LogBuffer
+	bufferConfig := &storage.LogBufferConfig{
+		BatchSize:     cfg.ClickHouse.BatchSize,
+		FlushInterval: flushInterval,
+		MaxSize:       cfg.ClickHouse.MaxBufferSize,
+	}
+	logBuffer := storage.NewLogBuffer(logStorage.Logs(), bufferConfig)
+
+	return logBuffer, nil
+}
+
+// logBufferAdapter adapts storage.LogBuffer to server.LogBuffer interface.
+type logBufferAdapter struct {
+	buffer *storage.LogBuffer
+}
+
+func (a *logBufferAdapter) AddBatch(entries []*server.LogRecord) error {
+	// Convert server.LogRecord to storage.LogRecord
+	records := make([]*storage.LogRecord, len(entries))
+	for i, e := range entries {
+		records[i] = &storage.LogRecord{
+			ID:         e.ID,
+			Timestamp:  e.Timestamp,
+			Level:      e.Level,
+			Message:    e.Message,
+			Source:     e.Source,
+			Type:       e.Type,
+			Raw:        e.Raw,
+			AgentID:    e.AgentID,
+			FilePath:   e.FilePath,
+			LineNumber: e.LineNumber,
+			Fields:     e.Fields,
+			Labels:     e.Labels,
+			HTTPStatus: e.HTTPStatus,
+			HTTPMethod: e.HTTPMethod,
+			URI:        e.URI,
+		}
+	}
+	return a.buffer.AddBatch(records)
+}
+
+func (a *logBufferAdapter) Close() error {
+	return a.buffer.Close()
 }

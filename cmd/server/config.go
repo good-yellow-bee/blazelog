@@ -10,10 +10,26 @@ import (
 
 // Config represents the server configuration.
 type Config struct {
-	Server         ServerConfig    `yaml:"server"`
-	Database       DatabaseConfig  `yaml:"database"`        // Database configuration
-	SSHConnections []SSHConnection `yaml:"ssh_connections"` // SSH connections for remote log collection
-	Verbose        bool            `yaml:"-"`               // set via CLI flag
+	Server         ServerConfig      `yaml:"server"`
+	Database       DatabaseConfig    `yaml:"database"`        // Database configuration
+	ClickHouse     ClickHouseConfig  `yaml:"clickhouse"`      // ClickHouse log storage configuration
+	SSHConnections []SSHConnection   `yaml:"ssh_connections"` // SSH connections for remote log collection
+	Verbose        bool              `yaml:"-"`               // set via CLI flag
+}
+
+// ClickHouseConfig contains ClickHouse settings.
+type ClickHouseConfig struct {
+	Enabled       bool     `yaml:"enabled"`         // Enable ClickHouse log storage
+	Addresses     []string `yaml:"addresses"`       // ClickHouse server addresses (host:port)
+	Database      string   `yaml:"database"`        // Database name (default: blazelog)
+	Username      string   `yaml:"username"`        // Username for authentication
+	Password      string   `yaml:"password"`        // Password (use password_env for security)
+	PasswordEnv   string   `yaml:"password_env"`    // Environment variable name for password
+	MaxOpenConns  int      `yaml:"max_open_conns"`  // Max open connections (default: 5)
+	BatchSize     int      `yaml:"batch_size"`      // Batch size for inserts (default: 1000)
+	FlushInterval string   `yaml:"flush_interval"`  // Flush interval (default: 5s)
+	MaxBufferSize int      `yaml:"max_buffer_size"` // Max buffer size before dropping (default: 100000)
+	RetentionDays int      `yaml:"retention_days"`  // Log retention in days (default: 30)
 }
 
 // DatabaseConfig contains database settings.
@@ -92,6 +108,31 @@ func (c *Config) setDefaults() {
 	}
 	if c.Database.Path == "" {
 		c.Database.Path = "./data/blazelog.db"
+	}
+	// ClickHouse defaults
+	if len(c.ClickHouse.Addresses) == 0 {
+		c.ClickHouse.Addresses = []string{"localhost:9000"}
+	}
+	if c.ClickHouse.Database == "" {
+		c.ClickHouse.Database = "blazelog"
+	}
+	if c.ClickHouse.Username == "" {
+		c.ClickHouse.Username = "default"
+	}
+	if c.ClickHouse.MaxOpenConns == 0 {
+		c.ClickHouse.MaxOpenConns = 5
+	}
+	if c.ClickHouse.BatchSize == 0 {
+		c.ClickHouse.BatchSize = 1000
+	}
+	if c.ClickHouse.FlushInterval == "" {
+		c.ClickHouse.FlushInterval = "5s"
+	}
+	if c.ClickHouse.MaxBufferSize == 0 {
+		c.ClickHouse.MaxBufferSize = 100000
+	}
+	if c.ClickHouse.RetentionDays == 0 {
+		c.ClickHouse.RetentionDays = 30
 	}
 }
 
