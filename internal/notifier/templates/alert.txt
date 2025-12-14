@@ -1,0 +1,33 @@
+BlazeLog Alert: {{.RuleName}}
+================================================================================
+
+Severity: {{.Severity | upper}}
+Time: {{.Timestamp}}
+
+MESSAGE
+-------
+{{.Message}}
+{{if .Description}}
+DESCRIPTION
+-----------
+{{.Description}}
+{{end}}
+{{if gt .Count 0}}
+THRESHOLD ALERT
+---------------
+Count: {{.Count}} events in {{.Window}}
+Threshold: {{.Threshold}}
+{{end}}
+{{if .TriggeringEntry}}
+TRIGGERING LOG ENTRY
+--------------------
+{{.TriggeringEntry.Timestamp}} [{{.TriggeringEntry.Level}}] {{.TriggeringEntry.Message}}
+{{if .TriggeringEntry.FilePath}}Source: {{.TriggeringEntry.FilePath}}{{end}}
+{{end}}
+{{if .Labels}}
+LABELS
+------
+{{range $key, $value := .Labels}}  {{$key}}: {{$value}}
+{{end}}{{end}}
+--------------------------------------------------------------------------------
+Sent by BlazeLog

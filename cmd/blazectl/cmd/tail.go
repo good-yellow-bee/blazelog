@@ -10,7 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/alerting"
 	"github.com/good-yellow-bee/blazelog/internal/models"
+	"github.com/good-yellow-bee/blazelog/internal/notifier"
 	"github.com/good-yellow-bee/blazelog/internal/parser"
 	"github.com/good-yellow-bee/blazelog/internal/tailer"
 	"github.com/spf13/cobra"
@@ -20,6 +22,16 @@ var (
 	tailFollow     bool
 	tailParserType string
 	tailShowFile   bool
+
+	// Alert flags
+	tailAlertRules string
+
+	// Email notification flags
+	tailNotifyEmail []string
+	tailSMTPHost    string
+	tailSMTPPort    int
+	tailSMTPUser    string
+	tailSMTPFrom    string
 )
 
 var tailCmd = &cobra.Command{
@@ -44,7 +56,15 @@ Examples:
   blazelog tail /var/log/nginx/error.log --parser auto
 
   # Tail with JSON output
-  blazelog tail /var/log/nginx/access.log -o json --follow`,
+  blazelog tail /var/log/nginx/access.log -o json --follow
+
+  # Tail with email notifications on alerts
+  blazelog tail /var/log/nginx/*.log \
+    --alert-rules ./alerts.yaml \
+    --notify-email admin@example.com \
+    --smtp-host smtp.gmail.com \
+    --smtp-port 587 \
+    --smtp-from "BlazeLog <alerts@example.com>"`,
 	Args: cobra.MinimumNArgs(1),
 	Run:  runTail,
 }
@@ -55,6 +75,16 @@ func init() {
 	tailCmd.Flags().BoolVarP(&tailFollow, "follow", "f", true, "follow the file(s) and output new lines as they're written")
 	tailCmd.Flags().StringVarP(&tailParserType, "parser", "p", "", "parser type to use (nginx, apache, magento, prestashop, wordpress, auto)")
 	tailCmd.Flags().BoolVar(&tailShowFile, "show-file", true, "show file path for each line (useful with multiple files)")
+
+	// Alert flags
+	tailCmd.Flags().StringVar(&tailAlertRules, "alert-rules", "", "path to alert rules YAML file")
+
+	// Email notification flags
+	tailCmd.Flags().StringSliceVar(&tailNotifyEmail, "notify-email", nil, "email addresses for notifications (can be specified multiple times)")
+	tailCmd.Flags().StringVar(&tailSMTPHost, "smtp-host", "", "SMTP server host")
+	tailCmd.Flags().IntVar(&tailSMTPPort, "smtp-port", 587, "SMTP server port (587 for STARTTLS, 465 for implicit TLS)")
+	tailCmd.Flags().StringVar(&tailSMTPUser, "smtp-user", "", "SMTP username (optional)")
+	tailCmd.Flags().StringVar(&tailSMTPFrom, "smtp-from", "", "sender email address")
 }
 
 func runTail(cmd *cobra.Command, args []string) {
@@ -97,6 +127,50 @@ func runTail(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// Load alert rules if specified
+	var engine *alerting.Engine
+	if tailAlertRules != "" {
+		rules, err := alerting.LoadRulesFromFile(tailAlertRules)
+		if err != nil {
+			PrintError(fmt.Sprintf("failed to load alert rules: %v", err), true)
+			return
+		}
+		engine = alerting.NewEngine(rules, nil)
+		PrintVerbose("Loaded %d alert rule(s)", len(rules))
+	}
+
+	// Set up notification dispatcher
+	var dispatcher *notifier.Dispatcher
+	if len(tailNotifyEmail) > 0 {
+		if tailSMTPHost == "" {
+			PrintError("--smtp-host is required when using --notify-email", true)
+			return
+		}
+		if tailSMTPFrom == "" {
+			PrintError("--smtp-from is required when using --notify-email", true)
+			return
+		}
+
+		dispatcher = notifier.NewDispatcher()
+
+		emailConfig := notifier.EmailConfig{
+			Host:       tailSMTPHost,
+			Port:       tailSMTPPort,
+			Username:   tailSMTPUser,
+			Password:   getSMTPPassword(),
+			From:       tailSMTPFrom,
+			Recipients: tailNotifyEmail,
+		}
+
+		emailNotifier, err := notifier.NewEmailNotifier(emailConfig)
+		if err != nil {
+			PrintError(fmt.Sprintf("failed to create email notifier: %v", err), true)
+			return
+		}
+		dispatcher.Register(emailNotifier)
+		PrintVerbose("Email notifications enabled for: %v", tailNotifyEmail)
+	}
+
 	// Create multi-tailer
 	mt, err := tailer.NewMultiTailer(patterns, opts)
 	if err != nil {
@@ -115,7 +189,18 @@ func runTail(cmd *cobra.Command, args []string) {
 		<-sigChan
 		cancel()
 		mt.Stop()
+		if engine != nil {
+			engine.Close()
+		}
+		if dispatcher != nil {
+			dispatcher.Close()
+		}
 	}()
+
+	// Start alert consumer goroutine if engine is configured
+	if engine != nil && dispatcher != nil {
+		go consumeAlerts(ctx, engine, dispatcher)
+	}
 
 	// Start tailing
 	if err := mt.Start(ctx); err != nil {
@@ -125,6 +210,9 @@ func runTail(cmd *cobra.Command, args []string) {
 
 	if tailFollow {
 		fmt.Fprintf(os.Stderr, "Tailing %d file(s). Press Ctrl+C to stop.\n", len(files))
+		if engine != nil {
+			fmt.Fprintf(os.Stderr, "Alert rules active. Notifications will be sent on matches.\n")
+		}
 	}
 
 	// Process lines
@@ -136,8 +224,85 @@ func runTail(cmd *cobra.Command, args []string) {
 			continue
 		}
 
-		outputLine(line, p, multiFile && tailShowFile)
+		// Process for output and alerting
+		entry := processLine(line, p, multiFile && tailShowFile)
+
+		// Evaluate against alert rules if engine is configured
+		if engine != nil && entry != nil {
+			engine.Evaluate(entry)
+		}
 	}
+}
+
+// processLine parses and outputs a line, returning the parsed entry for alerting.
+func processLine(line tailer.Line, p parser.Parser, showFile bool) *models.LogEntry {
+	outputFormat := GetOutput()
+
+	// If no parser specified, output raw line
+	if p == nil && tailParserType != "auto" {
+		outputRawLine(line, showFile)
+		return nil
+	}
+
+	// Try to parse the line
+	var entry *models.LogEntry
+	var err error
+
+	if tailParserType == "auto" {
+		// Auto-detect parser for this line
+		detectedParser, ok := parser.AutoDetect(line.Text)
+		if ok {
+			entry, err = detectedParser.Parse(line.Text)
+		}
+	} else if p != nil {
+		entry, err = p.Parse(line.Text)
+	}
+
+	if err != nil || entry == nil {
+		// Could not parse, output raw line
+		outputRawLine(line, showFile)
+		return nil
+	}
+
+	entry.FilePath = line.FilePath
+
+	switch outputFormat {
+	case "json":
+		outputJSONLine(entry)
+	case "plain":
+		outputPlainLine(entry, showFile)
+	default:
+		outputFormattedLine(entry, showFile)
+	}
+
+	return entry
+}
+
+// consumeAlerts reads alerts from the engine and dispatches notifications.
+func consumeAlerts(ctx context.Context, engine *alerting.Engine, dispatcher *notifier.Dispatcher) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case alert, ok := <-engine.Alerts():
+			if !ok {
+				return
+			}
+
+			// Log the alert
+			PrintVerbose("Alert triggered: %s (severity: %s)", alert.RuleName, alert.Severity)
+
+			// Dispatch to all registered notifiers
+			if err := dispatcher.DispatchAll(ctx, alert); err != nil {
+				PrintVerbose("Notification error: %v", err)
+			}
+		}
+	}
+}
+
+// getSMTPPassword returns the SMTP password from environment variable.
+func getSMTPPassword() string {
+	return os.Getenv("BLAZELOG_SMTP_PASS")
 }
 
 func expandGlobs(patterns []string) []string {
@@ -164,47 +329,6 @@ func expandGlobs(patterns []string) []string {
 	}
 
 	return files
-}
-
-func outputLine(line tailer.Line, p parser.Parser, showFile bool) {
-	outputFormat := GetOutput()
-
-	// If no parser specified, output raw line
-	if p == nil && tailParserType != "auto" {
-		outputRawLine(line, showFile)
-		return
-	}
-
-	// Try to parse the line
-	var entry *models.LogEntry
-	var err error
-
-	if tailParserType == "auto" {
-		// Auto-detect parser for this line
-		detectedParser, ok := parser.AutoDetect(line.Text)
-		if ok {
-			entry, err = detectedParser.Parse(line.Text)
-		}
-	} else if p != nil {
-		entry, err = p.Parse(line.Text)
-	}
-
-	if err != nil || entry == nil {
-		// Could not parse, output raw line
-		outputRawLine(line, showFile)
-		return
-	}
-
-	entry.FilePath = line.FilePath
-
-	switch outputFormat {
-	case "json":
-		outputJSONLine(entry)
-	case "plain":
-		outputPlainLine(entry, showFile)
-	default:
-		outputFormattedLine(entry, showFile)
-	}
 }
 
 func outputRawLine(line tailer.Line, showFile bool) {
