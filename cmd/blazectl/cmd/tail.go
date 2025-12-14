@@ -35,6 +35,9 @@ var (
 
 	// Slack notification flags
 	tailNotifySlack string
+
+	// Teams notification flags
+	tailNotifyTeams string
 )
 
 var tailCmd = &cobra.Command{
@@ -72,7 +75,12 @@ Examples:
   # Tail with Slack notifications
   blazelog tail /var/log/nginx/*.log \
     --alert-rules ./alerts.yaml \
-    --notify-slack https://hooks.slack.com/services/T00/B00/xxx`,
+    --notify-slack https://hooks.slack.com/services/T00/B00/xxx
+
+  # Tail with Teams notifications
+  blazelog tail /var/log/nginx/*.log \
+    --alert-rules ./alerts.yaml \
+    --notify-teams https://outlook.office.com/webhook/xxx`,
 	Args: cobra.MinimumNArgs(1),
 	Run:  runTail,
 }
@@ -96,6 +104,9 @@ func init() {
 
 	// Slack notification flags
 	tailCmd.Flags().StringVar(&tailNotifySlack, "notify-slack", "", "Slack webhook URL for notifications")
+
+	// Teams notification flags
+	tailCmd.Flags().StringVar(&tailNotifyTeams, "notify-teams", "", "Microsoft Teams webhook URL for notifications")
 }
 
 func runTail(cmd *cobra.Command, args []string) {
@@ -199,6 +210,25 @@ func runTail(cmd *cobra.Command, args []string) {
 		}
 		dispatcher.Register(slackNotifier)
 		PrintVerbose("Slack notifications enabled")
+	}
+
+	// Set up Teams notifications
+	if tailNotifyTeams != "" {
+		if dispatcher == nil {
+			dispatcher = notifier.NewDispatcher()
+		}
+
+		teamsConfig := notifier.TeamsConfig{
+			WebhookURL: tailNotifyTeams,
+		}
+
+		teamsNotifier, err := notifier.NewTeamsNotifier(teamsConfig)
+		if err != nil {
+			PrintError(fmt.Sprintf("failed to create teams notifier: %v", err), true)
+			return
+		}
+		dispatcher.Register(teamsNotifier)
+		PrintVerbose("Teams notifications enabled")
 	}
 
 	// Create multi-tailer
