@@ -51,13 +51,15 @@ func (c *Config) SetDefaults() {
 
 // Server is the HTTP API server.
 type Server struct {
-	config  *Config
-	storage storage.Storage
-	server  *http.Server
+	config     *Config
+	storage    storage.Storage
+	logStorage storage.LogStorage
+	server     *http.Server
 }
 
 // New creates a new API server.
-func New(cfg *Config, store storage.Storage) (*Server, error) {
+// logStore can be nil if ClickHouse is disabled.
+func New(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*Server, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
@@ -71,8 +73,9 @@ func New(cfg *Config, store storage.Storage) (*Server, error) {
 	cfg.SetDefaults()
 
 	s := &Server{
-		config:  cfg,
-		storage: store,
+		config:     cfg,
+		storage:    store,
+		logStorage: logStore,
 	}
 
 	router := s.setupRouter()

@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/good-yellow-bee/blazelog/internal/api/auth"
+	"github.com/good-yellow-bee/blazelog/internal/api/logs"
 	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/api/users"
 	"github.com/good-yellow-bee/blazelog/internal/models"
@@ -85,6 +86,18 @@ func (s *Server) setupRouter() *chi.Mux {
 					r.Delete("/", userHandler.Delete)
 				})
 			})
+		})
+
+		// Log routes (protected - any authenticated user can view)
+		r.Route("/logs", func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(middleware.RateLimitByUser(userLimiter))
+
+			logsHandler := logs.NewHandler(s.logStorage)
+
+			r.Get("/", logsHandler.Query)
+			r.Get("/stats", logsHandler.Stats)
+			r.Get("/stream", logsHandler.Stream)
 		})
 	})
 
