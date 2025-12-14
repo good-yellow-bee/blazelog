@@ -25,14 +25,38 @@ server:
     # CA certificate for verifying client certificates
     # client_ca_file: "/etc/blazelog/certs/ca.crt"
 
+# SSH security settings
+ssh:
+  # Host key verification file (OpenSSH known_hosts format)
+  # Default: /etc/blazelog/known_hosts (server) or ~/.blazelog/known_hosts (agent)
+  host_key_file: "/etc/blazelog/known_hosts"
+
+  # Host key verification policy:
+  #   strict - reject unknown hosts (most secure, requires pre-configured known_hosts)
+  #   tofu   - trust on first use, reject on key change (balanced, default)
+  #   warn   - accept all, log warnings (dev only, not recommended for production)
+  host_key_policy: "tofu"
+
+  # Audit log for SSH operations (JSON lines format)
+  # Records: connections, disconnections, host key events, commands, file operations
+  audit_log: "/var/log/blazelog/ssh-audit.log"
+
+  # Connection pool settings
+  pool:
+    # Maximum connections per host
+    max_per_host: 5
+    # Close idle connections after this duration
+    idle_timeout: 5m
+
 # SSH connections for remote log collection (agentless mode)
 # Uncomment and configure to pull logs from remote servers via SSH
 # ssh_connections:
 #   - name: "web-server-1"
 #     host: "web1.example.com:22"
 #     user: "blazelog"
+#     # Key file - use .enc suffix for encrypted keys (requires master_password)
 #     key_file: "/etc/blazelog/ssh/web1.key"
-#     # key_passphrase: ""  # Optional passphrase for encrypted keys
+#     # key_passphrase: ""  # Optional passphrase for encrypted SSH keys
 #     sources:
 #       - path: "/var/log/nginx/access.log"
 #         type: "nginx"
@@ -51,4 +75,19 @@ server:
 #         follow: true
 #       - path: "/var/www/magento/var/log/exception.log"
 #         type: "magento"
+#         follow: true
+#
+#   - name: "internal-server"
+#     host: "internal.example.com:22"
+#     user: "blazelog"
+#     # Encrypted key file (requires BLAZELOG_MASTER_KEY env var or master_password)
+#     key_file: "/etc/blazelog/ssh/internal.key.enc"
+#     # Jump host / bastion for reaching internal servers
+#     jump_host:
+#       host: "bastion.example.com:22"
+#       user: "blazelog"
+#       key_file: "/etc/blazelog/ssh/bastion.key"
+#     sources:
+#       - path: "/var/log/app/*.log"
+#         type: "auto"
 #         follow: true
