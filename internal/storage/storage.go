@@ -24,6 +24,7 @@ type Storage interface {
 	Projects() ProjectRepository
 	Alerts() AlertRepository
 	Connections() ConnectionRepository
+	Tokens() TokenRepository
 }
 
 // UserRepository defines operations for user management.
@@ -74,4 +75,14 @@ type ConnectionRepository interface {
 	List(ctx context.Context) ([]*models.Connection, error)
 	ListByProject(ctx context.Context, projectID string) ([]*models.Connection, error)
 	UpdateStatus(ctx context.Context, id string, status models.ConnectionStatus, testedAt time.Time) error
+}
+
+// TokenRepository defines operations for refresh token management.
+type TokenRepository interface {
+	Create(ctx context.Context, token *models.RefreshToken) error
+	GetByTokenHash(ctx context.Context, tokenHash string) (*models.RefreshToken, error)
+	Revoke(ctx context.Context, id string) error
+	RevokeByTokenHash(ctx context.Context, tokenHash string) error
+	RevokeAllForUser(ctx context.Context, userID string) error
+	DeleteExpired(ctx context.Context) (int64, error)
 }

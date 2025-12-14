@@ -25,6 +25,7 @@ type SQLiteStorage struct {
 	projects    *sqliteProjectRepo
 	alerts      *sqliteAlertRepo
 	connections *sqliteConnectionRepo
+	tokens      *sqliteTokenRepo
 }
 
 // NewSQLiteStorage creates a new SQLite storage.
@@ -75,6 +76,7 @@ func (s *SQLiteStorage) Open() error {
 	s.projects = &sqliteProjectRepo{db: db}
 	s.alerts = &sqliteAlertRepo{db: db}
 	s.connections = &sqliteConnectionRepo{db: db, masterKey: s.masterKey}
+	s.tokens = &sqliteTokenRepo{db: db}
 
 	return nil
 }
@@ -153,6 +155,11 @@ func (s *SQLiteStorage) Alerts() AlertRepository {
 // Connections returns the connection repository.
 func (s *SQLiteStorage) Connections() ConnectionRepository {
 	return s.connections
+}
+
+// Tokens returns the token repository.
+func (s *SQLiteStorage) Tokens() TokenRepository {
+	return s.tokens
 }
 
 // generateRandomPassword generates a random password of the specified length.
