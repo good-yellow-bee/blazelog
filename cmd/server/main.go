@@ -107,13 +107,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Initialize ClickHouse storage (if enabled)
 	var logBuffer *storage.LogBuffer
+	var logStore storage.LogStorage
 	if cfg.ClickHouse.Enabled {
 		var chErr error
-		logBuffer, chErr = initClickHouse(cfg)
+		logBuffer, logStore, chErr = initClickHouse(cfg)
 		if chErr != nil {
 			return fmt.Errorf("init clickhouse: %w", chErr)
 		}
 		defer logBuffer.Close()
+		defer logStore.Close()
 	}
 
 	// Build server config
@@ -143,7 +145,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize HTTP API server
-	apiServer, err := initAPIServer(cfg, store)
+	apiServer, err := initAPIServer(cfg, store, logStore)
 	if err != nil {
 		return fmt.Errorf("init api server: %w", err)
 	}
@@ -194,7 +196,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 }
 
 // initAPIServer initializes the HTTP API server.
-func initAPIServer(cfg *Config, store storage.Storage) (*api.Server, error) {
+func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*api.Server, error) {
 	// Get JWT secret
 	jwtSecret := os.Getenv(cfg.Auth.JWTSecretEnv)
 	if jwtSecret == "" {
@@ -227,15 +229,15 @@ func initAPIServer(cfg *Config, store storage.Storage) (*api.Server, error) {
 		Verbose:          cfg.Verbose,
 	}
 
-	return api.New(apiConfig, store)
+	return api.New(apiConfig, store, logStore)
 }
 
-// initClickHouse initializes ClickHouse storage and returns a LogBuffer.
-func initClickHouse(cfg *Config) (*storage.LogBuffer, error) {
+// initClickHouse initializes ClickHouse storage and returns a LogBuffer and LogStorage.
+func initClickHouse(cfg *Config) (*storage.LogBuffer, storage.LogStorage, error) {
 	// Parse flush interval
 	flushInterval, err := time.ParseDuration(cfg.ClickHouse.FlushInterval)
 	if err != nil {
-		return nil, fmt.Errorf("parse flush_interval: %w", err)
+		return nil, nil, fmt.Errorf("parse flush_interval: %w", err)
 	}
 
 	// Get password from env if specified
@@ -260,12 +262,12 @@ func initClickHouse(cfg *Config) (*storage.LogBuffer, error) {
 	// Initialize ClickHouse storage
 	logStorage := storage.NewClickHouseStorage(chConfig)
 	if err := logStorage.Open(); err != nil {
-		return nil, fmt.Errorf("open clickhouse: %w", err)
+		return nil, nil, fmt.Errorf("open clickhouse: %w", err)
 	}
 
 	if err := logStorage.Migrate(); err != nil {
 		logStorage.Close()
-		return nil, fmt.Errorf("migrate clickhouse: %w", err)
+		return nil, nil, fmt.Errorf("migrate clickhouse: %w", err)
 	}
 
 	log.Printf("clickhouse initialized at %v (database: %s)", cfg.ClickHouse.Addresses, cfg.ClickHouse.Database)
@@ -278,7 +280,7 @@ func initClickHouse(cfg *Config) (*storage.LogBuffer, error) {
 	}
 	logBuffer := storage.NewLogBuffer(logStorage.Logs(), bufferConfig)
 
-	return logBuffer, nil
+	return logBuffer, logStorage, nil
 }
 
 // logBufferAdapter adapts storage.LogBuffer to server.LogBuffer interface.

@@ -51,7 +51,7 @@ func testServer(t *testing.T) (*Server, storage.Storage, func()) {
 		Verbose:          false,
 	}
 
-	srv, err := New(cfg, store)
+	srv, err := New(cfg, store, nil) // nil logStorage - ClickHouse not used in tests
 	if err != nil {
 		store.Close()
 		os.Remove(tmpFile.Name())
