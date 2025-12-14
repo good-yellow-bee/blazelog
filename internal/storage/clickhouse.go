@@ -152,12 +152,70 @@ func (s *ClickHouseStorage) Migrate() error {
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_message message TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 4",
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_source source TYPE bloom_filter(0.01) GRANULARITY 4",
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_file_path file_path TYPE bloom_filter(0.01) GRANULARITY 4",
+		// Advanced indexes (Milestone 21)
+		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_message_ngram message TYPE ngrambf_v1(3, 65536, 3, 0) GRANULARITY 4",
+		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_timestamp_minmax timestamp TYPE minmax GRANULARITY 3",
+		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_http_status http_status TYPE set(100) GRANULARITY 4",
 	}
 
 	for _, idx := range indexes {
 		if _, err := s.db.ExecContext(ctx, idx); err != nil {
 			// Log warning but don't fail - index creation may not be supported in all ClickHouse versions
 			fmt.Printf("warning: failed to create index: %v\n", err)
+		}
+	}
+
+	// Create materialized views for dashboards (Milestone 21)
+	materializedViews := []string{
+		// Hourly error counts for error rate dashboards
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS logs_hourly_errors_mv
+		ENGINE = SummingMergeTree()
+		PARTITION BY toYYYYMM(hour)
+		ORDER BY (agent_id, type, level, hour)
+		AS SELECT
+			agent_id,
+			type,
+			level,
+			toStartOfHour(timestamp) AS hour,
+			count() AS count
+		FROM logs
+		WHERE level IN ('error', 'fatal', 'warning')
+		GROUP BY agent_id, type, level, hour`,
+
+		// Daily log volume for capacity planning
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS logs_daily_volume_mv
+		ENGINE = SummingMergeTree()
+		PARTITION BY toYYYYMM(day)
+		ORDER BY (agent_id, type, day)
+		AS SELECT
+			agent_id,
+			type,
+			toDate(timestamp) AS day,
+			count() AS total_count,
+			countIf(level = 'error') AS error_count,
+			countIf(level = 'fatal') AS fatal_count,
+			countIf(level = 'warning') AS warning_count
+		FROM logs
+		GROUP BY agent_id, type, day`,
+
+		// HTTP status distribution for web server monitoring
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS logs_http_stats_mv
+		ENGINE = SummingMergeTree()
+		PARTITION BY toYYYYMM(hour)
+		ORDER BY (agent_id, hour, http_status)
+		AS SELECT
+			agent_id,
+			toStartOfHour(timestamp) AS hour,
+			http_status,
+			count() AS count
+		FROM logs
+		WHERE http_status > 0
+		GROUP BY agent_id, hour, http_status`,
+	}
+
+	for _, mv := range materializedViews {
+		if _, err := s.db.ExecContext(ctx, mv); err != nil {
+			fmt.Printf("warning: failed to create materialized view: %v\n", err)
 		}
 	}
 
@@ -345,6 +403,7 @@ func (r *clickhouseLogRepo) DeleteBefore(ctx context.Context, before time.Time) 
 func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (string, []interface{}) {
 	var sb strings.Builder
 	var args []interface{}
+	var prewhereArgs []interface{}
 
 	if countOnly {
 		sb.WriteString("SELECT count() FROM logs")
@@ -357,18 +416,19 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 		`)
 	}
 
-	// Build WHERE clause
-	var conditions []string
-
-	// Time range filter (required for efficient queries)
+	// Build PREWHERE clause for indexed columns (timestamp optimization)
+	var prewhereConditions []string
 	if !filter.StartTime.IsZero() {
-		conditions = append(conditions, "timestamp >= ?")
-		args = append(args, filter.StartTime)
+		prewhereConditions = append(prewhereConditions, "timestamp >= ?")
+		prewhereArgs = append(prewhereArgs, filter.StartTime)
 	}
 	if !filter.EndTime.IsZero() {
-		conditions = append(conditions, "timestamp <= ?")
-		args = append(args, filter.EndTime)
+		prewhereConditions = append(prewhereConditions, "timestamp <= ?")
+		prewhereArgs = append(prewhereArgs, filter.EndTime)
 	}
+
+	// Build WHERE clause
+	var conditions []string
 
 	// Agent filter
 	if filter.AgentID != "" {
@@ -416,10 +476,28 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 		args = append(args, filter.FilePath)
 	}
 
-	// Full-text search on message
+	// Full-text search on message with search mode support (Milestone 21)
 	if filter.MessageContains != "" {
-		conditions = append(conditions, "hasToken(message, ?)")
-		args = append(args, filter.MessageContains)
+		switch filter.SearchMode {
+		case SearchModeSubstring:
+			conditions = append(conditions, "position(message, ?) > 0")
+			args = append(args, filter.MessageContains)
+		case SearchModePhrase:
+			words := strings.Fields(filter.MessageContains)
+			for _, word := range words {
+				conditions = append(conditions, "hasToken(message, ?)")
+				args = append(args, word)
+			}
+		default: // SearchModeToken
+			conditions = append(conditions, "hasToken(message, ?)")
+			args = append(args, filter.MessageContains)
+		}
+	}
+
+	// Append PREWHERE clause (ClickHouse optimization for indexed columns)
+	if len(prewhereConditions) > 0 {
+		sb.WriteString(" PREWHERE ")
+		sb.WriteString(strings.Join(prewhereConditions, " AND "))
 	}
 
 	// Append WHERE clause
@@ -428,9 +506,12 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 		sb.WriteString(strings.Join(conditions, " AND "))
 	}
 
+	// Combine args: prewhere args first, then where args
+	allArgs := append(prewhereArgs, args...)
+
 	// Skip ORDER BY and LIMIT for count queries
 	if countOnly {
-		return sb.String(), args
+		return sb.String(), allArgs
 	}
 
 	// ORDER BY
@@ -454,5 +535,202 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 		sb.WriteString(fmt.Sprintf(" OFFSET %d", filter.Offset))
 	}
 
-	return sb.String(), args
+	return sb.String(), allArgs
+}
+
+// GetErrorRates returns error statistics for the given filter.
+func (r *clickhouseLogRepo) GetErrorRates(ctx context.Context, filter *AggregationFilter) (*ErrorRateResult, error) {
+	query := `
+		SELECT
+			count() AS total,
+			countIf(level = 'error') AS errors,
+			countIf(level = 'warning') AS warnings,
+			countIf(level = 'fatal') AS fatals
+		FROM logs
+	`
+	args, whereClause := r.buildAggregationWhere(filter)
+	if whereClause != "" {
+		query += " WHERE " + whereClause
+	}
+
+	result := &ErrorRateResult{}
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&result.TotalLogs,
+		&result.ErrorCount,
+		&result.WarningCount,
+		&result.FatalCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get error rates: %w", err)
+	}
+
+	if result.TotalLogs > 0 {
+		result.ErrorRate = float64(result.ErrorCount+result.FatalCount) / float64(result.TotalLogs)
+	}
+
+	return result, nil
+}
+
+// GetTopSources returns the top sources by log count.
+func (r *clickhouseLogRepo) GetTopSources(ctx context.Context, filter *AggregationFilter, limit int) ([]*SourceCount, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+
+	query := `
+		SELECT
+			source,
+			count() AS total,
+			countIf(level IN ('error', 'fatal')) AS errors
+		FROM logs
+	`
+	args, whereClause := r.buildAggregationWhere(filter)
+	if whereClause != "" {
+		query += " WHERE " + whereClause
+	}
+	query += fmt.Sprintf(" GROUP BY source ORDER BY total DESC LIMIT %d", limit)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get top sources: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*SourceCount
+	for rows.Next() {
+		sc := &SourceCount{}
+		if err := rows.Scan(&sc.Source, &sc.Count, &sc.ErrorCount); err != nil {
+			return nil, fmt.Errorf("scan source count: %w", err)
+		}
+		results = append(results, sc)
+	}
+
+	return results, rows.Err()
+}
+
+// GetLogVolume returns time-series log volume data.
+func (r *clickhouseLogRepo) GetLogVolume(ctx context.Context, filter *AggregationFilter, interval string) ([]*VolumePoint, error) {
+	// Determine time function based on interval
+	var timeFunc string
+	switch interval {
+	case "minute":
+		timeFunc = "toStartOfMinute(timestamp)"
+	case "day":
+		timeFunc = "toStartOfDay(timestamp)"
+	default: // hour
+		timeFunc = "toStartOfHour(timestamp)"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			%s AS ts,
+			count() AS total,
+			countIf(level IN ('error', 'fatal')) AS errors
+		FROM logs
+	`, timeFunc)
+
+	args, whereClause := r.buildAggregationWhere(filter)
+	if whereClause != "" {
+		query += " WHERE " + whereClause
+	}
+	query += " GROUP BY ts ORDER BY ts ASC"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get log volume: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*VolumePoint
+	for rows.Next() {
+		vp := &VolumePoint{}
+		if err := rows.Scan(&vp.Timestamp, &vp.TotalCount, &vp.ErrorCount); err != nil {
+			return nil, fmt.Errorf("scan volume point: %w", err)
+		}
+		results = append(results, vp)
+	}
+
+	return results, rows.Err()
+}
+
+// GetHTTPStats returns HTTP status code distribution.
+func (r *clickhouseLogRepo) GetHTTPStats(ctx context.Context, filter *AggregationFilter) (*HTTPStatsResult, error) {
+	query := `
+		SELECT
+			countIf(http_status >= 200 AND http_status < 300) AS total_2xx,
+			countIf(http_status >= 300 AND http_status < 400) AS total_3xx,
+			countIf(http_status >= 400 AND http_status < 500) AS total_4xx,
+			countIf(http_status >= 500 AND http_status < 600) AS total_5xx
+		FROM logs
+	`
+	args, whereClause := r.buildAggregationWhere(filter)
+	if whereClause != "" {
+		query += " WHERE " + whereClause + " AND http_status > 0"
+	} else {
+		query += " WHERE http_status > 0"
+	}
+
+	result := &HTTPStatsResult{}
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&result.Total2xx,
+		&result.Total3xx,
+		&result.Total4xx,
+		&result.Total5xx,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get http stats: %w", err)
+	}
+
+	// Get top URIs
+	uriQuery := `
+		SELECT uri, count() AS cnt
+		FROM logs
+	`
+	if whereClause != "" {
+		uriQuery += " WHERE " + whereClause + " AND http_status > 0 AND uri != ''"
+	} else {
+		uriQuery += " WHERE http_status > 0 AND uri != ''"
+	}
+	uriQuery += " GROUP BY uri ORDER BY cnt DESC LIMIT 10"
+
+	rows, err := r.db.QueryContext(ctx, uriQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get top uris: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		uc := &URICount{}
+		if err := rows.Scan(&uc.URI, &uc.Count); err != nil {
+			return nil, fmt.Errorf("scan uri count: %w", err)
+		}
+		result.TopURIs = append(result.TopURIs, uc)
+	}
+
+	return result, rows.Err()
+}
+
+// buildAggregationWhere builds WHERE clause for aggregation queries.
+func (r *clickhouseLogRepo) buildAggregationWhere(filter *AggregationFilter) ([]interface{}, string) {
+	var conditions []string
+	var args []interface{}
+
+	if !filter.StartTime.IsZero() {
+		conditions = append(conditions, "timestamp >= ?")
+		args = append(args, filter.StartTime)
+	}
+	if !filter.EndTime.IsZero() {
+		conditions = append(conditions, "timestamp <= ?")
+		args = append(args, filter.EndTime)
+	}
+	if filter.AgentID != "" {
+		conditions = append(conditions, "agent_id = ?")
+		args = append(args, filter.AgentID)
+	}
+	if filter.Type != "" {
+		conditions = append(conditions, "type = ?")
+		args = append(args, filter.Type)
+	}
+
+	return args, strings.Join(conditions, " AND ")
 }

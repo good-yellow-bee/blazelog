@@ -19,17 +19,18 @@ type Config struct {
 
 // ClickHouseConfig contains ClickHouse settings.
 type ClickHouseConfig struct {
-	Enabled       bool     `yaml:"enabled"`         // Enable ClickHouse log storage
-	Addresses     []string `yaml:"addresses"`       // ClickHouse server addresses (host:port)
-	Database      string   `yaml:"database"`        // Database name (default: blazelog)
-	Username      string   `yaml:"username"`        // Username for authentication
-	Password      string   `yaml:"password"`        // Password (use password_env for security)
-	PasswordEnv   string   `yaml:"password_env"`    // Environment variable name for password
-	MaxOpenConns  int      `yaml:"max_open_conns"`  // Max open connections (default: 5)
-	BatchSize     int      `yaml:"batch_size"`      // Batch size for inserts (default: 1000)
-	FlushInterval string   `yaml:"flush_interval"`  // Flush interval (default: 5s)
-	MaxBufferSize int      `yaml:"max_buffer_size"` // Max buffer size before dropping (default: 100000)
-	RetentionDays int      `yaml:"retention_days"`  // Log retention in days (default: 30)
+	Enabled          bool           `yaml:"enabled"`            // Enable ClickHouse log storage
+	Addresses        []string       `yaml:"addresses"`          // ClickHouse server addresses (host:port)
+	Database         string         `yaml:"database"`           // Database name (default: blazelog)
+	Username         string         `yaml:"username"`           // Username for authentication
+	Password         string         `yaml:"password"`           // Password (use password_env for security)
+	PasswordEnv      string         `yaml:"password_env"`       // Environment variable name for password
+	MaxOpenConns     int            `yaml:"max_open_conns"`     // Max open connections (default: 5)
+	BatchSize        int            `yaml:"batch_size"`         // Batch size for inserts (default: 1000)
+	FlushInterval    string         `yaml:"flush_interval"`     // Flush interval (default: 5s)
+	MaxBufferSize    int            `yaml:"max_buffer_size"`    // Max buffer size before dropping (default: 100000)
+	RetentionDays    int            `yaml:"retention_days"`     // Log retention in days (default: 30)
+	RetentionByLevel map[string]int `yaml:"retention_by_level"` // Per-level retention days (e.g., error: 90, debug: 7)
 }
 
 // DatabaseConfig contains database settings.
