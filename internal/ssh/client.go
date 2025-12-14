@@ -7,9 +7,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/security"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -20,26 +22,38 @@ type ClientConfig struct {
 	// User is the SSH username.
 	User string
 	// KeyFile is the path to the private key file.
+	// If the file has .enc suffix, it will be decrypted using MasterPassword.
 	KeyFile string
 	// KeyPassphrase is the optional passphrase for encrypted keys.
 	KeyPassphrase string
+	// MasterPassword is the password for decrypting .enc key files.
+	MasterPassword string
 	// Password is used for password authentication (not recommended).
 	Password string
 	// Timeout is the connection timeout.
 	Timeout time.Duration
 	// KeepAliveInterval is the interval for keep-alive probes.
 	KeepAliveInterval time.Duration
+
+	// JumpHost is an optional bastion/jump host for proxying connections.
+	JumpHost *ClientConfig
+	// HostKeyCallback is the callback for host key verification.
+	// If nil, uses InsecureIgnoreHostKey (not recommended for production).
+	HostKeyCallback ssh.HostKeyCallback
+	// AuditLogger is the optional audit logger for SSH operations.
+	AuditLogger AuditLogger
 }
 
 // Client is an SSH client for remote file operations.
 type Client struct {
-	config    *ClientConfig
-	sshClient *ssh.Client
-	mu        sync.Mutex
-	connected bool
-	lastError error
-	closeCh   chan struct{}
-	closeOnce sync.Once
+	config     *ClientConfig
+	sshClient  *ssh.Client
+	jumpClient *Client // connection to jump host
+	mu         sync.Mutex
+	connected  bool
+	lastError  error
+	closeCh    chan struct{}
+	closeOnce  sync.Once
 }
 
 // NewClient creates a new SSH client with the given configuration.
@@ -49,6 +63,9 @@ func NewClient(cfg *ClientConfig) *Client {
 	}
 	if cfg.KeepAliveInterval == 0 {
 		cfg.KeepAliveInterval = 30 * time.Second
+	}
+	if cfg.AuditLogger == nil {
+		cfg.AuditLogger = NopAuditLogger{}
 	}
 
 	return &Client{
@@ -71,24 +88,61 @@ func (c *Client) Connect(ctx context.Context) error {
 		return fmt.Errorf("build auth methods: %w", err)
 	}
 
+	hostKeyCallback := c.config.HostKeyCallback
+	if hostKeyCallback == nil {
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	}
+
 	sshConfig := &ssh.ClientConfig{
 		User:            c.config.User,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: proper host key verification in M18
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         c.config.Timeout,
 	}
 
-	// Use context for connection timeout
-	dialer := net.Dialer{Timeout: c.config.Timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", c.config.Host)
-	if err != nil {
-		return fmt.Errorf("dial %s: %w", c.config.Host, err)
+	// Determine jump host info for audit logging
+	jumpHostStr := ""
+	if c.config.JumpHost != nil {
+		jumpHostStr = c.config.JumpHost.Host
 	}
+
+	var conn net.Conn
+
+	// Connect through jump host if configured
+	if c.config.JumpHost != nil {
+		jumpClient := NewClient(c.config.JumpHost)
+		if err := jumpClient.Connect(ctx); err != nil {
+			return fmt.Errorf("connect to jump host %s: %w", c.config.JumpHost.Host, err)
+		}
+		c.jumpClient = jumpClient
+
+		// Dial target through jump host
+		conn, err = jumpClient.sshClient.Dial("tcp", c.config.Host)
+		if err != nil {
+			jumpClient.Close()
+			c.jumpClient = nil
+			return fmt.Errorf("dial %s through jump host: %w", c.config.Host, err)
+		}
+	} else {
+		// Direct connection
+		dialer := net.Dialer{Timeout: c.config.Timeout}
+		conn, err = dialer.DialContext(ctx, "tcp", c.config.Host)
+		if err != nil {
+			return fmt.Errorf("dial %s: %w", c.config.Host, err)
+		}
+	}
+
+	// Log connection attempt
+	c.config.AuditLogger.LogConnect(c.config.Host, c.config.User, jumpHostStr)
 
 	// Perform SSH handshake
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, c.config.Host, sshConfig)
 	if err != nil {
 		conn.Close()
+		if c.jumpClient != nil {
+			c.jumpClient.Close()
+			c.jumpClient = nil
+		}
 		return fmt.Errorf("ssh handshake: %w", err)
 	}
 
@@ -111,14 +165,26 @@ func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if !c.connected || c.sshClient == nil {
-		return nil
+	var firstErr error
+
+	if c.connected && c.sshClient != nil {
+		if err := c.sshClient.Close(); err != nil {
+			firstErr = err
+		}
+		c.config.AuditLogger.LogDisconnect(c.config.Host, firstErr)
 	}
 
-	err := c.sshClient.Close()
+	// Close jump host connection
+	if c.jumpClient != nil {
+		if err := c.jumpClient.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		c.jumpClient = nil
+	}
+
 	c.connected = false
 	c.sshClient = nil
-	return err
+	return firstErr
 }
 
 // IsConnected returns true if the client is connected.
@@ -135,6 +201,11 @@ func (c *Client) LastError() error {
 	return c.lastError
 }
 
+// Host returns the host address.
+func (c *Client) Host() string {
+	return c.config.Host
+}
+
 // ReadFile reads a remote file and returns its contents.
 func (c *Client) ReadFile(ctx context.Context, path string) ([]byte, error) {
 	c.mu.Lock()
@@ -145,6 +216,7 @@ func (c *Client) ReadFile(ctx context.Context, path string) ([]byte, error) {
 	client := c.sshClient
 	c.mu.Unlock()
 
+	start := time.Now()
 	session, err := client.NewSession()
 	if err != nil {
 		c.handleError(err)
@@ -153,11 +225,18 @@ func (c *Client) ReadFile(ctx context.Context, path string) ([]byte, error) {
 	defer session.Close()
 
 	// Use cat to read file contents
-	output, err := session.Output(fmt.Sprintf("cat %q", path))
+	cmd := fmt.Sprintf("cat %q", path)
+	output, err := session.Output(cmd)
+	duration := time.Since(start)
+
+	c.config.AuditLogger.LogCommand(c.config.Host, cmd, err == nil, duration)
+
 	if err != nil {
+		c.config.AuditLogger.LogFileOp(c.config.Host, "read", path, 0, err)
 		return nil, fmt.Errorf("read file %s: %w", path, err)
 	}
 
+	c.config.AuditLogger.LogFileOp(c.config.Host, "read", path, int64(len(output)), nil)
 	return output, nil
 }
 
@@ -171,6 +250,7 @@ func (c *Client) ReadFileRange(ctx context.Context, path string, offset, limit i
 	client := c.sshClient
 	c.mu.Unlock()
 
+	start := time.Now()
 	session, err := client.NewSession()
 	if err != nil {
 		c.handleError(err)
@@ -181,10 +261,16 @@ func (c *Client) ReadFileRange(ctx context.Context, path string, offset, limit i
 	// Use tail with byte offset to read from specific position
 	cmd := fmt.Sprintf("tail -c +%d %q | head -c %d", offset+1, path, limit)
 	output, err := session.Output(cmd)
+	duration := time.Since(start)
+
+	c.config.AuditLogger.LogCommand(c.config.Host, cmd, err == nil, duration)
+
 	if err != nil {
+		c.config.AuditLogger.LogFileOp(c.config.Host, "read_range", path, 0, err)
 		return nil, fmt.Errorf("read file range %s: %w", path, err)
 	}
 
+	c.config.AuditLogger.LogFileOp(c.config.Host, "read_range", path, int64(len(output)), nil)
 	return output, nil
 }
 
@@ -198,6 +284,7 @@ func (c *Client) FileInfo(ctx context.Context, path string) (*RemoteFileInfo, er
 	client := c.sshClient
 	c.mu.Unlock()
 
+	start := time.Now()
 	session, err := client.NewSession()
 	if err != nil {
 		c.handleError(err)
@@ -208,7 +295,12 @@ func (c *Client) FileInfo(ctx context.Context, path string) (*RemoteFileInfo, er
 	// Use stat to get file info (size, mtime, inode)
 	cmd := fmt.Sprintf("stat -c '%%s %%Y %%i' %q 2>/dev/null || stat -f '%%z %%m %%i' %q", path, path)
 	output, err := session.Output(cmd)
+	duration := time.Since(start)
+
+	c.config.AuditLogger.LogCommand(c.config.Host, "stat", err == nil, duration)
+
 	if err != nil {
+		c.config.AuditLogger.LogFileOp(c.config.Host, "stat", path, 0, err)
 		return nil, fmt.Errorf("stat file %s: %w", path, err)
 	}
 
@@ -218,6 +310,7 @@ func (c *Client) FileInfo(ctx context.Context, path string) (*RemoteFileInfo, er
 		return nil, fmt.Errorf("parse stat output: %w", err)
 	}
 
+	c.config.AuditLogger.LogFileOp(c.config.Host, "stat", path, 0, nil)
 	return info, nil
 }
 
@@ -231,6 +324,7 @@ func (c *Client) ListFiles(ctx context.Context, pattern string) ([]string, error
 	client := c.sshClient
 	c.mu.Unlock()
 
+	start := time.Now()
 	session, err := client.NewSession()
 	if err != nil {
 		c.handleError(err)
@@ -241,7 +335,12 @@ func (c *Client) ListFiles(ctx context.Context, pattern string) ([]string, error
 	// Use ls with glob pattern
 	cmd := fmt.Sprintf("ls -1 %s 2>/dev/null || true", pattern)
 	output, err := session.Output(cmd)
+	duration := time.Since(start)
+
+	c.config.AuditLogger.LogCommand(c.config.Host, cmd, err == nil, duration)
+
 	if err != nil {
+		c.config.AuditLogger.LogFileOp(c.config.Host, "list", pattern, 0, err)
 		return nil, fmt.Errorf("list files %s: %w", pattern, err)
 	}
 
@@ -257,6 +356,7 @@ func (c *Client) ListFiles(ctx context.Context, pattern string) ([]string, error
 		}
 	}
 
+	c.config.AuditLogger.LogFileOp(c.config.Host, "list", pattern, int64(len(files)), nil)
 	return files, nil
 }
 
@@ -308,6 +408,8 @@ func (c *Client) StreamFile(ctx context.Context, path string, offset int64) (io.
 		return nil, fmt.Errorf("start tail: %w", err)
 	}
 
+	c.config.AuditLogger.LogFileOp(c.config.Host, "stream", path, 0, nil)
+
 	return &sessionReader{
 		session: session,
 		reader:  stdout,
@@ -319,16 +421,27 @@ func (c *Client) buildAuthMethods() ([]ssh.AuthMethod, error) {
 
 	// Try key authentication first
 	if c.config.KeyFile != "" {
-		key, err := os.ReadFile(c.config.KeyFile)
+		var keyData []byte
+		var err error
+
+		// Check if key file is encrypted (.enc suffix)
+		if security.IsEncryptedFile(c.config.KeyFile) {
+			if c.config.MasterPassword == "" {
+				return nil, fmt.Errorf("master password required for encrypted key file")
+			}
+			keyData, err = security.ReadEncryptedFile(c.config.KeyFile, []byte(c.config.MasterPassword))
+		} else {
+			keyData, err = os.ReadFile(c.config.KeyFile)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("read key file: %w", err)
 		}
 
 		var signer ssh.Signer
 		if c.config.KeyPassphrase != "" {
-			signer, err = ssh.ParsePrivateKeyWithPassphrase(key, []byte(c.config.KeyPassphrase))
+			signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(c.config.KeyPassphrase))
 		} else {
-			signer, err = ssh.ParsePrivateKey(key)
+			signer, err = ssh.ParsePrivateKey(keyData)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("parse private key: %w", err)
@@ -438,6 +551,13 @@ func isConnectionError(err error) bool {
 		return true
 	}
 	if _, ok := err.(*net.OpError); ok {
+		return true
+	}
+	// Check for SSH-specific errors indicating connection loss
+	errStr := err.Error()
+	if strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "connection reset") ||
+		strings.Contains(errStr, "broken pipe") {
 		return true
 	}
 	return false
