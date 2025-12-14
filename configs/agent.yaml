@@ -6,6 +6,24 @@ server:
   # BlazeLog server address (host:port)
   address: "localhost:9443"
 
+  # TLS configuration for mTLS (mutual TLS)
+  # Generate certificates with: blazelog ca init && blazelog cert agent
+  tls:
+    # Enable mTLS (set to false for insecure mode during development)
+    enabled: false
+
+    # Agent certificate file
+    # cert_file: "/etc/blazelog/certs/agent.crt"
+
+    # Agent private key file
+    # key_file: "/etc/blazelog/certs/agent.key"
+
+    # CA certificate for verifying server certificate
+    # ca_file: "/etc/blazelog/certs/ca.crt"
+
+    # Skip server certificate verification (dev only, NOT recommended for production)
+    # insecure_skip_verify: false
+
 # Agent settings
 agent:
   # Agent name (defaults to hostname if empty)

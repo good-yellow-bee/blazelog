@@ -77,8 +77,20 @@ func runServer(cmd *cobra.Command, args []string) error {
 		Verbose:     cfg.Verbose,
 	}
 
+	// Configure TLS if enabled
+	if cfg.Server.TLS.Enabled {
+		serverCfg.TLS = &server.TLSConfig{
+			CertFile:     cfg.Server.TLS.CertFile,
+			KeyFile:      cfg.Server.TLS.KeyFile,
+			ClientCAFile: cfg.Server.TLS.ClientCAFile,
+		}
+	}
+
 	// Create server
-	srv := server.New(serverCfg)
+	srv, err := server.New(serverCfg)
+	if err != nil {
+		return fmt.Errorf("create server: %w", err)
+	}
 
 	// Setup signal handling
 	ctx, cancel := context.WithCancel(context.Background())

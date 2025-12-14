@@ -16,8 +16,17 @@ type Config struct {
 
 // ServerConfig contains server settings.
 type ServerConfig struct {
-	GRPCAddress string `yaml:"grpc_address"` // gRPC listen address (default: :9443)
-	HTTPAddress string `yaml:"http_address"` // HTTP listen address (default: :8080)
+	GRPCAddress string    `yaml:"grpc_address"` // gRPC listen address (default: :9443)
+	HTTPAddress string    `yaml:"http_address"` // HTTP listen address (default: :8080)
+	TLS         TLSConfig `yaml:"tls"`          // TLS configuration for mTLS
+}
+
+// TLSConfig contains TLS settings for the server.
+type TLSConfig struct {
+	Enabled      bool   `yaml:"enabled"`        // Enable mTLS
+	CertFile     string `yaml:"cert_file"`      // Server certificate file
+	KeyFile      string `yaml:"key_file"`       // Server private key file
+	ClientCAFile string `yaml:"client_ca_file"` // CA certificate for verifying client certs
 }
 
 // LoadConfig loads configuration from a YAML file.
@@ -62,6 +71,17 @@ func (c *Config) setDefaults() {
 func (c *Config) Validate() error {
 	if c.Server.GRPCAddress == "" {
 		return fmt.Errorf("server.grpc_address is required")
+	}
+	if c.Server.TLS.Enabled {
+		if c.Server.TLS.CertFile == "" {
+			return fmt.Errorf("server.tls.cert_file is required when TLS is enabled")
+		}
+		if c.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("server.tls.key_file is required when TLS is enabled")
+		}
+		if c.Server.TLS.ClientCAFile == "" {
+			return fmt.Errorf("server.tls.client_ca_file is required when TLS is enabled")
+		}
 	}
 	return nil
 }

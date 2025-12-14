@@ -9,3 +9,18 @@ server:
 
   # HTTP listen address for REST API (future)
   http_address: ":8080"
+
+  # TLS configuration for mTLS (mutual TLS)
+  # Generate certificates with: blazelog ca init && blazelog cert server
+  tls:
+    # Enable mTLS (set to false for insecure mode during development)
+    enabled: false
+
+    # Server certificate file
+    # cert_file: "/etc/blazelog/certs/server.crt"
+
+    # Server private key file
+    # key_file: "/etc/blazelog/certs/server.key"
+
+    # CA certificate for verifying client certificates
+    # client_ca_file: "/etc/blazelog/certs/ca.crt"
