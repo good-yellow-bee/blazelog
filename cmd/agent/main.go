@@ -83,6 +83,12 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		Sources:       sources,
 		Labels:        cfg.Labels,
 		Verbose:       verbose,
+
+		// Reliability settings
+		BufferDir:         cfg.Reliability.BufferDir,
+		HeartbeatInterval: cfg.Reliability.HeartbeatInterval,
+		ReconnectInitial:  cfg.Reliability.ReconnectInitial,
+		ReconnectMax:      cfg.Reliability.ReconnectMax,
 	}
 
 	// Configure TLS if enabled
