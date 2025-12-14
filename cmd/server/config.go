@@ -14,7 +14,19 @@ type Config struct {
 	Database       DatabaseConfig    `yaml:"database"`        // Database configuration
 	ClickHouse     ClickHouseConfig  `yaml:"clickhouse"`      // ClickHouse log storage configuration
 	SSHConnections []SSHConnection   `yaml:"ssh_connections"` // SSH connections for remote log collection
+	Auth           AuthConfig        `yaml:"auth"`            // Authentication configuration
 	Verbose        bool              `yaml:"-"`               // set via CLI flag
+}
+
+// AuthConfig contains authentication settings.
+type AuthConfig struct {
+	JWTSecretEnv     string `yaml:"jwt_secret_env"`      // Env var name for JWT secret (default: BLAZELOG_JWT_SECRET)
+	AccessTokenTTL   string `yaml:"access_token_ttl"`    // Access token TTL (default: 15m)
+	RefreshTokenTTL  string `yaml:"refresh_token_ttl"`   // Refresh token TTL (default: 168h / 7 days)
+	RateLimitPerIP   int    `yaml:"rate_limit_per_ip"`   // Login rate limit per IP (default: 5/min)
+	RateLimitPerUser int    `yaml:"rate_limit_per_user"` // API rate limit per user (default: 100/min)
+	LockoutThreshold int    `yaml:"lockout_threshold"`   // Failed attempts before lockout (default: 5)
+	LockoutDuration  string `yaml:"lockout_duration"`    // Lockout duration (default: 15m)
 }
 
 // ClickHouseConfig contains ClickHouse settings.
@@ -134,6 +146,28 @@ func (c *Config) setDefaults() {
 	}
 	if c.ClickHouse.RetentionDays == 0 {
 		c.ClickHouse.RetentionDays = 30
+	}
+	// Auth defaults
+	if c.Auth.JWTSecretEnv == "" {
+		c.Auth.JWTSecretEnv = "BLAZELOG_JWT_SECRET"
+	}
+	if c.Auth.AccessTokenTTL == "" {
+		c.Auth.AccessTokenTTL = "15m"
+	}
+	if c.Auth.RefreshTokenTTL == "" {
+		c.Auth.RefreshTokenTTL = "168h" // 7 days
+	}
+	if c.Auth.RateLimitPerIP == 0 {
+		c.Auth.RateLimitPerIP = 5
+	}
+	if c.Auth.RateLimitPerUser == 0 {
+		c.Auth.RateLimitPerUser = 100
+	}
+	if c.Auth.LockoutThreshold == 0 {
+		c.Auth.LockoutThreshold = 5
+	}
+	if c.Auth.LockoutDuration == "" {
+		c.Auth.LockoutDuration = "15m"
 	}
 }
 

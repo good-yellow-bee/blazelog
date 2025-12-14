@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/api"
 	"github.com/good-yellow-bee/blazelog/internal/server"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/pkg/config"
@@ -135,10 +136,16 @@ func runServer(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Create server
+	// Create gRPC server
 	srv, err := server.New(serverCfg)
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
+	}
+
+	// Initialize HTTP API server
+	apiServer, err := initAPIServer(cfg, store)
+	if err != nil {
+		return fmt.Errorf("init api server: %w", err)
 	}
 
 	// Setup signal handling
@@ -154,16 +161,73 @@ func runServer(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	// Run server
+	// Run servers
 	log.Printf("starting blazelog-server %s", config.Version)
 	log.Printf("gRPC listening on %s", cfg.Server.GRPCAddress)
 
-	if err := srv.Run(ctx); err != nil {
-		return fmt.Errorf("run server: %w", err)
+	errChan := make(chan error, 2)
+
+	// Start gRPC server
+	go func() {
+		if err := srv.Run(ctx); err != nil {
+			errChan <- fmt.Errorf("grpc server: %w", err)
+		}
+	}()
+
+	// Start HTTP API server
+	go func() {
+		if err := apiServer.Run(ctx); err != nil {
+			errChan <- fmt.Errorf("api server: %w", err)
+		}
+	}()
+
+	// Wait for shutdown or error
+	select {
+	case <-ctx.Done():
+		log.Printf("server stopped")
+	case err := <-errChan:
+		cancel()
+		return err
 	}
 
-	log.Printf("server stopped")
 	return nil
+}
+
+// initAPIServer initializes the HTTP API server.
+func initAPIServer(cfg *Config, store storage.Storage) (*api.Server, error) {
+	// Get JWT secret
+	jwtSecret := os.Getenv(cfg.Auth.JWTSecretEnv)
+	if jwtSecret == "" {
+		return nil, fmt.Errorf("%s environment variable is required", cfg.Auth.JWTSecretEnv)
+	}
+
+	// Parse durations
+	accessTTL, err := time.ParseDuration(cfg.Auth.AccessTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("parse access_token_ttl: %w", err)
+	}
+	refreshTTL, err := time.ParseDuration(cfg.Auth.RefreshTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("parse refresh_token_ttl: %w", err)
+	}
+	lockoutDuration, err := time.ParseDuration(cfg.Auth.LockoutDuration)
+	if err != nil {
+		return nil, fmt.Errorf("parse lockout_duration: %w", err)
+	}
+
+	apiConfig := &api.Config{
+		Address:          cfg.Server.HTTPAddress,
+		JWTSecret:        []byte(jwtSecret),
+		AccessTokenTTL:   accessTTL,
+		RefreshTokenTTL:  refreshTTL,
+		RateLimitPerIP:   cfg.Auth.RateLimitPerIP,
+		RateLimitPerUser: cfg.Auth.RateLimitPerUser,
+		LockoutThreshold: cfg.Auth.LockoutThreshold,
+		LockoutDuration:  lockoutDuration,
+		Verbose:          cfg.Verbose,
+	}
+
+	return api.New(apiConfig, store)
 }
 
 // initClickHouse initializes ClickHouse storage and returns a LogBuffer.
