@@ -84,6 +84,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, alert *alerting.Alert) error 
 	defer d.mu.RUnlock()
 
 	var errs []error
+	sentCount := 0
 	for _, name := range alert.Notify {
 		n, ok := d.notifiers[name]
 		if !ok {
@@ -91,7 +92,14 @@ func (d *Dispatcher) Dispatch(ctx context.Context, alert *alerting.Alert) error 
 		}
 		if err := n.Send(ctx, alert); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", name, err))
+		} else {
+			sentCount++
 		}
+	}
+
+	// Refund rate limit token if all sends failed
+	if sentCount == 0 && d.rateLimiter != nil {
+		d.rateLimiter.Release()
 	}
 
 	if len(errs) > 0 {
@@ -112,10 +120,18 @@ func (d *Dispatcher) DispatchAll(ctx context.Context, alert *alerting.Alert) err
 	defer d.mu.RUnlock()
 
 	var errs []error
+	sentCount := 0
 	for name, n := range d.notifiers {
 		if err := n.Send(ctx, alert); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", name, err))
+		} else {
+			sentCount++
 		}
+	}
+
+	// Refund rate limit token if all sends failed
+	if sentCount == 0 && d.rateLimiter != nil {
+		d.rateLimiter.Release()
 	}
 
 	if len(errs) > 0 {

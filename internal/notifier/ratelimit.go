@@ -75,6 +75,17 @@ func (r *RateLimiter) Allow() bool {
 	return true
 }
 
+// Release refunds the most recently consumed token.
+// Call this when a notification attempt fails after Allow() returned true.
+func (r *RateLimiter) Release() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.timestamps) > 0 {
+		r.timestamps = r.timestamps[:len(r.timestamps)-1]
+	}
+}
+
 // cleanup removes timestamps older than the cutoff time.
 // Must be called with mutex held.
 func (r *RateLimiter) cleanup(cutoff time.Time) {

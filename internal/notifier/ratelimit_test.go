@@ -214,6 +214,62 @@ func TestRateLimiterSlidingWindow(t *testing.T) {
 	}
 }
 
+func TestRateLimiterRelease(t *testing.T) {
+	config := RateLimitConfig{
+		MaxPerWindow: 3,
+		Window:       time.Minute,
+		Enabled:      true,
+	}
+	rl := NewRateLimiter(config)
+
+	// Use up 2 tokens
+	rl.Allow()
+	rl.Allow()
+
+	stats := rl.Stats()
+	if stats.CurrentCount != 2 {
+		t.Errorf("current count = %d, want 2", stats.CurrentCount)
+	}
+
+	// Release one token
+	rl.Release()
+
+	stats = rl.Stats()
+	if stats.CurrentCount != 1 {
+		t.Errorf("current count after release = %d, want 1", stats.CurrentCount)
+	}
+
+	// Should now be able to make 2 more requests (1 remaining + 2 new = 3 max)
+	if !rl.Allow() {
+		t.Error("should allow after release")
+	}
+	if !rl.Allow() {
+		t.Error("should allow 2nd after release")
+	}
+
+	// 4th should be denied (at max now)
+	if rl.Allow() {
+		t.Error("should deny when at max")
+	}
+}
+
+func TestRateLimiterReleaseEmpty(t *testing.T) {
+	config := RateLimitConfig{
+		MaxPerWindow: 3,
+		Window:       time.Minute,
+		Enabled:      true,
+	}
+	rl := NewRateLimiter(config)
+
+	// Release on empty should not panic
+	rl.Release()
+
+	stats := rl.Stats()
+	if stats.CurrentCount != 0 {
+		t.Errorf("current count = %d, want 0", stats.CurrentCount)
+	}
+}
+
 func TestRateLimiterConcurrentAccess(t *testing.T) {
 	config := RateLimitConfig{
 		MaxPerWindow: 100,
