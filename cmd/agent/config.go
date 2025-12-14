@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,10 +15,11 @@ import (
 
 // Config represents the agent configuration.
 type Config struct {
-	Server  ServerConfig      `yaml:"server"`
-	Agent   AgentConfig       `yaml:"agent"`
-	Sources []SourceConfig    `yaml:"sources"`
-	Labels  map[string]string `yaml:"labels"`
+	Server      ServerConfig      `yaml:"server"`
+	Agent       AgentConfig       `yaml:"agent"`
+	Reliability ReliabilityConfig `yaml:"reliability"`
+	Sources     []SourceConfig    `yaml:"sources"`
+	Labels      map[string]string `yaml:"labels"`
 }
 
 // ServerConfig contains server connection settings.
@@ -40,6 +43,15 @@ type AgentConfig struct {
 	Name          string        `yaml:"name"`           // human-readable name
 	BatchSize     int           `yaml:"batch_size"`     // entries per batch (default: 100)
 	FlushInterval time.Duration `yaml:"flush_interval"` // batch flush interval (default: 1s)
+}
+
+// ReliabilityConfig contains reliability settings.
+type ReliabilityConfig struct {
+	BufferDir         string        `yaml:"buffer_dir"`         // buffer directory (default: ~/.blazelog/buffer)
+	BufferMaxSize     string        `yaml:"buffer_max_size"`    // max buffer size (default: 100MB)
+	HeartbeatInterval time.Duration `yaml:"heartbeat_interval"` // heartbeat interval (default: 15s)
+	ReconnectInitial  time.Duration `yaml:"reconnect_initial"`  // initial reconnect delay (default: 1s)
+	ReconnectMax      time.Duration `yaml:"reconnect_max"`      // max reconnect delay (default: 30s)
 }
 
 // SourceConfig defines a log source to collect.
@@ -94,6 +106,20 @@ func (c *Config) setDefaults() {
 	if c.Labels == nil {
 		c.Labels = make(map[string]string)
 	}
+
+	// Reliability defaults
+	if c.Reliability.BufferMaxSize == "" {
+		c.Reliability.BufferMaxSize = "100MB"
+	}
+	if c.Reliability.HeartbeatInterval <= 0 {
+		c.Reliability.HeartbeatInterval = 15 * time.Second
+	}
+	if c.Reliability.ReconnectInitial <= 0 {
+		c.Reliability.ReconnectInitial = time.Second
+	}
+	if c.Reliability.ReconnectMax <= 0 {
+		c.Reliability.ReconnectMax = 30 * time.Second
+	}
 }
 
 // Validate checks the configuration for errors.
@@ -143,4 +169,35 @@ func OS() string {
 // Arch returns the CPU architecture.
 func Arch() string {
 	return runtime.GOARCH
+}
+
+// parseBufferSize parses human-readable size strings like "100MB" to bytes.
+func parseBufferSize(s string) int64 {
+	if s == "" {
+		return 0
+	}
+
+	s = strings.TrimSpace(strings.ToUpper(s))
+
+	multipliers := map[string]int64{
+		"B":  1,
+		"KB": 1024,
+		"MB": 1024 * 1024,
+		"GB": 1024 * 1024 * 1024,
+	}
+
+	for suffix, mult := range multipliers {
+		if strings.HasSuffix(s, suffix) {
+			numStr := strings.TrimSuffix(s, suffix)
+			num, err := strconv.ParseInt(strings.TrimSpace(numStr), 10, 64)
+			if err != nil {
+				return 0
+			}
+			return num * mult
+		}
+	}
+
+	// Try parsing as raw bytes
+	num, _ := strconv.ParseInt(s, 10, 64)
+	return num
 }

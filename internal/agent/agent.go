@@ -7,8 +7,10 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/agent/buffer"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 	blazelogv1 "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1"
 	"github.com/good-yellow-bee/blazelog/pkg/config"
@@ -25,16 +27,30 @@ type AgentConfig struct {
 	Labels        map[string]string
 	Verbose       bool
 	TLS           *TLSConfig // nil = insecure mode
+
+	// Reliability settings
+	BufferDir         string        // Buffer directory (default: ~/.blazelog/buffer)
+	BufferMaxSize     int64         // Max buffer size in bytes (default: 100MB)
+	HeartbeatInterval time.Duration // Heartbeat interval (default: 15s)
+	ReconnectInitial  time.Duration // Initial reconnect delay (default: 1s)
+	ReconnectMax      time.Duration // Max reconnect delay (default: 30s)
 }
 
-// Agent is the main BlazeLog agent.
+// Agent is the main BlazeLog agent with reliability features.
 type Agent struct {
 	config     *AgentConfig
-	client     *Client
+	connMgr    *ConnManager
+	heartbeater *Heartbeater
+	buffer     buffer.Buffer
 	collectors []*Collector
 
 	entriesChan chan *models.LogEntry
 	batchBuffer []*blazelogv1.LogEntry
+
+	// Metrics for heartbeat status
+	entriesProcessed uint64
+	entriesSent      uint64
+	errorCount       uint64
 
 	mu     sync.Mutex
 	closed bool
@@ -42,15 +58,40 @@ type Agent struct {
 
 // New creates a new agent with the given configuration.
 func New(cfg *AgentConfig) (*Agent, error) {
+	// Apply defaults
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = 100
 	}
 	if cfg.FlushInterval <= 0 {
 		cfg.FlushInterval = time.Second
 	}
+	if cfg.HeartbeatInterval <= 0 {
+		cfg.HeartbeatInterval = 15 * time.Second
+	}
+	if cfg.ReconnectInitial <= 0 {
+		cfg.ReconnectInitial = time.Second
+	}
+	if cfg.ReconnectMax <= 0 {
+		cfg.ReconnectMax = 30 * time.Second
+	}
+
+	// Initialize buffer
+	bufCfg := buffer.DefaultConfig()
+	if cfg.BufferDir != "" {
+		bufCfg.Dir = cfg.BufferDir
+	}
+	if cfg.BufferMaxSize > 0 {
+		bufCfg.MaxSize = cfg.BufferMaxSize
+	}
+
+	buf, err := buffer.NewDiskBuffer(bufCfg)
+	if err != nil {
+		return nil, fmt.Errorf("create buffer: %w", err)
+	}
 
 	return &Agent{
 		config:      cfg,
+		buffer:      buf,
 		entriesChan: make(chan *models.LogEntry, 1000),
 		batchBuffer: make([]*blazelogv1.LogEntry, 0, cfg.BatchSize),
 	}, nil
@@ -58,23 +99,62 @@ func New(cfg *AgentConfig) (*Agent, error) {
 
 // Run starts the agent and blocks until the context is cancelled.
 func (a *Agent) Run(ctx context.Context) error {
-	// Connect to server
-	client, err := NewClient(a.config.ServerAddress, a.config.TLS)
-	if err != nil {
-		return fmt.Errorf("create client: %w", err)
-	}
-	a.client = client
-	defer a.client.Close()
+	defer a.buffer.Close()
 
-	// Register with server
-	if err := a.register(ctx); err != nil {
-		return fmt.Errorf("register: %w", err)
+	// Check for buffered entries from previous run
+	if a.buffer.Len() > 0 {
+		a.logf("found %d buffered entries from previous run", a.buffer.Len())
 	}
 
-	// Start log stream
-	if err := a.client.StartStream(ctx); err != nil {
-		return fmt.Errorf("start stream: %w", err)
+	// Build agent info for registration
+	agentInfo := a.buildAgentInfo()
+
+	// Create connection manager
+	connCfg := ConnManagerConfig{
+		ServerAddress:  a.config.ServerAddress,
+		TLS:            a.config.TLS,
+		AgentInfo:      agentInfo,
+		InitialBackoff: a.config.ReconnectInitial,
+		MaxBackoff:     a.config.ReconnectMax,
 	}
+	a.connMgr = NewConnManager(connCfg)
+	a.connMgr.SetVerbose(a.config.Verbose)
+	a.connMgr.SetCallbacks(
+		func() { a.onConnected(ctx) },
+		func(err error) { a.onDisconnected(err) },
+		func(state ConnState) { a.logf("connection state: %s", state) },
+	)
+
+	// Initial connect with retry
+	if err := a.connMgr.Connect(ctx); err != nil {
+		return fmt.Errorf("connect: %w", err)
+	}
+	defer a.connMgr.Close()
+
+	// Start heartbeat
+	hbCfg := HeartbeatConfig{
+		Interval:  a.config.HeartbeatInterval,
+		Timeout:   5 * time.Second,
+		MaxMissed: 3,
+	}
+	a.heartbeater = NewHeartbeater(a.connMgr, hbCfg, a.buildStatus)
+	a.heartbeater.SetVerbose(a.config.Verbose)
+	hbReconnectCh := a.heartbeater.Start(ctx)
+
+	// Start reconnection loop
+	go a.connMgr.RunReconnectLoop(ctx)
+
+	// Handle heartbeat-triggered reconnects
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hbReconnectCh:
+				a.connMgr.TriggerReconnect()
+			}
+		}
+	}()
 
 	// Create and start collectors
 	if err := a.startCollectors(ctx); err != nil {
@@ -97,8 +177,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	return a.Stop()
 }
 
-// register registers the agent with the server.
-func (a *Agent) register(ctx context.Context) error {
+// buildAgentInfo creates the AgentInfo for registration.
+func (a *Agent) buildAgentInfo() *blazelogv1.AgentInfo {
 	hostname, _ := os.Hostname()
 
 	sources := make([]*blazelogv1.LogSource, len(a.config.Sources))
@@ -111,7 +191,7 @@ func (a *Agent) register(ctx context.Context) error {
 		}
 	}
 
-	info := &blazelogv1.AgentInfo{
+	return &blazelogv1.AgentInfo{
 		AgentId:  a.config.ID,
 		Name:     a.config.Name,
 		Hostname: hostname,
@@ -121,14 +201,59 @@ func (a *Agent) register(ctx context.Context) error {
 		Labels:   a.config.Labels,
 		Sources:  sources,
 	}
+}
 
-	resp, err := a.client.Register(ctx, info)
-	if err != nil {
-		return err
+// buildStatus creates the AgentStatus for heartbeats.
+func (a *Agent) buildStatus() *blazelogv1.AgentStatus {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	return &blazelogv1.AgentStatus{
+		EntriesProcessed: atomic.LoadUint64(&a.entriesProcessed),
+		BufferSize:       uint64(a.buffer.Len()),
+		ActiveSources:    int32(len(a.collectors)),
+		MemoryBytes:      memStats.Alloc,
+	}
+}
+
+// onConnected is called when connection is established.
+func (a *Agent) onConnected(ctx context.Context) {
+	a.logf("connected, replaying %d buffered entries...", a.buffer.Len())
+
+	// Replay buffered entries
+	replayed := 0
+	for a.buffer.Len() > 0 {
+		entries, err := a.buffer.Read(a.config.BatchSize)
+		if err != nil || len(entries) == 0 {
+			break
+		}
+
+		client := a.connMgr.Client()
+		if client == nil {
+			// Re-buffer if no client
+			a.buffer.Write(entries)
+			break
+		}
+
+		if err := client.SendBatch(ctx, entries); err != nil {
+			a.logf("replay failed, re-buffering: %v", err)
+			a.buffer.Write(entries)
+			break
+		}
+
+		replayed += len(entries)
+		atomic.AddUint64(&a.entriesSent, uint64(len(entries)))
 	}
 
-	a.logf("registered with server, agent_id=%s", resp.AgentId)
-	return nil
+	if replayed > 0 {
+		a.logf("replayed %d buffered entries", replayed)
+	}
+}
+
+// onDisconnected is called when connection is lost.
+func (a *Agent) onDisconnected(err error) {
+	atomic.AddUint64(&a.errorCount, 1)
+	a.logf("disconnected: %v, buffering logs...", err)
 }
 
 // startCollectors creates and starts all log collectors.
@@ -159,6 +284,7 @@ func (a *Agent) mergeEntries(ctx context.Context) {
 		go func(collector *Collector) {
 			defer wg.Done()
 			for entry := range collector.Entries() {
+				atomic.AddUint64(&a.entriesProcessed, 1)
 				select {
 				case a.entriesChan <- entry:
 				case <-ctx.Done():
@@ -205,7 +331,7 @@ func (a *Agent) batchSender(ctx context.Context) {
 	}
 }
 
-// flushBatch sends the current batch to the server.
+// flushBatch sends the current batch to the server or buffers on failure.
 func (a *Agent) flushBatch(ctx context.Context) {
 	if len(a.batchBuffer) == 0 {
 		return
@@ -214,33 +340,78 @@ func (a *Agent) flushBatch(ctx context.Context) {
 	batch := a.batchBuffer
 	a.batchBuffer = make([]*blazelogv1.LogEntry, 0, a.config.BatchSize)
 
-	if err := a.client.SendBatch(ctx, batch); err != nil {
-		a.logf("error sending batch: %v", err)
-		return
+	// Try to send if connected
+	if a.connMgr != nil && a.connMgr.IsConnected() {
+		client := a.connMgr.Client()
+		if client != nil {
+			if err := client.SendBatch(ctx, batch); err != nil {
+				a.logf("send failed, buffering %d entries: %v", len(batch), err)
+				atomic.AddUint64(&a.errorCount, 1)
+				// Buffer on failure
+				if err := a.buffer.Write(batch); err != nil {
+					a.logf("buffer write failed: %v", err)
+				}
+				// Trigger reconnect
+				a.connMgr.TriggerReconnect()
+				return
+			}
+
+			atomic.AddUint64(&a.entriesSent, uint64(len(batch)))
+			a.logf("sent batch of %d entries", len(batch))
+			return
+		}
 	}
 
-	a.logf("sent batch of %d entries", len(batch))
+	// Not connected: buffer entries
+	if err := a.buffer.Write(batch); err != nil {
+		a.logf("buffer write failed: %v", err)
+	} else {
+		a.logf("buffered %d entries (disconnected)", len(batch))
+	}
 }
 
 // handleResponses processes responses from the server.
 func (a *Agent) handleResponses(ctx context.Context) {
-	responses, errs := a.client.ReceiveResponses(ctx)
-
 	for {
+		client := a.connMgr.Client()
+		if client == nil {
+			// Wait for connection
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(100 * time.Millisecond):
+				continue
+			}
+		}
+
+		responses, errs := client.ReceiveResponses(ctx)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case resp, ok := <-responses:
+				if !ok {
+					// Channel closed, reconnect
+					goto reconnect
+				}
+				a.handleResponse(resp)
+			case err, ok := <-errs:
+				if !ok {
+					goto reconnect
+				}
+				a.logf("stream error: %v", err)
+				a.connMgr.TriggerReconnect()
+				goto reconnect
+			}
+		}
+
+	reconnect:
+		// Wait before retrying
 		select {
 		case <-ctx.Done():
 			return
-		case resp, ok := <-responses:
-			if !ok {
-				return
-			}
-			a.handleResponse(resp)
-		case err, ok := <-errs:
-			if !ok {
-				return
-			}
-			a.logf("stream error: %v", err)
-			return
+		case <-time.After(100 * time.Millisecond):
 		}
 	}
 }
@@ -285,14 +456,32 @@ func (a *Agent) Stop() error {
 		c.Stop()
 	}
 
-	// Close client
-	if a.client != nil {
-		if err := a.client.Close(); err != nil {
-			a.logf("error closing client: %v", err)
-		}
+	// Close connection manager
+	if a.connMgr != nil {
+		a.connMgr.Close()
+	}
+
+	// Close buffer (already deferred in Run, but just in case)
+	if a.buffer != nil {
+		a.buffer.Close()
 	}
 
 	return nil
+}
+
+// BufferLen returns the current buffer length.
+func (a *Agent) BufferLen() int {
+	if a.buffer == nil {
+		return 0
+	}
+	return a.buffer.Len()
+}
+
+// Stats returns current agent statistics.
+func (a *Agent) Stats() (processed, sent, errors uint64) {
+	return atomic.LoadUint64(&a.entriesProcessed),
+		atomic.LoadUint64(&a.entriesSent),
+		atomic.LoadUint64(&a.errorCount)
 }
 
 // logf logs a message if verbose mode is enabled.
