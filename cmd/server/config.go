@@ -10,8 +10,9 @@ import (
 
 // Config represents the server configuration.
 type Config struct {
-	Server  ServerConfig `yaml:"server"`
-	Verbose bool         `yaml:"-"` // set via CLI flag
+	Server         ServerConfig    `yaml:"server"`
+	SSHConnections []SSHConnection `yaml:"ssh_connections"` // SSH connections for remote log collection
+	Verbose        bool            `yaml:"-"`               // set via CLI flag
 }
 
 // ServerConfig contains server settings.
@@ -27,6 +28,24 @@ type TLSConfig struct {
 	CertFile     string `yaml:"cert_file"`      // Server certificate file
 	KeyFile      string `yaml:"key_file"`       // Server private key file
 	ClientCAFile string `yaml:"client_ca_file"` // CA certificate for verifying client certs
+}
+
+// SSHConnection defines a remote server connection for log collection.
+type SSHConnection struct {
+	Name          string      `yaml:"name"`           // Unique name for this connection
+	Host          string      `yaml:"host"`           // SSH server address (host:port)
+	User          string      `yaml:"user"`           // SSH username
+	KeyFile       string      `yaml:"key_file"`       // Path to private key file
+	KeyPassphrase string      `yaml:"key_passphrase"` // Optional passphrase for encrypted keys
+	Password      string      `yaml:"password"`       // Password authentication (not recommended)
+	Sources       []SSHSource `yaml:"sources"`        // Log sources on this server
+}
+
+// SSHSource defines a log source on a remote server.
+type SSHSource struct {
+	Path   string `yaml:"path"`   // File path or glob pattern
+	Type   string `yaml:"type"`   // Parser type (nginx, apache, magento, etc.)
+	Follow bool   `yaml:"follow"` // Tail the file for new content
 }
 
 // LoadConfig loads configuration from a YAML file.
@@ -83,5 +102,39 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("server.tls.client_ca_file is required when TLS is enabled")
 		}
 	}
+
+	// Validate SSH connections
+	names := make(map[string]bool)
+	for i, conn := range c.SSHConnections {
+		if conn.Name == "" {
+			return fmt.Errorf("ssh_connections[%d].name is required", i)
+		}
+		if names[conn.Name] {
+			return fmt.Errorf("ssh_connections[%d].name '%s' is duplicated", i, conn.Name)
+		}
+		names[conn.Name] = true
+
+		if conn.Host == "" {
+			return fmt.Errorf("ssh_connections[%d].host is required", i)
+		}
+		if conn.User == "" {
+			return fmt.Errorf("ssh_connections[%d].user is required", i)
+		}
+		if conn.KeyFile == "" && conn.Password == "" {
+			return fmt.Errorf("ssh_connections[%d] requires key_file or password", i)
+		}
+		if len(conn.Sources) == 0 {
+			return fmt.Errorf("ssh_connections[%d].sources is required", i)
+		}
+		for j, src := range conn.Sources {
+			if src.Path == "" {
+				return fmt.Errorf("ssh_connections[%d].sources[%d].path is required", i, j)
+			}
+			if src.Type == "" {
+				return fmt.Errorf("ssh_connections[%d].sources[%d].type is required", i, j)
+			}
+		}
+	}
+
 	return nil
 }
