@@ -21,14 +21,24 @@ type Notifier interface {
 
 // Dispatcher manages multiple notifiers and routes alerts.
 type Dispatcher struct {
-	mu        sync.RWMutex
-	notifiers map[string]Notifier
+	mu          sync.RWMutex
+	notifiers   map[string]Notifier
+	rateLimiter *RateLimiter
 }
 
-// NewDispatcher creates a new notification dispatcher.
+// NewDispatcher creates a new notification dispatcher with default rate limiting.
 func NewDispatcher() *Dispatcher {
 	return &Dispatcher{
-		notifiers: make(map[string]Notifier),
+		notifiers:   make(map[string]Notifier),
+		rateLimiter: NewRateLimiter(DefaultRateLimitConfig()),
+	}
+}
+
+// NewDispatcherWithRateLimit creates a dispatcher with custom rate limit configuration.
+func NewDispatcherWithRateLimit(config RateLimitConfig) *Dispatcher {
+	return &Dispatcher{
+		notifiers:   make(map[string]Notifier),
+		rateLimiter: NewRateLimiter(config),
 	}
 }
 
@@ -54,11 +64,20 @@ func (d *Dispatcher) Get(name string) (Notifier, bool) {
 	return n, ok
 }
 
+// ErrRateLimited is returned when a notification is dropped due to rate limiting.
+var ErrRateLimited = fmt.Errorf("notification rate limited")
+
 // Dispatch sends an alert to all notifiers specified in alert.Notify.
 // If alert.Notify is empty, the alert is not sent to any notifier.
+// Returns ErrRateLimited if the notification is dropped due to rate limiting.
 func (d *Dispatcher) Dispatch(ctx context.Context, alert *alerting.Alert) error {
 	if len(alert.Notify) == 0 {
 		return nil
+	}
+
+	// Check rate limit
+	if d.rateLimiter != nil && !d.rateLimiter.Allow() {
+		return ErrRateLimited
 	}
 
 	d.mu.RLock()
@@ -82,7 +101,13 @@ func (d *Dispatcher) Dispatch(ctx context.Context, alert *alerting.Alert) error 
 }
 
 // DispatchAll sends an alert to all registered notifiers regardless of alert.Notify.
+// Returns ErrRateLimited if the notification is dropped due to rate limiting.
 func (d *Dispatcher) DispatchAll(ctx context.Context, alert *alerting.Alert) error {
+	// Check rate limit
+	if d.rateLimiter != nil && !d.rateLimiter.Allow() {
+		return ErrRateLimited
+	}
+
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -97,6 +122,14 @@ func (d *Dispatcher) DispatchAll(ctx context.Context, alert *alerting.Alert) err
 		return fmt.Errorf("notification errors: %v", errs)
 	}
 	return nil
+}
+
+// RateLimitStats returns the rate limiter statistics.
+func (d *Dispatcher) RateLimitStats() RateLimitStats {
+	if d.rateLimiter == nil {
+		return RateLimitStats{}
+	}
+	return d.rateLimiter.Stats()
 }
 
 // Close closes all registered notifiers.

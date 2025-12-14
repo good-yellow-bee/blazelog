@@ -84,6 +84,7 @@ rules:
     severity: "high"
     notify:
       - "slack"
+      - "teams"
 
   # Magento-specific pattern rule
   - name: "Magento Exception"
