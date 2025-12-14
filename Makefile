@@ -1,7 +1,8 @@
 # BlazeLog Makefile
 # Build, test, and manage the project
 
-.PHONY: all build build-agent build-server build-cli test lint clean install help
+.PHONY: all build build-agent build-server build-cli test lint clean install help \
+	proto proto-deps proto-lint proto-generate proto-clean
 
 # Go parameters
 GOCMD=/opt/homebrew/bin/go
@@ -137,3 +138,34 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  /'
+
+# Proto generation targets
+PROTO_DIR=proto
+
+## proto-deps: Install buf and protoc plugins
+proto-deps:
+	@echo "Installing buf..."
+	@$(GOCMD) install github.com/bufbuild/buf/cmd/buf@latest
+	@echo "Installing protoc-gen-go..."
+	@$(GOCMD) install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	@echo "Installing protoc-gen-go-grpc..."
+	@$(GOCMD) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+## proto-lint: Lint proto files
+proto-lint:
+	@echo "Linting proto files..."
+	@cd $(PROTO_DIR) && buf lint
+
+## proto-generate: Generate Go code from proto files
+proto-generate:
+	@echo "Generating Go code from protos..."
+	@cd $(PROTO_DIR) && buf generate
+
+## proto: Lint and generate proto files
+proto: proto-lint proto-generate
+	@echo "Proto generation complete"
+
+## proto-clean: Clean generated proto files
+proto-clean:
+	@echo "Cleaning generated proto files..."
+	@rm -rf internal/proto/blazelog

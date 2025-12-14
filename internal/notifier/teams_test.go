@@ -256,7 +256,7 @@ func TestTeamsNotifierContextCancellation(t *testing.T) {
 	}
 }
 
-func TestSeverityColor(t *testing.T) {
+func TestTeamsSeverityStyle(t *testing.T) {
 	tests := []struct {
 		severity alerting.Severity
 		want     string
@@ -270,9 +270,9 @@ func TestSeverityColor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.severity), func(t *testing.T) {
-			got := severityColor(tt.severity)
+			got := teamsSeverityStyle(tt.severity)
 			if got != tt.want {
-				t.Errorf("severityColor(%q) = %q, want %q", tt.severity, got, tt.want)
+				t.Errorf("teamsSeverityStyle(%q) = %q, want %q", tt.severity, got, tt.want)
 			}
 		})
 	}
@@ -332,6 +332,42 @@ func TestTeamsAdaptiveCardFormatting(t *testing.T) {
 	}
 	if !strings.Contains(jsonStr, "attention") {
 		t.Error("JSON missing critical color style")
+	}
+}
+
+func TestTeamsTextBlockColorLowercase(t *testing.T) {
+	notifier := &TeamsNotifier{}
+
+	alert := &alerting.Alert{
+		RuleName:    "Test Alert",
+		Description: "Test description triggers color field",
+		Severity:    alerting.SeverityMedium,
+		Message:     "Test message",
+		Timestamp:   time.Now(),
+		Labels: map[string]string{
+			"env": "prod",
+		},
+	}
+
+	payload := notifier.buildPayload(alert)
+
+	// Marshal to JSON and check for color values
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("failed to marshal payload: %v", err)
+	}
+
+	jsonStr := string(jsonData)
+
+	// Adaptive Cards require lowercase color names
+	// Check that we use "light" not "Light"
+	if strings.Contains(jsonStr, `"color":"Light"`) {
+		t.Error("found uppercase 'Light' color; Adaptive Cards require lowercase color names")
+	}
+
+	// Verify the lowercase version is present (description and labels both set color)
+	if !strings.Contains(jsonStr, `"color":"light"`) {
+		t.Error("expected lowercase 'light' color in payload")
 	}
 }
 

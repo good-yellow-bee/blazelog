@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package blazelog.v1;
+
+option go_package = "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1;blazelogv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "blazelog/v1/common.proto";
+
+// LogEntry represents a single parsed log entry.
+message LogEntry {
+  // When the log event occurred.
+  google.protobuf.Timestamp timestamp = 1;
+
+  // Severity level of the log.
+  LogLevel level = 2;
+
+  // Main log message content.
+  string message = 3;
+
+  // Source identifies where the log came from (optional).
+  string source = 4;
+
+  // Log format type (nginx, apache, etc.).
+  LogType type = 5;
+
+  // Original unparsed log line (optional).
+  string raw = 6;
+
+  // Additional parsed fields (status code, request path, etc.).
+  google.protobuf.Struct fields = 7;
+
+  // Key-value pairs for categorization.
+  map<string, string> labels = 8;
+
+  // Line number in the source file.
+  int64 line_number = 9;
+
+  // Path to the source file.
+  string file_path = 10;
+}
+
+// LogBatch contains multiple log entries for efficient streaming.
+message LogBatch {
+  // Batch of log entries.
+  repeated LogEntry entries = 1;
+
+  // Agent that sent this batch.
+  string agent_id = 2;
+
+  // Sequence number for ordering/deduplication.
+  uint64 sequence = 3;
+}

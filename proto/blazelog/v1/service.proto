@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package blazelog.v1;
+
+option go_package = "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1;blazelogv1";
+
+import "blazelog/v1/agent.proto";
+import "blazelog/v1/log.proto";
+
+// LogService handles log streaming from agents to server.
+service LogService {
+  // Register registers an agent with the server.
+  // Called once when agent starts.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // StreamLogs is a bidirectional stream for log ingestion.
+  // Agent sends log batches, server sends acknowledgements/commands.
+  rpc StreamLogs(stream LogBatch) returns (stream StreamResponse);
+
+  // Heartbeat sends periodic health checks.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+// StreamResponse is sent from server to agent during log streaming.
+message StreamResponse {
+  // Sequence number being acknowledged.
+  uint64 acked_sequence = 1;
+
+  // Optional command from server.
+  ServerCommand command = 2;
+
+  // Optional error message.
+  string error = 3;
+}
