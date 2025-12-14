@@ -21,7 +21,17 @@ type Config struct {
 
 // ServerConfig contains server connection settings.
 type ServerConfig struct {
-	Address string `yaml:"address"` // host:port
+	Address string    `yaml:"address"` // host:port
+	TLS     TLSConfig `yaml:"tls"`     // TLS configuration for mTLS
+}
+
+// TLSConfig contains TLS settings for the agent.
+type TLSConfig struct {
+	Enabled            bool   `yaml:"enabled"`              // Enable mTLS
+	CertFile           string `yaml:"cert_file"`            // Agent certificate file
+	KeyFile            string `yaml:"key_file"`             // Agent private key file
+	CAFile             string `yaml:"ca_file"`              // CA certificate for verifying server cert
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"` // Skip server cert verification (dev only)
 }
 
 // AgentConfig contains agent settings.
@@ -90,6 +100,17 @@ func (c *Config) setDefaults() {
 func (c *Config) Validate() error {
 	if c.Server.Address == "" {
 		return fmt.Errorf("server.address is required")
+	}
+	if c.Server.TLS.Enabled {
+		if c.Server.TLS.CertFile == "" {
+			return fmt.Errorf("server.tls.cert_file is required when TLS is enabled")
+		}
+		if c.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("server.tls.key_file is required when TLS is enabled")
+		}
+		if !c.Server.TLS.InsecureSkipVerify && c.Server.TLS.CAFile == "" {
+			return fmt.Errorf("server.tls.ca_file is required when TLS is enabled and insecure_skip_verify is false")
+		}
 	}
 	if len(c.Sources) == 0 {
 		return fmt.Errorf("at least one source is required")

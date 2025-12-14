@@ -3,13 +3,23 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 
 	blazelogv1 "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1"
+	"github.com/good-yellow-bee/blazelog/internal/security"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+// TLSConfig holds TLS configuration for the agent client.
+type TLSConfig struct {
+	CertFile           string
+	KeyFile            string
+	CAFile             string
+	InsecureSkipVerify bool
+}
 
 // Client is a gRPC client for the BlazeLog server.
 type Client struct {
@@ -24,12 +34,30 @@ type Client struct {
 }
 
 // NewClient creates a new gRPC client for the given server address.
-// Uses insecure connection (mTLS will be added in Milestone 15).
-func NewClient(address string) (*Client, error) {
-	conn, err := grpc.NewClient(
-		address,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+// If tlsConfig is nil, uses insecure connection.
+func NewClient(address string, tlsConfig *TLSConfig) (*Client, error) {
+	var opts []grpc.DialOption
+
+	// Configure TLS if enabled
+	if tlsConfig != nil {
+		cfg := &security.ClientTLSConfig{
+			CertFile:           tlsConfig.CertFile,
+			KeyFile:            tlsConfig.KeyFile,
+			CAFile:             tlsConfig.CAFile,
+			InsecureSkipVerify: tlsConfig.InsecureSkipVerify,
+		}
+		creds, err := security.LoadClientTLS(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("load client TLS: %w", err)
+		}
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+		log.Printf("mTLS enabled for gRPC client")
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		log.Printf("WARNING: gRPC client running in insecure mode (no TLS)")
+	}
+
+	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("connect to server: %w", err)
 	}

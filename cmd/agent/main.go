@@ -85,6 +85,16 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		Verbose:       verbose,
 	}
 
+	// Configure TLS if enabled
+	if cfg.Server.TLS.Enabled {
+		agentCfg.TLS = &agent.TLSConfig{
+			CertFile:           cfg.Server.TLS.CertFile,
+			KeyFile:            cfg.Server.TLS.KeyFile,
+			CAFile:             cfg.Server.TLS.CAFile,
+			InsecureSkipVerify: cfg.Server.TLS.InsecureSkipVerify,
+		}
+	}
+
 	// Create agent
 	a, err := agent.New(agentCfg)
 	if err != nil {

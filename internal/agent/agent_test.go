@@ -247,7 +247,7 @@ func TestClientRegister(t *testing.T) {
 	defer server.Stop()
 
 	// Create client
-	client, err := NewClient(lis.Addr().String())
+	client, err := NewClient(lis.Addr().String(), nil)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

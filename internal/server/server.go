@@ -7,6 +7,7 @@ import (
 	"net"
 
 	blazelogv1 "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1"
+	"github.com/good-yellow-bee/blazelog/internal/security"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -15,6 +16,14 @@ import (
 type Config struct {
 	GRPCAddress string
 	Verbose     bool
+	TLS         *TLSConfig // nil = insecure mode
+}
+
+// TLSConfig holds TLS configuration for the server.
+type TLSConfig struct {
+	CertFile     string
+	KeyFile      string
+	ClientCAFile string
 }
 
 // Server is the BlazeLog gRPC server.
@@ -26,13 +35,31 @@ type Server struct {
 }
 
 // New creates a new BlazeLog server.
-func New(cfg *Config) *Server {
+func New(cfg *Config) (*Server, error) {
 	processor := NewProcessor(cfg.Verbose)
 	handler := NewHandler(processor, cfg.Verbose)
 
-	grpcServer := grpc.NewServer(
-		grpc.Creds(insecure.NewCredentials()),
-	)
+	var opts []grpc.ServerOption
+
+	// Configure TLS if enabled
+	if cfg.TLS != nil {
+		tlsCfg := &security.ServerTLSConfig{
+			CertFile:     cfg.TLS.CertFile,
+			KeyFile:      cfg.TLS.KeyFile,
+			ClientCAFile: cfg.TLS.ClientCAFile,
+		}
+		creds, err := security.LoadServerTLS(tlsCfg)
+		if err != nil {
+			return nil, fmt.Errorf("load server TLS: %w", err)
+		}
+		opts = append(opts, grpc.Creds(creds))
+		log.Printf("mTLS enabled for gRPC server")
+	} else {
+		opts = append(opts, grpc.Creds(insecure.NewCredentials()))
+		log.Printf("WARNING: gRPC server running in insecure mode (no TLS)")
+	}
+
+	grpcServer := grpc.NewServer(opts...)
 	blazelogv1.RegisterLogServiceServer(grpcServer, handler)
 
 	return &Server{
@@ -40,7 +67,7 @@ func New(cfg *Config) *Server {
 		grpcServer: grpcServer,
 		handler:    handler,
 		processor:  processor,
-	}
+	}, nil
 }
 
 // Run starts the server and blocks until context is cancelled.

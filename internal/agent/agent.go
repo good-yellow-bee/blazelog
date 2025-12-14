@@ -24,6 +24,7 @@ type AgentConfig struct {
 	Sources       []SourceConfig
 	Labels        map[string]string
 	Verbose       bool
+	TLS           *TLSConfig // nil = insecure mode
 }
 
 // Agent is the main BlazeLog agent.
@@ -58,7 +59,7 @@ func New(cfg *AgentConfig) (*Agent, error) {
 // Run starts the agent and blocks until the context is cancelled.
 func (a *Agent) Run(ctx context.Context) error {
 	// Connect to server
-	client, err := NewClient(a.config.ServerAddress)
+	client, err := NewClient(a.config.ServerAddress, a.config.TLS)
 	if err != nil {
 		return fmt.Errorf("create client: %w", err)
 	}

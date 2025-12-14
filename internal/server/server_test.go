@@ -26,7 +26,10 @@ func TestServerIntegration(t *testing.T) {
 		GRPCAddress: addr,
 		Verbose:     true,
 	}
-	srv := New(cfg)
+	srv, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New server failed: %v", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
