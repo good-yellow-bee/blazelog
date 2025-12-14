@@ -6,9 +6,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/good-yellow-bee/blazelog/internal/server"
+	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/pkg/config"
 	"github.com/spf13/cobra"
 )
@@ -70,6 +72,36 @@ func runServer(cmd *cobra.Command, args []string) error {
 		cfg.Server.GRPCAddress = grpcAddr
 	}
 	cfg.Verbose = verbose
+
+	// Get master key from environment
+	masterKey := os.Getenv("BLAZELOG_MASTER_KEY")
+	if masterKey == "" {
+		return fmt.Errorf("BLAZELOG_MASTER_KEY environment variable is required")
+	}
+
+	// Auto-create data directory
+	dbDir := filepath.Dir(cfg.Database.Path)
+	if err := os.MkdirAll(dbDir, 0750); err != nil {
+		return fmt.Errorf("create data directory: %w", err)
+	}
+
+	// Initialize storage
+	store := storage.NewSQLiteStorage(cfg.Database.Path, []byte(masterKey))
+	if err := store.Open(); err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer store.Close()
+
+	if err := store.Migrate(); err != nil {
+		return fmt.Errorf("migrate database: %w", err)
+	}
+
+	// Create default admin user on first run
+	if err := store.EnsureAdminUser(); err != nil {
+		return fmt.Errorf("ensure admin user: %w", err)
+	}
+
+	log.Printf("database initialized at %s", cfg.Database.Path)
 
 	// Build server config
 	serverCfg := &server.Config{

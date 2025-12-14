@@ -25,6 +25,15 @@ server:
     # CA certificate for verifying client certificates
     # client_ca_file: "/etc/blazelog/certs/ca.crt"
 
+# Database configuration
+# NOTE: BLAZELOG_MASTER_KEY environment variable is REQUIRED
+# This key is used to encrypt sensitive data (connection credentials)
+# Generate a secure key: openssl rand -base64 32
+database:
+  # SQLite database file path
+  # Default: ./data/blazelog.db
+  path: "./data/blazelog.db"
+
 # SSH security settings
 ssh:
   # Host key verification file (OpenSSH known_hosts format)
