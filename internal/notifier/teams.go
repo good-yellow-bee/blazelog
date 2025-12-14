@@ -213,7 +213,7 @@ func (t *TeamsNotifier) buildPayload(alert *alerting.Alert) teamsMessage {
 			Type:  "TextBlock",
 			Text:  fmt.Sprintf("_Rule: %s_", alert.Description),
 			Wrap:  true,
-			Color: "Light",
+			Color: "light",
 		})
 	}
 
@@ -227,7 +227,7 @@ func (t *TeamsNotifier) buildPayload(alert *alerting.Alert) teamsMessage {
 			Type:  "TextBlock",
 			Text:  fmt.Sprintf("**Labels:** %s", strings.Join(labelParts, " ")),
 			Wrap:  true,
-			Color: "Light",
+			Color: "light",
 		})
 	}
 
