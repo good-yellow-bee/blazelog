@@ -619,6 +619,78 @@ Small, incremental milestones that each deliver usable value.
 
 ---
 
+#### Milestone 31: Docker Development & Production Environment
+**Tasks:**
+1. Create Dockerfile for blazelog-server (multi-stage build)
+2. Create Dockerfile for blazelog-agent (minimal Alpine)
+3. Create docker-compose.yml with profiles (dev/prod)
+4. Configure ClickHouse container with persistence
+5. Configure SQLite volume mounts
+6. Add health check endpoints integration
+7. Create .dockerignore files
+8. Add environment variable templates (.env.example)
+9. Create entrypoint scripts for initialization
+10. Configure mTLS certificate volume mounts
+11. Add docker-compose.override.yml for local dev
+12. Write container deployment documentation
+
+**Deliverable:** `docker-compose up` starts full stack (server + ClickHouse)
+**Effort:** Medium
+
+---
+
+#### Milestone 32: Kubernetes Deployment
+**Tasks:**
+1. Create Deployment manifests (server, agent DaemonSet)
+2. Create Service manifests (ClusterIP, LoadBalancer)
+3. Create ConfigMap for configuration
+4. Create Secret templates for credentials
+5. Create PersistentVolumeClaim for SQLite/data
+6. Add Helm chart (optional packaging)
+7. Configure ClickHouse StatefulSet or external connection
+8. Add Ingress configuration for web UI
+9. Add NetworkPolicy for security
+10. Write Kubernetes deployment guide
+
+**Deliverable:** `kubectl apply` deploys full BlazeLog stack
+**Effort:** Medium
+
+---
+
+### STAGE I: Documentation (Milestone 33)
+*Goal: Complete documentation for all features and deployment options*
+
+---
+
+#### Milestone 33: Comprehensive Documentation
+**Tasks:**
+1. Installation guide (binary, Docker, Kubernetes, systemd)
+2. Configuration reference (all YAML options documented)
+3. Agent deployment guide (all platforms: Linux, macOS, Windows)
+4. Log format integration guides:
+   - Nginx access/error logs
+   - Apache access/error logs
+   - Magento system/exception/debug logs
+   - PrestaShop logs
+   - WordPress debug.log
+   - Custom regex patterns
+5. Alert rules reference (threshold, pattern, all options)
+6. Notification setup guides (Email SMTP, Slack webhooks, Teams webhooks)
+7. SSH collection setup guide (key management, bastion/jump hosts)
+8. mTLS certificate management guide (CA, server, agent certs)
+9. REST API documentation (OpenAPI/Swagger spec)
+10. Web UI user guide (dashboard, log viewer, settings)
+11. Troubleshooting guide (common issues, debugging)
+12. Security best practices (hardening, audit logging)
+13. Performance tuning guide (buffer sizes, batch settings)
+14. Architecture deep-dive (components, data flow)
+15. Contributing guide (development setup, code style)
+
+**Deliverable:** Complete markdown documentation in docs/ folder
+**Effort:** Large
+
+---
+
 ## Milestone Summary
 
 | Stage | Milestones | Description |
@@ -630,9 +702,10 @@ Small, incremental milestones that each deliver usable value.
 | E | 19-21 | ClickHouse storage |
 | F | 22-24 | REST API |
 | G | 25-28 | Web UI |
-| H | 29-30 | Batch + Production |
+| H | 29-32 | Batch + Production + Docker + K8s |
+| I | 33 | Documentation |
 
-**Total: 30 milestones** (vs 11 large phases before)
+**Total: 33 milestones**
 
 Each milestone is:
 - Self-contained and testable
@@ -667,8 +740,10 @@ GitHub Project: "BlazeLog Development"
 | `stage-f` | `#E99695` | REST API |
 | `stage-g` | `#C2E0C6` | Web UI |
 | `stage-h` | `#BFD4F2` | Batch & Production |
+| `stage-i` | `#FF9800` | Documentation |
 | `effort-small` | `#C5DEF5` | Small effort |
 | `effort-medium` | `#FEF2C0` | Medium effort |
+| `effort-large` | `#F9D0C4` | Large effort |
 
 ### Workflow
 
