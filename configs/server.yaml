@@ -24,3 +24,31 @@ server:
 
     # CA certificate for verifying client certificates
     # client_ca_file: "/etc/blazelog/certs/ca.crt"
+
+# SSH connections for remote log collection (agentless mode)
+# Uncomment and configure to pull logs from remote servers via SSH
+# ssh_connections:
+#   - name: "web-server-1"
+#     host: "web1.example.com:22"
+#     user: "blazelog"
+#     key_file: "/etc/blazelog/ssh/web1.key"
+#     # key_passphrase: ""  # Optional passphrase for encrypted keys
+#     sources:
+#       - path: "/var/log/nginx/access.log"
+#         type: "nginx"
+#         follow: true
+#       - path: "/var/log/nginx/error.log"
+#         type: "nginx"
+#         follow: true
+#
+#   - name: "magento-server"
+#     host: "magento.example.com:22"
+#     user: "blazelog"
+#     key_file: "/etc/blazelog/ssh/magento.key"
+#     sources:
+#       - path: "/var/www/magento/var/log/system.log"
+#         type: "magento"
+#         follow: true
+#       - path: "/var/www/magento/var/log/exception.log"
+#         type: "magento"
+#         follow: true

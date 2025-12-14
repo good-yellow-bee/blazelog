@@ -1,0 +1,444 @@
+// Package ssh provides SSH client functionality for remote log collection.
+package ssh
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"sync"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+)
+
+// ClientConfig holds SSH client configuration.
+type ClientConfig struct {
+	// Host is the SSH server address (host:port).
+	Host string
+	// User is the SSH username.
+	User string
+	// KeyFile is the path to the private key file.
+	KeyFile string
+	// KeyPassphrase is the optional passphrase for encrypted keys.
+	KeyPassphrase string
+	// Password is used for password authentication (not recommended).
+	Password string
+	// Timeout is the connection timeout.
+	Timeout time.Duration
+	// KeepAliveInterval is the interval for keep-alive probes.
+	KeepAliveInterval time.Duration
+}
+
+// Client is an SSH client for remote file operations.
+type Client struct {
+	config    *ClientConfig
+	sshClient *ssh.Client
+	mu        sync.Mutex
+	connected bool
+	lastError error
+	closeCh   chan struct{}
+	closeOnce sync.Once
+}
+
+// NewClient creates a new SSH client with the given configuration.
+func NewClient(cfg *ClientConfig) *Client {
+	if cfg.Timeout == 0 {
+		cfg.Timeout = 30 * time.Second
+	}
+	if cfg.KeepAliveInterval == 0 {
+		cfg.KeepAliveInterval = 30 * time.Second
+	}
+
+	return &Client{
+		config:  cfg,
+		closeCh: make(chan struct{}),
+	}
+}
+
+// Connect establishes an SSH connection to the remote server.
+func (c *Client) Connect(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.connected {
+		return nil
+	}
+
+	authMethods, err := c.buildAuthMethods()
+	if err != nil {
+		return fmt.Errorf("build auth methods: %w", err)
+	}
+
+	sshConfig := &ssh.ClientConfig{
+		User:            c.config.User,
+		Auth:            authMethods,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: proper host key verification in M18
+		Timeout:         c.config.Timeout,
+	}
+
+	// Use context for connection timeout
+	dialer := net.Dialer{Timeout: c.config.Timeout}
+	conn, err := dialer.DialContext(ctx, "tcp", c.config.Host)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", c.config.Host, err)
+	}
+
+	// Perform SSH handshake
+	sshConn, chans, reqs, err := ssh.NewClientConn(conn, c.config.Host, sshConfig)
+	if err != nil {
+		conn.Close()
+		return fmt.Errorf("ssh handshake: %w", err)
+	}
+
+	c.sshClient = ssh.NewClient(sshConn, chans, reqs)
+	c.connected = true
+	c.lastError = nil
+
+	// Start keep-alive routine
+	go c.keepAlive()
+
+	return nil
+}
+
+// Close closes the SSH connection.
+func (c *Client) Close() error {
+	c.closeOnce.Do(func() {
+		close(c.closeCh)
+	})
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.connected || c.sshClient == nil {
+		return nil
+	}
+
+	err := c.sshClient.Close()
+	c.connected = false
+	c.sshClient = nil
+	return err
+}
+
+// IsConnected returns true if the client is connected.
+func (c *Client) IsConnected() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.connected
+}
+
+// LastError returns the last connection error.
+func (c *Client) LastError() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.lastError
+}
+
+// ReadFile reads a remote file and returns its contents.
+func (c *Client) ReadFile(ctx context.Context, path string) ([]byte, error) {
+	c.mu.Lock()
+	if !c.connected {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	session, err := client.NewSession()
+	if err != nil {
+		c.handleError(err)
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	defer session.Close()
+
+	// Use cat to read file contents
+	output, err := session.Output(fmt.Sprintf("cat %q", path))
+	if err != nil {
+		return nil, fmt.Errorf("read file %s: %w", path, err)
+	}
+
+	return output, nil
+}
+
+// ReadFileRange reads a portion of a remote file starting at offset.
+func (c *Client) ReadFileRange(ctx context.Context, path string, offset, limit int64) ([]byte, error) {
+	c.mu.Lock()
+	if !c.connected {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	session, err := client.NewSession()
+	if err != nil {
+		c.handleError(err)
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	defer session.Close()
+
+	// Use tail with byte offset to read from specific position
+	cmd := fmt.Sprintf("tail -c +%d %q | head -c %d", offset+1, path, limit)
+	output, err := session.Output(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("read file range %s: %w", path, err)
+	}
+
+	return output, nil
+}
+
+// FileInfo returns information about a remote file.
+func (c *Client) FileInfo(ctx context.Context, path string) (*RemoteFileInfo, error) {
+	c.mu.Lock()
+	if !c.connected {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	session, err := client.NewSession()
+	if err != nil {
+		c.handleError(err)
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	defer session.Close()
+
+	// Use stat to get file info (size, mtime, inode)
+	cmd := fmt.Sprintf("stat -c '%%s %%Y %%i' %q 2>/dev/null || stat -f '%%z %%m %%i' %q", path, path)
+	output, err := session.Output(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("stat file %s: %w", path, err)
+	}
+
+	info := &RemoteFileInfo{Path: path}
+	_, err = fmt.Sscanf(string(output), "%d %d %d", &info.Size, &info.ModTime, &info.Inode)
+	if err != nil {
+		return nil, fmt.Errorf("parse stat output: %w", err)
+	}
+
+	return info, nil
+}
+
+// ListFiles lists files matching a glob pattern.
+func (c *Client) ListFiles(ctx context.Context, pattern string) ([]string, error) {
+	c.mu.Lock()
+	if !c.connected {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	session, err := client.NewSession()
+	if err != nil {
+		c.handleError(err)
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	defer session.Close()
+
+	// Use ls with glob pattern
+	cmd := fmt.Sprintf("ls -1 %s 2>/dev/null || true", pattern)
+	output, err := session.Output(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("list files %s: %w", pattern, err)
+	}
+
+	if len(output) == 0 {
+		return nil, nil
+	}
+
+	// Parse output into file list
+	var files []string
+	for _, line := range splitLines(output) {
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+
+	return files, nil
+}
+
+// NewSession creates a new SSH session for command execution.
+func (c *Client) NewSession() (*ssh.Session, error) {
+	c.mu.Lock()
+	if !c.connected {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	return client.NewSession()
+}
+
+// StreamFile opens a stream to read a remote file continuously.
+func (c *Client) StreamFile(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
+	c.mu.Lock()
+	if !c.connected {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	session, err := client.NewSession()
+	if err != nil {
+		c.handleError(err)
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		session.Close()
+		return nil, fmt.Errorf("get stdout pipe: %w", err)
+	}
+
+	// Use tail -f to stream file with optional offset
+	var cmd string
+	if offset > 0 {
+		cmd = fmt.Sprintf("tail -c +%d -f %q", offset+1, path)
+	} else {
+		cmd = fmt.Sprintf("tail -f %q", path)
+	}
+
+	if err := session.Start(cmd); err != nil {
+		session.Close()
+		return nil, fmt.Errorf("start tail: %w", err)
+	}
+
+	return &sessionReader{
+		session: session,
+		reader:  stdout,
+	}, nil
+}
+
+func (c *Client) buildAuthMethods() ([]ssh.AuthMethod, error) {
+	var methods []ssh.AuthMethod
+
+	// Try key authentication first
+	if c.config.KeyFile != "" {
+		key, err := os.ReadFile(c.config.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("read key file: %w", err)
+		}
+
+		var signer ssh.Signer
+		if c.config.KeyPassphrase != "" {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase(key, []byte(c.config.KeyPassphrase))
+		} else {
+			signer, err = ssh.ParsePrivateKey(key)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parse private key: %w", err)
+		}
+
+		methods = append(methods, ssh.PublicKeys(signer))
+	}
+
+	// Fallback to password authentication
+	if c.config.Password != "" {
+		methods = append(methods, ssh.Password(c.config.Password))
+	}
+
+	if len(methods) == 0 {
+		return nil, fmt.Errorf("no authentication methods configured")
+	}
+
+	return methods, nil
+}
+
+func (c *Client) keepAlive() {
+	ticker := time.NewTicker(c.config.KeepAliveInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.closeCh:
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			if !c.connected || c.sshClient == nil {
+				c.mu.Unlock()
+				return
+			}
+			client := c.sshClient
+			c.mu.Unlock()
+
+			// Send keep-alive request
+			_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+			if err != nil {
+				c.handleError(err)
+			}
+		}
+	}
+}
+
+func (c *Client) handleError(err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.lastError = err
+	// Mark as disconnected on connection errors
+	if isConnectionError(err) {
+		c.connected = false
+	}
+}
+
+// RemoteFileInfo contains information about a remote file.
+type RemoteFileInfo struct {
+	Path    string
+	Size    int64
+	ModTime int64
+	Inode   int64
+}
+
+// sessionReader wraps a session and reader for streaming.
+type sessionReader struct {
+	session *ssh.Session
+	reader  io.Reader
+}
+
+func (r *sessionReader) Read(p []byte) (n int, err error) {
+	return r.reader.Read(p)
+}
+
+func (r *sessionReader) Close() error {
+	// Signal the session to stop (sends SIGTERM to remote process)
+	r.session.Signal(ssh.SIGTERM)
+	return r.session.Close()
+}
+
+func splitLines(data []byte) []string {
+	var lines []string
+	start := 0
+	for i, b := range data {
+		if b == '\n' {
+			line := string(data[start:i])
+			if len(line) > 0 && line[len(line)-1] == '\r' {
+				line = line[:len(line)-1]
+			}
+			lines = append(lines, line)
+			start = i + 1
+		}
+	}
+	if start < len(data) {
+		lines = append(lines, string(data[start:]))
+	}
+	return lines
+}
+
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for common connection errors
+	if err == io.EOF {
+		return true
+	}
+	if _, ok := err.(*net.OpError); ok {
+		return true
+	}
+	return false
+}
