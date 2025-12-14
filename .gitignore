@@ -71,3 +71,8 @@ __debug_bin*
 
 # Generated proto files
 internal/proto/
+
+# AI related file
+.claude
+.serena
+.history
