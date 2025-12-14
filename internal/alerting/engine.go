@@ -236,7 +236,7 @@ func (e *Engine) RemoveRule(name string) bool {
 	for i, rule := range e.rules {
 		if rule.Name == name {
 			e.rules = append(e.rules[:i], e.rules[i+1:]...)
-			e.windows.Reset(name)
+			e.windows.Delete(name) // Delete window to prevent memory leak
 			e.cooldown.Clear(name)
 			return true
 		}
@@ -280,7 +280,7 @@ func (e *Engine) ReloadRules(rules []*Rule) error {
 	defer e.mu.Unlock()
 
 	e.rules = rules
-	e.windows.ResetAll()
+	e.windows.DeleteAll() // Delete all windows to prevent memory leaks
 	e.cooldown.ClearAll()
 
 	return nil

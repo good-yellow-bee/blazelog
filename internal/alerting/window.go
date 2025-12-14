@@ -133,7 +133,7 @@ func (wm *WindowManager) Get(ruleName string) *SlidingWindow {
 	return wm.windows[ruleName]
 }
 
-// Reset clears a specific window.
+// Reset clears a specific window's events without removing the window.
 func (wm *WindowManager) Reset(ruleName string) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
@@ -143,7 +143,16 @@ func (wm *WindowManager) Reset(ruleName string) {
 	}
 }
 
-// ResetAll clears all windows.
+// Delete removes a window from the manager entirely.
+// Use this when removing a rule to prevent memory leaks.
+func (wm *WindowManager) Delete(ruleName string) {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	delete(wm.windows, ruleName)
+}
+
+// ResetAll clears all windows' events without removing them.
 func (wm *WindowManager) ResetAll() {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
@@ -151,6 +160,15 @@ func (wm *WindowManager) ResetAll() {
 	for _, w := range wm.windows {
 		w.Reset()
 	}
+}
+
+// DeleteAll removes all windows from the manager.
+// Use this when reloading rules to prevent memory leaks.
+func (wm *WindowManager) DeleteAll() {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	wm.windows = make(map[string]*SlidingWindow)
 }
 
 // Count returns the event count for a rule.

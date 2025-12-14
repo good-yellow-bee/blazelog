@@ -887,3 +887,176 @@ func TestRuleIsEnabled(t *testing.T) {
 		t.Error("expected rule to be disabled when Enabled=false")
 	}
 }
+
+func TestWindowManagerDelete(t *testing.T) {
+	wm := NewWindowManager()
+
+	// Create windows for two rules
+	wm.GetOrCreate("rule1", 5*time.Minute)
+	wm.GetOrCreate("rule2", 5*time.Minute)
+
+	// Verify both windows exist
+	if wm.Get("rule1") == nil {
+		t.Error("expected rule1 window to exist")
+	}
+	if wm.Get("rule2") == nil {
+		t.Error("expected rule2 window to exist")
+	}
+
+	// Delete rule1 window
+	wm.Delete("rule1")
+
+	// Verify rule1 window is gone but rule2 remains
+	if wm.Get("rule1") != nil {
+		t.Error("expected rule1 window to be deleted")
+	}
+	if wm.Get("rule2") == nil {
+		t.Error("expected rule2 window to still exist")
+	}
+}
+
+func TestWindowManagerDeleteAll(t *testing.T) {
+	wm := NewWindowManager()
+
+	// Create windows for multiple rules
+	wm.GetOrCreate("rule1", 5*time.Minute)
+	wm.GetOrCreate("rule2", 5*time.Minute)
+	wm.GetOrCreate("rule3", 5*time.Minute)
+
+	// Add events to each window
+	for _, name := range []string{"rule1", "rule2", "rule3"} {
+		w := wm.Get(name)
+		w.Add()
+		w.Add()
+	}
+
+	// Verify all windows exist with events
+	if wm.Count("rule1") != 2 {
+		t.Errorf("expected rule1 count 2, got %d", wm.Count("rule1"))
+	}
+
+	// DeleteAll
+	wm.DeleteAll()
+
+	// Verify all windows are gone (Get returns nil)
+	if wm.Get("rule1") != nil {
+		t.Error("expected rule1 window to be deleted after DeleteAll")
+	}
+	if wm.Get("rule2") != nil {
+		t.Error("expected rule2 window to be deleted after DeleteAll")
+	}
+	if wm.Get("rule3") != nil {
+		t.Error("expected rule3 window to be deleted after DeleteAll")
+	}
+}
+
+func TestEngineRemoveRuleDeletesWindow(t *testing.T) {
+	rule := &Rule{
+		Name:     "threshold-rule",
+		Type:     RuleTypeThreshold,
+		Severity: SeverityMedium,
+		Condition: Condition{
+			Field:     "level",
+			Value:     "error",
+			Threshold: 100,
+			Window:    "5m",
+		},
+	}
+	if err := rule.Validate(); err != nil {
+		t.Fatalf("rule validation failed: %v", err)
+	}
+
+	engine := NewEngine([]*Rule{rule}, nil)
+	defer engine.Close()
+
+	// Trigger window creation by evaluating an entry
+	entry := models.NewLogEntry()
+	entry.Level = models.LevelError
+	engine.Evaluate(entry)
+
+	// Verify window exists
+	if engine.windows.Get("threshold-rule") == nil {
+		t.Error("expected window to exist after evaluation")
+	}
+
+	// Remove rule
+	engine.RemoveRule("threshold-rule")
+
+	// Verify window is deleted (not just reset)
+	if engine.windows.Get("threshold-rule") != nil {
+		t.Error("expected window to be deleted after RemoveRule, got non-nil (memory leak)")
+	}
+}
+
+func TestEngineReloadRulesDeletesWindows(t *testing.T) {
+	rule1 := &Rule{
+		Name:     "threshold1",
+		Type:     RuleTypeThreshold,
+		Severity: SeverityMedium,
+		Condition: Condition{
+			Field:     "level",
+			Value:     "error",
+			Threshold: 100,
+			Window:    "5m",
+		},
+	}
+	rule2 := &Rule{
+		Name:     "threshold2",
+		Type:     RuleTypeThreshold,
+		Severity: SeverityMedium,
+		Condition: Condition{
+			Field:     "level",
+			Value:     "warning",
+			Threshold: 100,
+			Window:    "5m",
+		},
+	}
+	for _, r := range []*Rule{rule1, rule2} {
+		if err := r.Validate(); err != nil {
+			t.Fatalf("rule validation failed: %v", err)
+		}
+	}
+
+	engine := NewEngine([]*Rule{rule1, rule2}, nil)
+	defer engine.Close()
+
+	// Trigger window creation
+	entry := models.NewLogEntry()
+	entry.Level = models.LevelError
+	engine.Evaluate(entry)
+	entry.Level = models.LevelWarning
+	engine.Evaluate(entry)
+
+	// Verify both windows exist
+	if engine.windows.Get("threshold1") == nil {
+		t.Error("expected threshold1 window to exist")
+	}
+	if engine.windows.Get("threshold2") == nil {
+		t.Error("expected threshold2 window to exist")
+	}
+
+	// Reload with new rule
+	newRule := &Rule{
+		Name:     "new-rule",
+		Type:     RuleTypePattern,
+		Severity: SeverityLow,
+		Condition: Condition{
+			Pattern: "NEW",
+		},
+	}
+	if err := newRule.Validate(); err != nil {
+		t.Fatalf("new rule validation failed: %v", err)
+	}
+
+	if err := engine.ReloadRules([]*Rule{newRule}); err != nil {
+		t.Fatalf("reload failed: %v", err)
+	}
+
+	// Verify old windows are deleted (not just reset)
+	if engine.windows.Get("threshold1") != nil {
+		t.Error("expected threshold1 window to be deleted after ReloadRules")
+	}
+	if engine.windows.Get("threshold2") != nil {
+		t.Error("expected threshold2 window to be deleted after ReloadRules")
+	}
+}
