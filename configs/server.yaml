@@ -1,0 +1,11 @@
+# BlazeLog Server Configuration
+#
+# This is an example configuration file for the BlazeLog server.
+# Copy and modify as needed.
+
+server:
+  # gRPC listen address for agent connections
+  grpc_address: ":9443"
+
+  # HTTP listen address for REST API (future)
+  http_address: ":8080"
