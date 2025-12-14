@@ -219,5 +219,102 @@ func (m *mockLogRepo) DeleteBefore(ctx context.Context, before time.Time) (int64
 	return 0, nil
 }
 
+func (m *mockLogRepo) GetErrorRates(ctx context.Context, filter *AggregationFilter) (*ErrorRateResult, error) {
+	return &ErrorRateResult{}, nil
+}
+
+func (m *mockLogRepo) GetTopSources(ctx context.Context, filter *AggregationFilter, limit int) ([]*SourceCount, error) {
+	return nil, nil
+}
+
+func (m *mockLogRepo) GetLogVolume(ctx context.Context, filter *AggregationFilter, interval string) ([]*VolumePoint, error) {
+	return nil, nil
+}
+
+func (m *mockLogRepo) GetHTTPStats(ctx context.Context, filter *AggregationFilter) (*HTTPStatsResult, error) {
+	return &HTTPStatsResult{}, nil
+}
+
+// Milestone 21: SearchMode tests
+
+func TestSearchMode_Constants(t *testing.T) {
+	if SearchModeToken != 0 {
+		t.Errorf("expected SearchModeToken = 0, got %d", SearchModeToken)
+	}
+	if SearchModeSubstring != 1 {
+		t.Errorf("expected SearchModeSubstring = 1, got %d", SearchModeSubstring)
+	}
+	if SearchModePhrase != 2 {
+		t.Errorf("expected SearchModePhrase = 2, got %d", SearchModePhrase)
+	}
+}
+
+func TestLogFilter_SearchMode_Default(t *testing.T) {
+	filter := &LogFilter{
+		MessageContains: "test",
+	}
+
+	// Default should be SearchModeToken (0)
+	if filter.SearchMode != SearchModeToken {
+		t.Errorf("expected default SearchMode = SearchModeToken, got %d", filter.SearchMode)
+	}
+}
+
+func TestAggregationFilter_TimeRange(t *testing.T) {
+	now := time.Now()
+	filter := &AggregationFilter{
+		StartTime: now.Add(-time.Hour),
+		EndTime:   now,
+		AgentID:   "test-agent",
+		Type:      "nginx",
+	}
+
+	if filter.StartTime.IsZero() {
+		t.Error("expected StartTime to be set")
+	}
+	if filter.EndTime.IsZero() {
+		t.Error("expected EndTime to be set")
+	}
+	if filter.AgentID != "test-agent" {
+		t.Errorf("expected AgentID 'test-agent', got %s", filter.AgentID)
+	}
+}
+
+func TestErrorRateResult_Calculation(t *testing.T) {
+	result := &ErrorRateResult{
+		TotalLogs:    100,
+		ErrorCount:   10,
+		FatalCount:   5,
+		WarningCount: 20,
+	}
+
+	expectedRate := float64(10+5) / float64(100)
+	result.ErrorRate = expectedRate
+
+	if result.ErrorRate != 0.15 {
+		t.Errorf("expected ErrorRate 0.15, got %f", result.ErrorRate)
+	}
+}
+
+func TestHTTPStatsResult_Fields(t *testing.T) {
+	result := &HTTPStatsResult{
+		Total2xx: 100,
+		Total3xx: 50,
+		Total4xx: 25,
+		Total5xx: 10,
+		TopURIs: []*URICount{
+			{URI: "/api/users", Count: 50},
+			{URI: "/api/posts", Count: 30},
+		},
+	}
+
+	if result.Total2xx != 100 {
+		t.Errorf("expected Total2xx 100, got %d", result.Total2xx)
+	}
+	if len(result.TopURIs) != 2 {
+		t.Errorf("expected 2 TopURIs, got %d", len(result.TopURIs))
+	}
+}
+
 // Integration tests are in clickhouse_integration_test.go
 // Run with: go test -tags=integration ./internal/storage/...
