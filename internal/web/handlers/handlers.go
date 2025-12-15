@@ -9,19 +9,21 @@ import (
 )
 
 type Handler struct {
-	storage  storage.Storage
-	sessions *session.Store
-	csrfKey  string
+	storage    storage.Storage
+	logStorage storage.LogStorage
+	sessions   *session.Store
+	csrfKey    string
 }
 
-func NewHandler(storage storage.Storage, sessions *session.Store, csrfKey string) *Handler {
+func NewHandler(storage storage.Storage, logStorage storage.LogStorage, sessions *session.Store, csrfKey string) *Handler {
 	if sessions == nil {
 		sessions = session.NewStore(24 * time.Hour)
 	}
 	return &Handler{
-		storage:  storage,
-		sessions: sessions,
-		csrfKey:  csrfKey,
+		storage:    storage,
+		logStorage: logStorage,
+		sessions:   sessions,
+		csrfKey:    csrfKey,
 	}
 }
 

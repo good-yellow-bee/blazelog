@@ -56,27 +56,55 @@ func Dashboard(user *session.Session, stats DashboardStats) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><h1 class=\"text-2xl font-bold text-gray-900\">Dashboard</h1><div class=\"grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"dashboardController()\" x-init=\"init()\" class=\"space-y-6\"><!-- Header with Controls --><div class=\"flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4\"><h1 class=\"text-2xl font-bold text-gray-900\">Dashboard</h1><div class=\"flex items-center space-x-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = StatCard("Total Logs", formatNumber(stats.TotalLogs), "blue").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = TimeRangeSelector().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = StatCard("Errors (24h)", formatNumber(stats.ErrorCount), "red").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = AutoRefreshToggle().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = StatCard("Warnings (24h)", formatNumber(stats.WarningCount), "yellow").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div></div><!-- Stats Cards with HTMX refresh --><div id=\"stats-cards\"><div id=\"stats-container\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = StatCard("Active Alerts", formatNumber(stats.ActiveAlerts), "green").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = StatsCards(stats).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><div class=\"grid grid-cols-1 gap-6 lg:grid-cols-2\"><div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Recent Logs</h3><div hx-get=\"/api/v1/logs?limit=5\" hx-trigger=\"load\" hx-target=\"this\" class=\"text-gray-500\">Loading recent logs...</div></div><div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Recent Alerts</h3><div hx-get=\"/api/v1/alerts/history?limit=5\" hx-trigger=\"load\" hx-target=\"this\" class=\"text-gray-500\">Loading recent alerts...</div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div></div><!-- Charts Grid - Row 1 --><div class=\"grid grid-cols-1 gap-6 lg:grid-cols-2\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = VolumeChart().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = LogLevelChart().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><!-- Charts Grid - Row 2 --><div class=\"grid grid-cols-1 gap-6 lg:grid-cols-2\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = TopSourcesChart().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = HTTPStatusChart().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></div><!-- ECharts CDN --> <script src=\"https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js\"></script> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = DashboardScript().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -90,7 +118,7 @@ func Dashboard(user *session.Session, stats DashboardStats) templ.Component {
 	})
 }
 
-func StatCard(title string, value string, color string) templ.Component {
+func TimeRangeSelector() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -111,55 +139,364 @@ func StatCard(title string, value string, color string) templ.Component {
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"bg-white overflow-hidden shadow rounded-lg\"><div class=\"p-5\"><div class=\"flex items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-gray-500\">Range:</span> <select x-model=\"$store.dashboard.timeRange\" @change=\"refreshDashboard()\" class=\"rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500\"><option value=\"15m\">15 min</option> <option value=\"1h\">1 hour</option> <option value=\"6h\">6 hours</option> <option value=\"24h\">24 hours</option> <option value=\"7d\">7 days</option> <option value=\"30d\">30 days</option></select></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 = []any{"flex-shrink-0 rounded-md p-3 " + colorClass(color)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
+		return nil
+	})
+}
+
+func AutoRefreshToggle() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-gray-500\">Refresh:</span> <select x-model=\"$store.dashboard.refreshInterval\" @change=\"setRefreshInterval()\" class=\"rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500\"><option value=\"0\">Off</option> <option value=\"10\">10s</option> <option value=\"30\">30s</option> <option value=\"60\">1m</option> <option value=\"300\">5m</option></select> <span x-show=\"$store.dashboard.refreshInterval > 0\" class=\"w-2 h-2 bg-green-500 rounded-full animate-pulse\" title=\"Auto-refresh active\"></span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"")
+		return nil
+	})
+}
+
+// StatsCards renders the stats cards grid (HTMX partial)
+func StatsCards(stats DashboardStats) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var4).String())
+		templ_7745c5c3_Err = StatCard("Total Logs", formatNumber(stats.TotalLogs), "blue", "chart").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = StatCard("Errors", formatNumber(stats.ErrorCount), "red", "error").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = StatCard("Warnings", formatNumber(stats.WarningCount), "yellow", "warning").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = StatCard("Active Alerts", formatNumber(stats.ActiveAlerts), "green", "bell").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func StatCard(title string, value string, color string, icon string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var6 == nil {
+			templ_7745c5c3_Var6 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"bg-white overflow-hidden shadow rounded-lg\"><div class=\"p-5\"><div class=\"flex items-center\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 = []any{"flex-shrink-0 rounded-md p-3 " + colorClass(color)}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var7...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var8 string
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var7).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\"><svg class=\"h-6 w-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5\"></path></svg></div><div class=\"ml-5 w-0 flex-1\"><dl><dt class=\"text-sm font-medium text-gray-500 truncate\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(title)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 69, Col: 68}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		templ_7745c5c3_Err = cardIcon(icon).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</dt><dd class=\"text-lg font-semibold text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><div class=\"ml-5 w-0 flex-1\"><dl><dt class=\"text-sm font-medium text-gray-500 truncate\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(value)
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 70, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 114, Col: 68}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</dd></dl></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</dt><dd class=\"text-lg font-semibold text-gray-900\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(value)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 115, Col: 61}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</dd></dl></div></div></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func cardIcon(icon string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var11 == nil {
+			templ_7745c5c3_Var11 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		switch icon {
+		case "error":
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<svg class=\"h-6 w-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		case "warning":
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<svg class=\"h-6 w-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		case "bell":
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<svg class=\"h-6 w-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		default:
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<svg class=\"h-6 w-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		return nil
+	})
+}
+
+// Chart containers
+func VolumeChart() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var12 == nil {
+			templ_7745c5c3_Var12 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Log Volume</h3><div id=\"volume-chart\" class=\"h-64\"></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func LogLevelChart() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Log Levels</h3><div id=\"level-chart\" class=\"h-64\"></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func TopSourcesChart() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Top Sources</h3><div id=\"sources-chart\" class=\"h-64\"></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func HTTPStatusChart() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var15 == nil {
+			templ_7745c5c3_Var15 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">HTTP Status</h3><div id=\"http-chart\" class=\"h-64\"></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func DashboardScript() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var16 == nil {
+			templ_7745c5c3_Var16 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<script>\n\t// Alpine.js store for dashboard state\n\tdocument.addEventListener('alpine:init', () => {\n\t\tAlpine.store('dashboard', {\n\t\t\ttimeRange: '24h',\n\t\t\trefreshInterval: 30,\n\t\t\trefreshTimer: null\n\t\t});\n\t});\n\n\tfunction dashboardController() {\n\t\treturn {\n\t\t\tcharts: {},\n\n\t\t\tinit() {\n\t\t\t\tthis.initCharts();\n\t\t\t\tthis.loadData();\n\t\t\t\tthis.setRefreshInterval();\n\t\t\t},\n\n\t\t\tinitCharts() {\n\t\t\t\t// Volume chart (area)\n\t\t\t\tthis.charts.volume = echarts.init(document.getElementById('volume-chart'));\n\t\t\t\tthis.charts.volume.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis' },\n\t\t\t\t\tlegend: { data: ['Total', 'Errors'], bottom: 0 },\n\t\t\t\t\tgrid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'category', data: [], boundaryGap: false },\n\t\t\t\t\tyAxis: { type: 'value' },\n\t\t\t\t\tseries: [\n\t\t\t\t\t\t{ name: 'Total', type: 'line', areaStyle: { opacity: 0.3 }, data: [], smooth: true, color: '#6366f1' },\n\t\t\t\t\t\t{ name: 'Errors', type: 'line', data: [], smooth: true, color: '#ef4444' }\n\t\t\t\t\t]\n\t\t\t\t});\n\n\t\t\t\t// Log level chart (donut)\n\t\t\t\tthis.charts.level = echarts.init(document.getElementById('level-chart'));\n\t\t\t\tthis.charts.level.setOption({\n\t\t\t\t\ttooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },\n\t\t\t\t\tlegend: { bottom: 0, left: 'center' },\n\t\t\t\t\tseries: [{\n\t\t\t\t\t\ttype: 'pie',\n\t\t\t\t\t\tradius: ['40%', '70%'],\n\t\t\t\t\t\tcenter: ['50%', '45%'],\n\t\t\t\t\t\tavoidLabelOverlap: false,\n\t\t\t\t\t\tlabel: { show: false },\n\t\t\t\t\t\tdata: []\n\t\t\t\t\t}]\n\t\t\t\t});\n\n\t\t\t\t// Top sources chart (horizontal bar)\n\t\t\t\tthis.charts.sources = echarts.init(document.getElementById('sources-chart'));\n\t\t\t\tthis.charts.sources.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },\n\t\t\t\t\tgrid: { left: '3%', right: '10%', bottom: '3%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'value' },\n\t\t\t\t\tyAxis: { type: 'category', data: [] },\n\t\t\t\t\tseries: [{ type: 'bar', data: [], itemStyle: { color: '#6366f1' } }]\n\t\t\t\t});\n\n\t\t\t\t// HTTP status chart (bar)\n\t\t\t\tthis.charts.http = echarts.init(document.getElementById('http-chart'));\n\t\t\t\tthis.charts.http.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis' },\n\t\t\t\t\tgrid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'category', data: ['2xx', '3xx', '4xx', '5xx'] },\n\t\t\t\t\tyAxis: { type: 'value' },\n\t\t\t\t\tseries: [{\n\t\t\t\t\t\ttype: 'bar',\n\t\t\t\t\t\tdata: [],\n\t\t\t\t\t\titemStyle: {\n\t\t\t\t\t\t\tcolor: function(params) {\n\t\t\t\t\t\t\t\tconst colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];\n\t\t\t\t\t\t\t\treturn colors[params.dataIndex];\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}]\n\t\t\t\t});\n\t\t\t},\n\n\t\t\tasync loadData() {\n\t\t\t\tconst range = Alpine.store('dashboard').timeRange;\n\t\t\t\ttry {\n\t\t\t\t\tconst res = await fetch(`/dashboard/stats?range=${range}`);\n\t\t\t\t\tif (!res.ok) throw new Error('Failed to fetch');\n\t\t\t\t\tconst data = await res.json();\n\t\t\t\t\tthis.updateCharts(data);\n\t\t\t\t\tthis.updateStatsCards(data);\n\t\t\t\t} catch (err) {\n\t\t\t\t\tconsole.error('Failed to load dashboard data:', err);\n\t\t\t\t}\n\t\t\t},\n\n\t\t\tupdateStatsCards(data) {\n\t\t\t\t// Update stats via DOM (simpler than HTMX for this case)\n\t\t\t\tconst cards = document.querySelectorAll('#stats-container .text-lg');\n\t\t\t\tif (cards.length >= 4) {\n\t\t\t\t\tcards[0].textContent = this.formatNumber(data.total_logs || 0);\n\t\t\t\t\tcards[1].textContent = this.formatNumber(data.error_count || 0);\n\t\t\t\t\tcards[2].textContent = this.formatNumber(data.warning_count || 0);\n\t\t\t\t\tcards[3].textContent = this.formatNumber(data.active_alerts || 0);\n\t\t\t\t}\n\t\t\t},\n\n\t\t\tformatNumber(n) {\n\t\t\t\tif (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';\n\t\t\t\tif (n >= 1000) return (n / 1000).toFixed(1) + 'K';\n\t\t\t\treturn n.toString();\n\t\t\t},\n\n\t\t\tupdateCharts(data) {\n\t\t\t\t// Volume chart\n\t\t\t\tif (data.volume && data.volume.length > 0) {\n\t\t\t\t\tthis.charts.volume.setOption({\n\t\t\t\t\t\txAxis: { data: data.volume.map(v => v.timestamp) },\n\t\t\t\t\t\tseries: [\n\t\t\t\t\t\t\t{ data: data.volume.map(v => v.total_count) },\n\t\t\t\t\t\t\t{ data: data.volume.map(v => v.error_count) }\n\t\t\t\t\t\t]\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\t// Level chart\n\t\t\t\tconst infoCount = (data.total_logs || 0) - (data.error_count || 0) - (data.warning_count || 0) - (data.fatal_count || 0);\n\t\t\t\tconst levelData = [\n\t\t\t\t\t{ value: Math.max(0, infoCount), name: 'Info', itemStyle: { color: '#3b82f6' } },\n\t\t\t\t\t{ value: data.warning_count || 0, name: 'Warning', itemStyle: { color: '#f59e0b' } },\n\t\t\t\t\t{ value: data.error_count || 0, name: 'Error', itemStyle: { color: '#ef4444' } },\n\t\t\t\t\t{ value: data.fatal_count || 0, name: 'Fatal', itemStyle: { color: '#7c3aed' } }\n\t\t\t\t].filter(d => d.value > 0);\n\n\t\t\t\tthis.charts.level.setOption({\n\t\t\t\t\tseries: [{ data: levelData }]\n\t\t\t\t});\n\n\t\t\t\t// Sources chart\n\t\t\t\tif (data.top_sources && data.top_sources.length > 0) {\n\t\t\t\t\tthis.charts.sources.setOption({\n\t\t\t\t\t\tyAxis: { data: data.top_sources.map(s => s.source).reverse() },\n\t\t\t\t\t\tseries: [{ data: data.top_sources.map(s => s.count).reverse() }]\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\t// HTTP chart\n\t\t\t\tif (data.http_stats) {\n\t\t\t\t\tthis.charts.http.setOption({\n\t\t\t\t\t\tseries: [{\n\t\t\t\t\t\t\tdata: [\n\t\t\t\t\t\t\t\tdata.http_stats.total_2xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_3xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_4xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_5xx || 0\n\t\t\t\t\t\t\t]\n\t\t\t\t\t\t}]\n\t\t\t\t\t});\n\t\t\t\t}\n\t\t\t},\n\n\t\t\trefreshDashboard() {\n\t\t\t\tthis.loadData();\n\t\t\t},\n\n\t\t\tsetRefreshInterval() {\n\t\t\t\tconst store = Alpine.store('dashboard');\n\t\t\t\tif (store.refreshTimer) {\n\t\t\t\t\tclearInterval(store.refreshTimer);\n\t\t\t\t\tstore.refreshTimer = null;\n\t\t\t\t}\n\t\t\t\tif (store.refreshInterval > 0) {\n\t\t\t\t\tstore.refreshTimer = setInterval(() => this.loadData(), store.refreshInterval * 1000);\n\t\t\t\t}\n\t\t\t}\n\t\t};\n\t}\n\n\t// Handle chart resize on window resize\n\twindow.addEventListener('resize', () => {\n\t\t['volume-chart', 'level-chart', 'sources-chart', 'http-chart'].forEach(id => {\n\t\t\tconst el = document.getElementById(id);\n\t\t\tif (el) {\n\t\t\t\tconst chart = echarts.getInstanceByDom(el);\n\t\t\t\tif (chart) chart.resize();\n\t\t\t}\n\t\t});\n\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

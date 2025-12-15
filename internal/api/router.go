@@ -203,7 +203,7 @@ func (s *Server) setupRouter() *chi.Mux {
 
 	// Web UI routes (mounted at root, but API routes take precedence)
 	if s.config.CSRFSecret != "" {
-		webServer := web.NewServer(s.storage, s.config.CSRFSecret)
+		webServer := web.NewServer(s.storage, s.logStorage, s.config.CSRFSecret)
 		r.Mount("/", webServer.Routes())
 	}
 
