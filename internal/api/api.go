@@ -15,6 +15,7 @@ import (
 type Config struct {
 	Address          string
 	JWTSecret        []byte
+	CSRFSecret       string // For web UI CSRF protection
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
 	RateLimitPerIP   int

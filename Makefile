@@ -2,7 +2,8 @@
 # Build, test, and manage the project
 
 .PHONY: all build build-agent build-server build-cli test lint clean install help \
-	proto proto-deps proto-lint proto-generate proto-clean
+	proto proto-deps proto-lint proto-generate proto-clean \
+	templ-generate templ-watch web-build web-watch dev-web
 
 # Go parameters
 GOCMD=/opt/homebrew/bin/go
@@ -55,7 +56,7 @@ build-agent:
 	$(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_AGENT) ./$(CMD_DIR)/agent
 
 ## build-server: Build the server binary
-build-server:
+build-server: templ-generate web-build
 	@echo "Building $(BINARY_SERVER)..."
 	@mkdir -p $(BUILD_DIR)
 	$(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_SERVER) ./$(CMD_DIR)/server
@@ -129,6 +130,31 @@ deps:
 generate:
 	@echo "Running go generate..."
 	$(GOCMD) generate ./...
+
+## templ-generate: Generate Go code from .templ files
+templ-generate:
+	@echo "Generating templ components..."
+	$(HOME)/go/bin/templ generate
+
+## templ-watch: Watch and regenerate templ files (development)
+templ-watch:
+	@echo "Watching templ files..."
+	$(HOME)/go/bin/templ generate --watch
+
+## web-build: Build Tailwind CSS
+web-build:
+	@echo "Building Tailwind CSS..."
+	$(HOME)/.local/bin/tailwindcss -i web/static/css/input.css -o web/static/css/output.css --minify
+
+## web-watch: Watch and rebuild Tailwind CSS (development)
+web-watch:
+	@echo "Watching Tailwind CSS..."
+	$(HOME)/.local/bin/tailwindcss -i web/static/css/input.css -o web/static/css/output.css --watch
+
+## dev-web: Start web development watchers
+dev-web:
+	@echo "Starting web development mode..."
+	@make -j2 templ-watch web-watch
 
 ## help: Show this help
 help:

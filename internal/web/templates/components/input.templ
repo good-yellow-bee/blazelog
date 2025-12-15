@@ -1,0 +1,48 @@
+// internal/web/templates/components/input.templ
+package components
+
+templ Input(name, label, inputType, placeholder string, required bool) {
+	<div>
+		<label for={ name } class="block text-sm font-medium text-gray-700">{ label }</label>
+		<div class="mt-1">
+			<input
+				id={ name }
+				name={ name }
+				type={ inputType }
+				placeholder={ placeholder }
+				class="input-field"
+				if required {
+					required
+				}
+			/>
+		</div>
+	</div>
+}
+
+templ InputWithError(name, label, inputType, placeholder, errorMsg string, required bool) {
+	<div>
+		<label for={ name } class="block text-sm font-medium text-gray-700">{ label }</label>
+		<div class="mt-1">
+			<input
+				id={ name }
+				name={ name }
+				type={ inputType }
+				placeholder={ placeholder }
+				class={ inputClass(errorMsg != "") }
+				if required {
+					required
+				}
+			/>
+		</div>
+		if errorMsg != "" {
+			<p class="mt-1 text-sm text-red-600">{ errorMsg }</p>
+		}
+	</div>
+}
+
+func inputClass(hasError bool) string {
+	if hasError {
+		return "input-field border-red-300 focus:border-red-500 focus:ring-red-500"
+	}
+	return "input-field"
+}

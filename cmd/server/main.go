@@ -203,6 +203,12 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 		return nil, fmt.Errorf("%s environment variable is required", cfg.Auth.JWTSecretEnv)
 	}
 
+	// Get CSRF secret (optional, for web UI)
+	csrfSecret := ""
+	if cfg.Auth.CSRFSecretEnv != "" {
+		csrfSecret = os.Getenv(cfg.Auth.CSRFSecretEnv)
+	}
+
 	// Parse durations
 	accessTTL, err := time.ParseDuration(cfg.Auth.AccessTokenTTL)
 	if err != nil {
@@ -220,6 +226,7 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 	apiConfig := &api.Config{
 		Address:          cfg.Server.HTTPAddress,
 		JWTSecret:        []byte(jwtSecret),
+		CSRFSecret:       csrfSecret,
 		AccessTokenTTL:   accessTTL,
 		RefreshTokenTTL:  refreshTTL,
 		RateLimitPerIP:   cfg.Auth.RateLimitPerIP,

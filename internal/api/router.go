@@ -13,6 +13,7 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/api/projects"
 	"github.com/good-yellow-bee/blazelog/internal/api/users"
 	"github.com/good-yellow-bee/blazelog/internal/models"
+	"github.com/good-yellow-bee/blazelog/internal/web"
 )
 
 // setupRouter creates and configures the chi router with all routes.
@@ -199,6 +200,12 @@ func (s *Server) setupRouter() *chi.Mux {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		OK(w, map[string]string{"status": "ok"})
 	})
+
+	// Web UI routes (mounted at root, but API routes take precedence)
+	if s.config.CSRFSecret != "" {
+		webServer := web.NewServer(s.storage, s.config.CSRFSecret)
+		r.Mount("/", webServer.Routes())
+	}
 
 	return r
 }

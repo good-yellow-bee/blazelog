@@ -21,6 +21,7 @@ type Config struct {
 // AuthConfig contains authentication settings.
 type AuthConfig struct {
 	JWTSecretEnv     string `yaml:"jwt_secret_env"`      // Env var name for JWT secret (default: BLAZELOG_JWT_SECRET)
+	CSRFSecretEnv    string `yaml:"csrf_secret_env"`     // Env var name for CSRF secret (optional, for web UI)
 	AccessTokenTTL   string `yaml:"access_token_ttl"`    // Access token TTL (default: 15m)
 	RefreshTokenTTL  string `yaml:"refresh_token_ttl"`   // Refresh token TTL (default: 168h / 7 days)
 	RateLimitPerIP   int    `yaml:"rate_limit_per_ip"`   // Login rate limit per IP (default: 5/min)
@@ -150,6 +151,9 @@ func (c *Config) setDefaults() {
 	// Auth defaults
 	if c.Auth.JWTSecretEnv == "" {
 		c.Auth.JWTSecretEnv = "BLAZELOG_JWT_SECRET"
+	}
+	if c.Auth.CSRFSecretEnv == "" {
+		c.Auth.CSRFSecretEnv = "BLAZELOG_CSRF_SECRET"
 	}
 	if c.Auth.AccessTokenTTL == "" {
 		c.Auth.AccessTokenTTL = "15m"
