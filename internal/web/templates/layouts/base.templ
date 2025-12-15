@@ -1,6 +1,9 @@
 package layouts
 
-import "github.com/good-yellow-bee/blazelog/internal/web/session"
+import (
+	"github.com/good-yellow-bee/blazelog/internal/web/session"
+	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
+)
 
 templ Base(title string, user *session.Session) {
 	<!DOCTYPE html>
@@ -12,62 +15,23 @@ templ Base(title string, user *session.Session) {
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+			@components.SidebarScript()
 		</head>
-		<body class="bg-gray-50 min-h-screen">
+		<body class="bg-gray-50 min-h-screen" x-data>
 			if user != nil {
-				@Nav(user)
+				<div class="flex min-h-screen">
+					@components.Sidebar(user)
+					<main class="flex-1 md:ml-0 p-4 md:p-8 pt-16 md:pt-8">
+						<div class="max-w-7xl mx-auto">
+							{ children... }
+						</div>
+					</main>
+				</div>
+			} else {
+				<main class="container mx-auto px-4 py-8">
+					{ children... }
+				</main>
 			}
-			<main class="container mx-auto px-4 py-8">
-				{ children... }
-			</main>
 		</body>
 	</html>
-}
-
-templ Nav(user *session.Session) {
-	<nav class="bg-white shadow-md">
-		<div class="container mx-auto px-4">
-			<div class="flex items-center justify-between h-16">
-				<div class="flex items-center space-x-8">
-					<a href="/" class="text-2xl font-bold text-indigo-600 hover:text-indigo-700">
-						BlazeLog
-					</a>
-					<div class="hidden md:flex space-x-4">
-						<a href="/dashboard" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-							Dashboard
-						</a>
-						<a href="/logs" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-							Logs
-						</a>
-						<a href="/alerts" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-							Alerts
-						</a>
-						if user.Role == "admin" {
-							<a href="/projects" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-								Projects
-							</a>
-							<a href="/users" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-								Users
-							</a>
-						}
-					</div>
-				</div>
-				<div class="flex items-center space-x-4">
-					<span class="text-gray-700 text-sm">
-						{ user.Username }
-						if user.Role == "admin" {
-							<span class="ml-2 px-2 py-1 bg-indigo-100 text-indigo-800 text-xs font-semibold rounded">
-								Admin
-							</span>
-						}
-					</span>
-					<form method="POST" action="/logout">
-						<button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-							Logout
-						</button>
-					</form>
-				</div>
-			</div>
-		</div>
-	</nav>
 }

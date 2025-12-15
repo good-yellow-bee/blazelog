@@ -1,0 +1,120 @@
+// internal/web/templates/components/badge.templ
+package components
+
+// Badge renders a colored badge/pill
+templ Badge(text, variant string) {
+	<span class={ badgeClass(variant) }>
+		{ text }
+	</span>
+}
+
+// BadgeDot renders a badge with a status dot
+templ BadgeDot(text, variant string) {
+	<span class={ badgeClass(variant) }>
+		<span class={ dotClass(variant) }></span>
+		{ text }
+	</span>
+}
+
+func badgeClass(variant string) string {
+	base := "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
+	switch variant {
+	case "gray", "default":
+		return base + " bg-gray-100 text-gray-800"
+	case "green", "success":
+		return base + " bg-green-100 text-green-800"
+	case "red", "danger", "error":
+		return base + " bg-red-100 text-red-800"
+	case "yellow", "warning":
+		return base + " bg-yellow-100 text-yellow-800"
+	case "blue", "info":
+		return base + " bg-blue-100 text-blue-800"
+	case "indigo", "primary":
+		return base + " bg-indigo-100 text-indigo-800"
+	case "purple":
+		return base + " bg-purple-100 text-purple-800"
+	case "pink":
+		return base + " bg-pink-100 text-pink-800"
+	default:
+		return base + " bg-gray-100 text-gray-800"
+	}
+}
+
+func dotClass(variant string) string {
+	base := "w-1.5 h-1.5 rounded-full"
+	switch variant {
+	case "gray", "default":
+		return base + " bg-gray-400"
+	case "green", "success":
+		return base + " bg-green-400"
+	case "red", "danger", "error":
+		return base + " bg-red-400"
+	case "yellow", "warning":
+		return base + " bg-yellow-400"
+	case "blue", "info":
+		return base + " bg-blue-400"
+	case "indigo", "primary":
+		return base + " bg-indigo-400"
+	case "purple":
+		return base + " bg-purple-400"
+	case "pink":
+		return base + " bg-pink-400"
+	default:
+		return base + " bg-gray-400"
+	}
+}
+
+// RoleBadge renders a badge appropriate for user roles
+templ RoleBadge(role string) {
+	switch role {
+		case "admin":
+			@Badge("Admin", "indigo")
+		case "operator":
+			@Badge("Operator", "blue")
+		case "viewer":
+			@Badge("Viewer", "gray")
+		default:
+			@Badge(role, "gray")
+	}
+}
+
+// SeverityBadge renders a badge for alert severity
+templ SeverityBadge(severity string) {
+	switch severity {
+		case "critical":
+			@Badge("Critical", "red")
+		case "high":
+			@Badge("High", "yellow")
+		case "medium":
+			@Badge("Medium", "blue")
+		case "low":
+			@Badge("Low", "gray")
+		default:
+			@Badge(severity, "gray")
+	}
+}
+
+// StatusBadge renders a badge with dot for connection status
+templ StatusBadge(status string) {
+	switch status {
+		case "connected":
+			@BadgeDot("Connected", "green")
+		case "disconnected":
+			@BadgeDot("Disconnected", "red")
+		case "failed":
+			@BadgeDot("Failed", "red")
+		case "unknown":
+			@BadgeDot("Unknown", "gray")
+		default:
+			@BadgeDot(status, "gray")
+	}
+}
+
+// EnabledBadge renders an enabled/disabled badge
+templ EnabledBadge(enabled bool) {
+	if enabled {
+		@BadgeDot("Enabled", "green")
+	} else {
+		@BadgeDot("Disabled", "gray")
+	}
+}

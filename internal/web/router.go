@@ -43,10 +43,16 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/logs/export", s.handler.ExportLogs)
 		r.Get("/logs/stream", s.handler.StreamLogs)
 
-		// Placeholder routes for future milestones
-		r.Get("/alerts", s.handler.ShowDashboard)   // TODO: Milestone 28
-		r.Get("/projects", s.handler.ShowDashboard) // TODO: Milestone 28
-		r.Get("/users", s.handler.ShowDashboard)    // TODO: Milestone 28
+		// Settings routes
+		r.Get("/settings/alerts", s.handler.ShowAlerts)
+
+		// Admin-only settings
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RequireRole(s.sessions, "admin"))
+			r.Get("/settings/projects", s.handler.ShowProjects)
+			r.Get("/settings/connections", s.handler.ShowConnections)
+			r.Get("/settings/users", s.handler.ShowUsers)
+		})
 	})
 
 	return r
