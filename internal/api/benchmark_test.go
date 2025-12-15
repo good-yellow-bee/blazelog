@@ -16,7 +16,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-
 // benchServer creates a test server for benchmarking
 func benchServer(b *testing.B) (*Server, storage.Storage, func()) {
 	b.Helper()
@@ -99,7 +98,7 @@ func getAuthTokenBench(b *testing.B, ts *httptest.Server) string {
 	b.Helper()
 
 	loginBody := `{"username":"benchadmin","password":"benchpassword"}`
-	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/auth/login", bytes.NewBufferString(loginBody))
+	req, _ := http.NewRequestWithContext(context.Background(), "POST", ts.URL+"/api/v1/auth/login", bytes.NewBufferString(loginBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := ts.Client().Do(req)
@@ -136,7 +135,8 @@ func BenchmarkAPI_Health(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		resp, err := client.Get(ts.URL + "/health")
+		req, _ := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/health", nil)
+		resp, err := client.Do(req)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -156,7 +156,8 @@ func BenchmarkAPI_HealthReady(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		resp, err := client.Get(ts.URL + "/health/ready")
+		req, _ := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/health/ready", nil)
+		resp, err := client.Do(req)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -180,7 +181,7 @@ func BenchmarkAPI_Login(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("POST", ts.URL+"/api/v1/auth/login", bytes.NewBufferString(loginBody))
+		req, _ := http.NewRequestWithContext(context.Background(), "POST", ts.URL+"/api/v1/auth/login", bytes.NewBufferString(loginBody))
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := client.Do(req)
 		if err != nil {
@@ -211,7 +212,7 @@ func BenchmarkAPI_UsersList(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", ts.URL+"/api/v1/users", nil)
+		req, _ := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/api/v1/users", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := client.Do(req)
@@ -250,7 +251,7 @@ func BenchmarkAPI_ProjectsList(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", ts.URL+"/api/v1/projects", nil)
+		req, _ := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/api/v1/projects", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := client.Do(req)
@@ -302,7 +303,7 @@ func BenchmarkAPI_ConnectionsList(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", ts.URL+"/api/v1/connections", nil)
+		req, _ := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/api/v1/connections", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := client.Do(req)
@@ -330,7 +331,7 @@ func BenchmarkAPI_Parallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			req, _ := http.NewRequest("GET", ts.URL+"/health", nil)
+			req, _ := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/health", nil)
 			req.Header.Set("Authorization", "Bearer "+token)
 
 			resp, err := client.Do(req)

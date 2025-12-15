@@ -13,9 +13,10 @@ import (
 // WordPressParser parses WordPress debug.log and PHP error logs.
 // WordPress debug.log format: [DD-Mon-YYYY HH:MM:SS TZ] PHP Level: message
 // Examples:
-//   [15-Jan-2024 10:23:45 UTC] PHP Notice:  Undefined variable: foo
-//   [15-Jan-2024 10:23:45 UTC] PHP Fatal error:  Uncaught Exception: ...
-//   [15-Jan-2024 10:23:45 UTC] WordPress database error ...
+//
+//	[15-Jan-2024 10:23:45 UTC] PHP Notice:  Undefined variable: foo
+//	[15-Jan-2024 10:23:45 UTC] PHP Fatal error:  Uncaught Exception: ...
+//	[15-Jan-2024 10:23:45 UTC] WordPress database error ...
 type WordPressParser struct {
 	*BaseParser
 	// Main regex for parsing log lines
@@ -171,7 +172,7 @@ func (p *WordPressParser) CanParse(line string) bool {
 
 	// Additional check: should contain "PHP " or "WordPress" after the timestamp
 	matches := p.regex.FindStringSubmatch(line)
-	if matches == nil || len(matches) < 4 {
+	if len(matches) < 4 {
 		return false
 	}
 	message := matches[3]

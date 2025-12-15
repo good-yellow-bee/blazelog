@@ -95,7 +95,7 @@ func New(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*Serv
 	return s, nil
 }
 
-// Run starts the HTTP server and blocks until context is cancelled.
+// Run starts the HTTP server and blocks until context is canceled.
 func (s *Server) Run(ctx context.Context) error {
 	errChan := make(chan error, 1)
 

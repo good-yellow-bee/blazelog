@@ -356,11 +356,6 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 		return nil, fmt.Errorf("count: %w", err)
 	}
 
-	limit := filter.Limit
-	if limit == 0 {
-		limit = 100
-	}
-
 	return &LogQueryResult{
 		Entries: entries,
 		Total:   total,

@@ -20,7 +20,6 @@ type LogBuffer struct {
 
 	mu       sync.Mutex
 	buffer   []*LogRecord
-	timer    *time.Timer
 	stopCh   chan struct{}
 	doneCh   chan struct{}
 	stopped  atomic.Bool

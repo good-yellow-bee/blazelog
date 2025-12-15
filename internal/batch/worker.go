@@ -81,7 +81,7 @@ func (p *WorkerPool) Start(ctx context.Context, processor func(context.Context, 
 }
 
 // Submit adds a file path to the job queue.
-// Returns error if pool is closed or context cancelled.
+// Returns error if pool is closed or context canceled.
 func (p *WorkerPool) Submit(ctx context.Context, path string) error {
 	select {
 	case <-ctx.Done():

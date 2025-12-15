@@ -106,7 +106,7 @@ func (p *PrestaShopParser) ParseWithContext(ctx context.Context, line string) (*
 	}
 
 	// Store extra if present
-	if extra != nil && len(extra) > 0 {
+	if len(extra) > 0 {
 		entry.SetField("extra", extra)
 	}
 

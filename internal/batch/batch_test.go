@@ -45,11 +45,11 @@ func setupTestData(t *testing.T) string {
 
 func TestDateFilter_Matches(t *testing.T) {
 	tests := []struct {
-		name    string
-		from    time.Time
-		to      time.Time
-		ts      time.Time
-		want    bool
+		name string
+		from time.Time
+		to   time.Time
+		ts   time.Time
+		want bool
 	}{
 		{
 			name: "disabled filter matches all",
@@ -234,9 +234,9 @@ func TestAnalyzer_ContextCancel(t *testing.T) {
 	analyzer := NewAnalyzer(opts)
 
 	_, err := analyzer.Analyze(ctx, []string{filepath.Join(dir, "*.log")})
-	// Should complete without error even if cancelled
+	// Should complete without error even if canceled
 	if err != nil {
-		t.Logf("Analyze() with cancelled context returned: %v", err)
+		t.Logf("Analyze() with canceled context returned: %v", err)
 	}
 }
 

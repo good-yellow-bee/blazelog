@@ -227,7 +227,8 @@ func (t *Tailer) handleEvent(event fsnotify.Event) {
 		// File was removed or renamed (rotation in progress)
 		// Wait for create event
 	case event.Has(fsnotify.Chmod):
-		// Ignore chmod events
+		// Ignore chmod events (no action needed)
+		return
 	}
 }
 

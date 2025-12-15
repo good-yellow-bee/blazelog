@@ -49,9 +49,7 @@ func newChaosServer(t *testing.T) *chaosServer {
 	blazelogv1.RegisterLogServiceServer(s.grpcServer, s)
 
 	go func() {
-		if err := s.grpcServer.Serve(lis); err != nil {
-			// Server stopped
-		}
+		_ = s.grpcServer.Serve(lis) // Server stopped on error
 	}()
 
 	return s
@@ -140,7 +138,7 @@ func (s *chaosServer) setFailRegister(fail bool) {
 	s.failRegister = fail
 }
 
-func (s *chaosServer) setFailStream(fail bool) {
+func (s *chaosServer) setFailStream(fail bool) { //nolint:unused // kept for future chaos testing
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.failStream = fail
@@ -152,7 +150,7 @@ func (s *chaosServer) setFailHeartbeat(fail bool) {
 	s.failHeartbeat = fail
 }
 
-func (s *chaosServer) setFailAfter(n int) {
+func (s *chaosServer) setFailAfter(n int) { //nolint:unused // kept for future chaos testing
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.failAfter = n

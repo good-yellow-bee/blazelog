@@ -96,7 +96,7 @@ func (p *MagentoParser) ParseWithContext(ctx context.Context, line string) (*mod
 	}
 
 	// Store extra if present
-	if extra != nil && len(extra) > 0 {
+	if len(extra) > 0 {
 		entry.SetField("extra", extra)
 	}
 
