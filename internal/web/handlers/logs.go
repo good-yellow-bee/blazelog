@@ -226,6 +226,7 @@ func (h *Handler) ExportLogs(w http.ResponseWriter, r *http.Request) {
 		EndTime:         endTime,
 		Level:           strings.ToLower(q.Get("level")),
 		Type:            strings.ToLower(q.Get("type")),
+		Source:          q.Get("source"),
 		MessageContains: q.Get("q"),
 		Limit:           limit,
 		OrderBy:         "timestamp",
@@ -315,6 +316,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 	baseFilter := &storage.LogFilter{
 		Level:           strings.ToLower(q.Get("level")),
 		Type:            strings.ToLower(q.Get("type")),
+		Source:          q.Get("source"),
 		MessageContains: q.Get("q"),
 		Limit:           100,
 		OrderBy:         "timestamp",
