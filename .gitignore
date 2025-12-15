@@ -81,3 +81,6 @@ internal/proto/
 agent
 server
 blazectl
+
+# Generated Tailwind CSS
+web/static/css/output.css
