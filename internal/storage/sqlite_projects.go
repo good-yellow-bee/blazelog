@@ -184,6 +184,32 @@ func (r *sqliteProjectRepo) GetUsers(ctx context.Context, projectID string) ([]*
 	return users, rows.Err()
 }
 
+func (r *sqliteProjectRepo) GetProjectMembers(ctx context.Context, projectID string) ([]*models.ProjectMember, error) {
+	query := `
+		SELECT u.id, u.username, u.email, pu.role
+		FROM users u
+		INNER JOIN project_users pu ON u.id = pu.user_id
+		WHERE pu.project_id = ?
+		ORDER BY u.username
+	`
+	rows, err := r.db.QueryContext(ctx, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("get project members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []*models.ProjectMember
+	for rows.Next() {
+		member := &models.ProjectMember{}
+		err := rows.Scan(&member.UserID, &member.Username, &member.Email, &member.Role)
+		if err != nil {
+			return nil, fmt.Errorf("scan project member: %w", err)
+		}
+		members = append(members, member)
+	}
+	return members, rows.Err()
+}
+
 func (r *sqliteProjectRepo) GetProjectsForUser(ctx context.Context, userID string) ([]*models.Project, error) {
 	query := `
 		SELECT p.id, p.name, p.description, p.created_at, p.updated_at

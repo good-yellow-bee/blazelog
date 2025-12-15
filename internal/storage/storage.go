@@ -51,6 +51,7 @@ type ProjectRepository interface {
 	AddUser(ctx context.Context, projectID, userID string, role models.Role) error
 	RemoveUser(ctx context.Context, projectID, userID string) error
 	GetUsers(ctx context.Context, projectID string) ([]*models.User, error)
+	GetProjectMembers(ctx context.Context, projectID string) ([]*models.ProjectMember, error)
 	GetProjectsForUser(ctx context.Context, userID string) ([]*models.Project, error)
 }
 
