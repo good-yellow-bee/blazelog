@@ -215,20 +215,15 @@ func (t *Tailer) handleEvent(event fsnotify.Event) {
 		return
 	}
 
-	switch {
-	case event.Has(fsnotify.Write):
+	if event.Has(fsnotify.Write) {
 		t.readLines()
-	case event.Has(fsnotify.Create):
+	} else if event.Has(fsnotify.Create) {
 		// File was recreated (rotation)
 		if t.opts.ReOpen {
 			t.handleRotation()
 		}
-	case event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename):
-		// File was removed or renamed (rotation in progress)
-		// Wait for create event
-	default:
-		// Ignore chmod and other events
 	}
+	// Ignore Remove, Rename, Chmod and other events - wait for create event on rotation
 }
 
 func (t *Tailer) checkForChanges() {
