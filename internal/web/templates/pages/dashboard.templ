@@ -1,0 +1,99 @@
+// internal/web/templates/pages/dashboard.templ
+package pages
+
+import (
+	"fmt"
+	"github.com/good-yellow-bee/blazelog/internal/web/templates/layouts"
+	"github.com/good-yellow-bee/blazelog/internal/web/session"
+)
+
+type DashboardStats struct {
+	TotalLogs     int
+	ErrorCount    int
+	WarningCount  int
+	ActiveAlerts  int
+}
+
+templ Dashboard(user *session.Session, stats DashboardStats) {
+	@layouts.Base("Dashboard", user) {
+		<div class="space-y-6">
+			<h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+
+			<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+				@StatCard("Total Logs", formatNumber(stats.TotalLogs), "blue")
+				@StatCard("Errors (24h)", formatNumber(stats.ErrorCount), "red")
+				@StatCard("Warnings (24h)", formatNumber(stats.WarningCount), "yellow")
+				@StatCard("Active Alerts", formatNumber(stats.ActiveAlerts), "green")
+			</div>
+
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+				<div class="bg-white shadow rounded-lg p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4">Recent Logs</h3>
+					<div
+						hx-get="/api/v1/logs?limit=5"
+						hx-trigger="load"
+						hx-target="this"
+						class="text-gray-500"
+					>
+						Loading recent logs...
+					</div>
+				</div>
+
+				<div class="bg-white shadow rounded-lg p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4">Recent Alerts</h3>
+					<div
+						hx-get="/api/v1/alerts/history?limit=5"
+						hx-trigger="load"
+						hx-target="this"
+						class="text-gray-500"
+					>
+						Loading recent alerts...
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ StatCard(title string, value string, color string) {
+	<div class="bg-white overflow-hidden shadow rounded-lg">
+		<div class="p-5">
+			<div class="flex items-center">
+				<div class={ "flex-shrink-0 rounded-md p-3 " + colorClass(color) }>
+					<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5"/>
+					</svg>
+				</div>
+				<div class="ml-5 w-0 flex-1">
+					<dl>
+						<dt class="text-sm font-medium text-gray-500 truncate">{ title }</dt>
+						<dd class="text-lg font-semibold text-gray-900">{ value }</dd>
+					</dl>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+func colorClass(color string) string {
+	switch color {
+	case "red":
+		return "bg-red-500"
+	case "yellow":
+		return "bg-yellow-500"
+	case "green":
+		return "bg-green-500"
+	default:
+		return "bg-blue-500"
+	}
+}
+
+func formatNumber(n int) string {
+	if n >= 1000000 {
+		return fmt.Sprintf("%.1fM", float64(n)/1000000)
+	}
+	if n >= 1000 {
+		return fmt.Sprintf("%.1fK", float64(n)/1000)
+	}
+	return fmt.Sprintf("%d", n)
+}
