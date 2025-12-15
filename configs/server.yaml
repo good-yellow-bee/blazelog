@@ -7,7 +7,7 @@ server:
   # gRPC listen address for agent connections
   grpc_address: ":9443"
 
-  # HTTP listen address for REST API (future)
+  # HTTP listen address for REST API and Web UI
   http_address: ":8080"
 
   # TLS configuration for mTLS (mutual TLS)
@@ -33,6 +33,15 @@ database:
   # SQLite database file path
   # Default: ./data/blazelog.db
   path: "./data/blazelog.db"
+
+# Authentication configuration
+# NOTE: Set these environment variables to enable JWT and Web UI
+# Generate secrets with: openssl rand -base64 32
+auth:
+  # JWT secret for REST API authentication
+  jwt_secret_env: "BLAZELOG_JWT_SECRET"
+  # CSRF secret for Web UI (if empty, web UI is disabled)
+  csrf_secret_env: "BLAZELOG_CSRF_SECRET"
 
 # SSH security settings
 ssh:
