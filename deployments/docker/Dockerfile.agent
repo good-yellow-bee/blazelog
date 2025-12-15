@@ -1,0 +1,50 @@
+# Build stage
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+WORKDIR /build
+
+# Copy go modules first (cache layer)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
+COPY . .
+
+# Build static binary
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -trimpath \
+    -ldflags "-s -w \
+        -X github.com/good-yellow-bee/blazelog/pkg/config.Version=${VERSION} \
+        -X github.com/good-yellow-bee/blazelog/pkg/config.Commit=${COMMIT} \
+        -X github.com/good-yellow-bee/blazelog/pkg/config.BuildTime=${BUILD_TIME}" \
+    -o /blazelog-agent ./cmd/agent
+
+# Runtime stage - Alpine for filesystem access (needed for log collection)
+FROM alpine:3.21
+
+# Install ca-certificates and tzdata
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -g 1000 blazelog \
+    && adduser -u 1000 -G blazelog -s /bin/sh -D blazelog
+
+# Copy binary
+COPY --from=builder /blazelog-agent /usr/local/bin/blazelog-agent
+
+# Copy default config
+COPY --from=builder /build/configs/agent.yaml /etc/blazelog/agent.yaml
+
+# Config volume
+VOLUME /etc/blazelog
+
+# Log directory mount point
+VOLUME /var/log
+
+# Run as non-root user
+USER blazelog
+
+ENTRYPOINT ["blazelog-agent"]
+CMD ["-c", "/etc/blazelog/agent.yaml"]

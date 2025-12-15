@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.server
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: blazelog/server:${VERSION:-latest}
+    container_name: blazelog-server
+    ports:
+      - "8080:8080"   # HTTP API / Web UI
+      - "9443:9443"   # gRPC (agents)
+      - "9090:9090"   # Prometheus metrics
+    environment:
+      - BLAZELOG_MASTER_KEY=${BLAZELOG_MASTER_KEY:?required}
+      - BLAZELOG_JWT_SECRET=${BLAZELOG_JWT_SECRET:?required}
+      - BLAZELOG_CSRF_SECRET=${BLAZELOG_CSRF_SECRET:-}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - blazelog-data:/data
+      - ./config/server.yaml:/etc/blazelog/server.yaml:ro
+    healthcheck:
+      test: ["CMD", "/blazelog-server", "-c", "/etc/blazelog/server.yaml", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - blazelog
+    profiles:
+      - dev
+      - prod
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: blazelog-clickhouse
+    ports:
+      - "9000:9000"   # Native protocol
+      - "8123:8123"   # HTTP interface
+    environment:
+      - CLICKHOUSE_DB=blazelog
+      - CLICKHOUSE_USER=blazelog
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:?required for prod}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - blazelog
+    profiles:
+      - prod
+
+  agent:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.agent
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: blazelog/agent:${VERSION:-latest}
+    container_name: blazelog-agent
+    environment:
+      - BLAZELOG_SERVER_ADDRESS=server:9443
+    volumes:
+      - ./config/agent.yaml:/etc/blazelog/agent.yaml:ro
+      - /var/log:/var/log:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - blazelog
+    profiles:
+      - prod
+
+volumes:
+  blazelog-data:
+    name: blazelog-data
+  clickhouse-data:
+    name: blazelog-clickhouse-data
+  clickhouse-logs:
+    name: blazelog-clickhouse-logs
+
+networks:
+  blazelog:
+    name: blazelog
+    driver: bridge

@@ -1,0 +1,57 @@
+[Unit]
+Description=BlazeLog Log Collection Agent
+Documentation=https://github.com/good-yellow-bee/blazelog
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=blazelog
+Group=blazelog
+
+# Binary and config
+ExecStart=/usr/local/bin/blazelog-agent -c /etc/blazelog/agent.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Working directory (for buffer storage)
+WorkingDirectory=/var/lib/blazelog
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Resource limits
+LimitNOFILE=65535
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+# Read-only access to log directories
+ReadOnlyPaths=/var/log
+
+# Read-write for buffer directory
+ReadWritePaths=/var/lib/blazelog
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=blazelog-agent
+
+[Install]
+WantedBy=multi-user.target

@@ -3,7 +3,8 @@
 
 .PHONY: all build build-agent build-server build-cli test lint clean install help \
 	proto proto-deps proto-lint proto-generate proto-clean \
-	templ-generate templ-watch web-build web-watch dev-web
+	templ-generate templ-watch web-build web-watch dev-web \
+	docker-build docker-push install-systemd benchmark
 
 # Go parameters
 GOCMD=/opt/homebrew/bin/go
@@ -195,3 +196,115 @@ proto: proto-lint proto-generate
 proto-clean:
 	@echo "Cleaning generated proto files..."
 	@rm -rf internal/proto/blazelog
+
+# Docker targets
+DOCKER_REGISTRY?=ghcr.io/good-yellow-bee
+DOCKER_TAG?=$(VERSION)
+
+## docker-build: Build Docker images
+docker-build:
+	@echo "Building Docker images..."
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_TIME=$(BUILD_TIME) \
+		-f deployments/docker/Dockerfile.server \
+		-t $(DOCKER_REGISTRY)/blazelog-server:$(DOCKER_TAG) .
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_TIME=$(BUILD_TIME) \
+		-f deployments/docker/Dockerfile.agent \
+		-t $(DOCKER_REGISTRY)/blazelog-agent:$(DOCKER_TAG) .
+
+## docker-build-multiarch: Build multi-arch Docker images (requires buildx)
+docker-build-multiarch:
+	@echo "Building multi-arch Docker images..."
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_TIME=$(BUILD_TIME) \
+		-f deployments/docker/Dockerfile.server \
+		-t $(DOCKER_REGISTRY)/blazelog-server:$(DOCKER_TAG) .
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_TIME=$(BUILD_TIME) \
+		-f deployments/docker/Dockerfile.agent \
+		-t $(DOCKER_REGISTRY)/blazelog-agent:$(DOCKER_TAG) .
+
+## docker-push: Push Docker images to registry
+docker-push:
+	@echo "Pushing Docker images..."
+	docker push $(DOCKER_REGISTRY)/blazelog-server:$(DOCKER_TAG)
+	docker push $(DOCKER_REGISTRY)/blazelog-agent:$(DOCKER_TAG)
+
+## docker-compose-dev: Start development environment
+docker-compose-dev:
+	cd deployments/docker && docker compose --profile dev up -d
+
+## docker-compose-prod: Start production environment
+docker-compose-prod:
+	cd deployments/docker && docker compose --profile prod up -d
+
+## docker-compose-down: Stop all containers
+docker-compose-down:
+	cd deployments/docker && docker compose down
+
+# Systemd targets
+## install-systemd: Install systemd service files (requires sudo)
+install-systemd:
+	@echo "Installing systemd services..."
+	@echo "Creating blazelog user..."
+	sudo useradd -r -s /bin/false blazelog 2>/dev/null || true
+	@echo "Creating directories..."
+	sudo mkdir -p /etc/blazelog/certs /var/lib/blazelog /var/log/blazelog
+	sudo chown -R blazelog:blazelog /var/lib/blazelog /var/log/blazelog
+	@echo "Installing binaries..."
+	sudo cp $(BUILD_DIR)/$(BINARY_SERVER) /usr/local/bin/
+	sudo cp $(BUILD_DIR)/$(BINARY_AGENT) /usr/local/bin/
+	sudo cp $(BUILD_DIR)/$(BINARY_CLI) /usr/local/bin/
+	@echo "Installing configs..."
+	sudo cp configs/server.yaml /etc/blazelog/
+	sudo cp configs/agent.yaml /etc/blazelog/
+	@echo "Installing service files..."
+	sudo cp deployments/systemd/blazelog-server.service /etc/systemd/system/
+	sudo cp deployments/systemd/blazelog-agent.service /etc/systemd/system/
+	sudo systemctl daemon-reload
+	@echo "Done! Configure /etc/blazelog/server.env with secrets, then:"
+	@echo "  sudo systemctl enable --now blazelog-server"
+
+# Benchmark targets
+## benchmark: Run Go benchmarks
+benchmark:
+	@echo "Running benchmarks..."
+	$(GOTEST) -bench=. -benchmem -run=^$$ ./internal/api/
+	$(GOTEST) -bench=. -benchmem -run=^$$ ./internal/server/
+	$(GOTEST) -bench=. -benchmem -run=^$$ ./internal/storage/
+
+## benchmark-api: Run API benchmarks only
+benchmark-api:
+	@echo "Running API benchmarks..."
+	$(GOTEST) -bench=. -benchmem -run=^$$ ./internal/api/
+
+## benchmark-grpc: Run gRPC benchmarks only
+benchmark-grpc:
+	@echo "Running gRPC benchmarks..."
+	$(GOTEST) -bench=. -benchmem -run=^$$ ./internal/server/
+
+## load-test: Run load tests (requires server running and k6 installed)
+load-test:
+	@echo "Running load tests..."
+	./scripts/load-test.sh --all
+
+## load-test-go: Run Go benchmarks only
+load-test-go:
+	@echo "Running Go benchmarks..."
+	./scripts/load-test.sh --go-only
+
+## load-test-k6: Run k6 load tests only
+load-test-k6:
+	@echo "Running k6 load tests..."
+	./scripts/load-test.sh --k6-only

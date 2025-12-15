@@ -1,8 +1,6 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 
 	"github.com/good-yellow-bee/blazelog/internal/api/alerts"
@@ -31,6 +29,7 @@ func (s *Server) setupRouter() *chi.Mux {
 	userLimiter := middleware.NewRateLimiter(s.config.RateLimitPerUser)
 
 	// Global middleware
+	r.Use(middleware.PrometheusMiddleware)
 	r.Use(middleware.RequestLogger(s.config.Verbose))
 	r.Use(middleware.SecurityHeaders)
 	r.Use(middleware.Recoverer)
@@ -196,10 +195,10 @@ func (s *Server) setupRouter() *chi.Mux {
 		})
 	})
 
-	// Health check (public, no rate limit)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		OK(w, map[string]string{"status": "ok"})
-	})
+	// Health check endpoints (public, no rate limit)
+	r.Get("/health", s.healthHandler.Health)
+	r.Get("/health/live", s.healthHandler.Live)
+	r.Get("/health/ready", s.healthHandler.Ready)
 
 	// Web UI routes (mounted at root, but API routes take precedence)
 	if s.config.CSRFSecret != "" {

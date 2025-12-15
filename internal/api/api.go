@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/health"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 )
 
@@ -52,10 +53,11 @@ func (c *Config) SetDefaults() {
 
 // Server is the HTTP API server.
 type Server struct {
-	config     *Config
-	storage    storage.Storage
-	logStorage storage.LogStorage
-	server     *http.Server
+	config        *Config
+	storage       storage.Storage
+	logStorage    storage.LogStorage
+	server        *http.Server
+	healthHandler *health.Handler
 }
 
 // New creates a new API server.
@@ -74,9 +76,10 @@ func New(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*Serv
 	cfg.SetDefaults()
 
 	s := &Server{
-		config:     cfg,
-		storage:    store,
-		logStorage: logStore,
+		config:        cfg,
+		storage:       store,
+		logStorage:    logStore,
+		healthHandler: health.NewHandler(),
 	}
 
 	router := s.setupRouter()
@@ -117,4 +120,11 @@ func (s *Server) Run(ctx context.Context) error {
 // Address returns the configured listen address.
 func (s *Server) Address() string {
 	return s.config.Address
+}
+
+// RegisterHealthChecker adds a health checker to the server.
+func (s *Server) RegisterHealthChecker(c health.Checker) {
+	if s.healthHandler != nil {
+		s.healthHandler.RegisterChecker(c)
+	}
 }
