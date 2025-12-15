@@ -30,3 +30,11 @@ type ProjectUser struct {
 	UserID    string `json:"user_id"`
 	Role      Role   `json:"role"`
 }
+
+// ProjectMember represents a user with their project-specific role.
+type ProjectMember struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Role     Role   `json:"role"` // Project-specific role, not global user role
+}

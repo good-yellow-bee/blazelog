@@ -21,11 +21,12 @@ type SQLiteStorage struct {
 	masterKey []byte
 	db        *sql.DB
 
-	users       *sqliteUserRepo
-	projects    *sqliteProjectRepo
-	alerts      *sqliteAlertRepo
-	connections *sqliteConnectionRepo
-	tokens      *sqliteTokenRepo
+	users        *sqliteUserRepo
+	projects     *sqliteProjectRepo
+	alerts       *sqliteAlertRepo
+	connections  *sqliteConnectionRepo
+	tokens       *sqliteTokenRepo
+	alertHistory *sqliteAlertHistoryRepo
 }
 
 // NewSQLiteStorage creates a new SQLite storage.
@@ -77,6 +78,7 @@ func (s *SQLiteStorage) Open() error {
 	s.alerts = &sqliteAlertRepo{db: db}
 	s.connections = &sqliteConnectionRepo{db: db, masterKey: s.masterKey}
 	s.tokens = &sqliteTokenRepo{db: db}
+	s.alertHistory = &sqliteAlertHistoryRepo{db: db}
 
 	return nil
 }
@@ -160,6 +162,11 @@ func (s *SQLiteStorage) Connections() ConnectionRepository {
 // Tokens returns the token repository.
 func (s *SQLiteStorage) Tokens() TokenRepository {
 	return s.tokens
+}
+
+// AlertHistory returns the alert history repository.
+func (s *SQLiteStorage) AlertHistory() AlertHistoryRepository {
+	return s.alertHistory
 }
 
 // generateRandomPassword generates a random password of the specified length.

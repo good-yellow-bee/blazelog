@@ -25,6 +25,7 @@ type Storage interface {
 	Alerts() AlertRepository
 	Connections() ConnectionRepository
 	Tokens() TokenRepository
+	AlertHistory() AlertHistoryRepository
 }
 
 // UserRepository defines operations for user management.
@@ -50,6 +51,7 @@ type ProjectRepository interface {
 	AddUser(ctx context.Context, projectID, userID string, role models.Role) error
 	RemoveUser(ctx context.Context, projectID, userID string) error
 	GetUsers(ctx context.Context, projectID string) ([]*models.User, error)
+	GetProjectMembers(ctx context.Context, projectID string) ([]*models.ProjectMember, error)
 	GetProjectsForUser(ctx context.Context, userID string) ([]*models.Project, error)
 }
 
@@ -85,4 +87,13 @@ type TokenRepository interface {
 	RevokeByTokenHash(ctx context.Context, tokenHash string) error
 	RevokeAllForUser(ctx context.Context, userID string) error
 	DeleteExpired(ctx context.Context) (int64, error)
+}
+
+// AlertHistoryRepository defines operations for alert history.
+type AlertHistoryRepository interface {
+	Create(ctx context.Context, history *models.AlertHistory) error
+	List(ctx context.Context, limit, offset int) ([]*models.AlertHistory, int64, error)
+	ListByAlert(ctx context.Context, alertID string, limit, offset int) ([]*models.AlertHistory, int64, error)
+	ListByProject(ctx context.Context, projectID string, limit, offset int) ([]*models.AlertHistory, int64, error)
+	DeleteBefore(ctx context.Context, before time.Time) (int64, error)
 }
