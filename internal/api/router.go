@@ -5,9 +5,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/alerts"
 	"github.com/good-yellow-bee/blazelog/internal/api/auth"
+	"github.com/good-yellow-bee/blazelog/internal/api/connections"
 	"github.com/good-yellow-bee/blazelog/internal/api/logs"
 	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
+	"github.com/good-yellow-bee/blazelog/internal/api/projects"
 	"github.com/good-yellow-bee/blazelog/internal/api/users"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 )
@@ -98,6 +101,97 @@ func (s *Server) setupRouter() *chi.Mux {
 			r.Get("/", logsHandler.Query)
 			r.Get("/stats", logsHandler.Stats)
 			r.Get("/stream", logsHandler.Stream)
+		})
+
+		// Alert routes (protected)
+		r.Route("/alerts", func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(middleware.RateLimitByUser(userLimiter))
+
+			alertsHandler := alerts.NewHandler(s.storage)
+
+			r.Get("/", alertsHandler.List)
+			r.Get("/history", alertsHandler.History)
+
+			// Admin/Operator can create
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole(models.RoleAdmin, models.RoleOperator))
+				r.Post("/", alertsHandler.Create)
+			})
+
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", alertsHandler.GetByID)
+
+				// Admin/Operator can update
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireRole(models.RoleAdmin, models.RoleOperator))
+					r.Put("/", alertsHandler.Update)
+				})
+
+				// Admin only can delete
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireRole(models.RoleAdmin))
+					r.Delete("/", alertsHandler.Delete)
+				})
+			})
+		})
+
+		// Project routes (protected)
+		r.Route("/projects", func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(middleware.RateLimitByUser(userLimiter))
+
+			projectsHandler := projects.NewHandler(s.storage)
+
+			r.Get("/", projectsHandler.List)
+
+			// Admin only for create
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole(models.RoleAdmin))
+				r.Post("/", projectsHandler.Create)
+			})
+
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", projectsHandler.GetByID)
+				r.Get("/users", projectsHandler.GetUsers)
+
+				// Admin only for update/delete/user management
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireRole(models.RoleAdmin))
+					r.Put("/", projectsHandler.Update)
+					r.Delete("/", projectsHandler.Delete)
+					r.Post("/users", projectsHandler.AddUser)
+					r.Delete("/users/{userId}", projectsHandler.RemoveUser)
+				})
+			})
+		})
+
+		// Connection routes (protected)
+		r.Route("/connections", func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(middleware.RateLimitByUser(userLimiter))
+
+			connectionsHandler := connections.NewHandler(s.storage)
+
+			r.Get("/", connectionsHandler.List)
+
+			// Admin only for create
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole(models.RoleAdmin))
+				r.Post("/", connectionsHandler.Create)
+			})
+
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", connectionsHandler.GetByID)
+
+				// Admin only for update/delete/test
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireRole(models.RoleAdmin))
+					r.Put("/", connectionsHandler.Update)
+					r.Delete("/", connectionsHandler.Delete)
+					r.Post("/test", connectionsHandler.Test)
+				})
+			})
 		})
 	})
 
