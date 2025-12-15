@@ -1,0 +1,161 @@
+# BlazeLog Agent DaemonSet
+#
+# Deploys BlazeLog agent on every node (or selected nodes) to collect logs.
+# Mounts host log directories read-only for collection.
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: blazelog-agent
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: blazelog
+      app.kubernetes.io/component: agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: blazelog
+        app.kubernetes.io/component: agent
+    spec:
+      serviceAccountName: blazelog-agent
+      # Tolerate all taints to run on all nodes
+      tolerations:
+        - operator: Exists
+      # Optional: Select specific nodes
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+      #   blazelog/collect-logs: "true"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: agent
+          image: blazelog/agent:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-c"
+            - "/etc/blazelog/agent.yaml"
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: config
+              mountPath: /etc/blazelog
+              readOnly: true
+            - name: tls-certs
+              mountPath: /etc/blazelog/certs
+              readOnly: true
+            - name: agent-state
+              mountPath: /var/lib/blazelog
+            # Host log directories (read-only)
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            # For containerd runtime
+            - name: containerd-logs
+              mountPath: /var/log/pods
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: config
+          configMap:
+            name: blazelog-agent-config
+        - name: tls-certs
+          secret:
+            secretName: blazelog-tls
+            optional: true
+        - name: agent-state
+          emptyDir: {}
+        # Host paths for log collection
+        - name: varlog
+          hostPath:
+            path: /var/log
+            type: Directory
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+            type: DirectoryOrCreate
+        - name: containerd-logs
+          hostPath:
+            path: /var/log/pods
+            type: DirectoryOrCreate
+---
+# ServiceAccount for agent
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: blazelog-agent
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: agent
+---
+# ClusterRole for agent (read pods/nodes for metadata enrichment)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: blazelog-agent
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: agent
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: blazelog-agent
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: blazelog-agent
+subjects:
+  - kind: ServiceAccount
+    name: blazelog-agent
+    namespace: blazelog

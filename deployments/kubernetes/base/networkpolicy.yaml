@@ -1,0 +1,189 @@
+# BlazeLog NetworkPolicies
+#
+# Security policies to restrict network traffic between components.
+# Requires CNI that supports NetworkPolicy (Calico, Cilium, etc.)
+---
+# Default deny all ingress/egress in namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow DNS resolution for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Server NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: blazelog-server
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: blazelog
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # HTTP from Ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # Adjust to match your ingress namespace
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # gRPC from agents
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: blazelog
+              app.kubernetes.io/component: agent
+      ports:
+        - protocol: TCP
+          port: 9443
+    # Metrics from Prometheus
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+  egress:
+    # ClickHouse
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: blazelog
+              app.kubernetes.io/component: clickhouse
+      ports:
+        - protocol: TCP
+          port: 9000
+    # External SMTP (email notifications)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 587
+        - protocol: TCP
+          port: 465
+    # External HTTPS (Slack/Teams webhooks)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# Agent NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: blazelog-agent
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: blazelog
+      app.kubernetes.io/component: agent
+  policyTypes:
+    - Egress
+  egress:
+    # Connect to BlazeLog server only
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: blazelog
+              app.kubernetes.io/component: server
+      ports:
+        - protocol: TCP
+          port: 9443
+---
+# ClickHouse NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: blazelog-clickhouse
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: blazelog
+      app.kubernetes.io/component: clickhouse
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Accept from server only
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: blazelog
+              app.kubernetes.io/component: server
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 8123
+  egress:
+    # Inter-server communication (for future HA setup)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: blazelog
+              app.kubernetes.io/component: clickhouse
+      ports:
+        - protocol: TCP
+          port: 9009

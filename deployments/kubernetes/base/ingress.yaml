@@ -1,0 +1,91 @@
+# BlazeLog Ingress
+#
+# Exposes BlazeLog Web UI and API via Ingress controller.
+# Supports nginx-ingress, traefik, and cloud ingress controllers.
+#
+# Prerequisites:
+# - Ingress controller installed (nginx-ingress, traefik, etc.)
+# - TLS certificate (via cert-manager or pre-created secret)
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: blazelog
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: ingress
+  annotations:
+    # nginx-ingress annotations
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # Enable WebSocket for real-time log streaming
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Rate limiting (optional)
+    # nginx.ingress.kubernetes.io/limit-rps: "100"
+    # nginx.ingress.kubernetes.io/limit-connections: "50"
+
+    # cert-manager for automatic TLS
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    # Traefik annotations (uncomment if using Traefik)
+    # traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    # traefik.ingress.kubernetes.io/router.tls: "true"
+
+    # AWS ALB annotations (uncomment if using AWS ALB)
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...
+
+    # GCP annotations (uncomment if using GKE)
+    # kubernetes.io/ingress.class: gce
+spec:
+  ingressClassName: nginx  # Change to your ingress controller
+  tls:
+    - hosts:
+        - blazelog.example.com
+      secretName: blazelog-ingress-tls
+  rules:
+    - host: blazelog.example.com
+      http:
+        paths:
+          # Web UI and REST API
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: blazelog-server
+                port:
+                  name: http
+---
+# Example TLS Secret (for manual certificate)
+# Create with:
+#   kubectl create secret tls blazelog-ingress-tls \
+#     --namespace=blazelog \
+#     --cert=blazelog.crt \
+#     --key=blazelog.key
+#
+# Or use cert-manager for automatic provisioning
+apiVersion: v1
+kind: Secret
+metadata:
+  name: blazelog-ingress-tls
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: ingress
+type: kubernetes.io/tls
+data:
+  tls.crt: ""  # Base64-encoded certificate
+  tls.key: ""  # Base64-encoded private key

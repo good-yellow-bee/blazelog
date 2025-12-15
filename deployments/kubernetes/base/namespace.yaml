@@ -1,0 +1,11 @@
+# BlazeLog Kubernetes Namespace
+#
+# Creates isolated namespace for all BlazeLog resources
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/part-of: blazelog

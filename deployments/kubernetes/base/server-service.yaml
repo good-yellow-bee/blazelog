@@ -1,0 +1,91 @@
+# BlazeLog Server Services
+#
+# Exposes server endpoints:
+# - ClusterIP for internal access (default)
+# - LoadBalancer for external access (optional)
+---
+# ClusterIP Service - Internal access
+apiVersion: v1
+kind: Service
+metadata:
+  name: blazelog-server
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: 9443
+      targetPort: grpc
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+---
+# Headless Service - For direct pod addressing (optional)
+apiVersion: v1
+kind: Service
+metadata:
+  name: blazelog-server-headless
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: 9443
+      targetPort: grpc
+      protocol: TCP
+---
+# LoadBalancer Service - External access (use sparingly)
+# Uncomment to expose server directly via cloud LoadBalancer
+# Prefer Ingress for HTTP traffic
+#
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: blazelog-server-lb
+#   namespace: blazelog
+#   labels:
+#     app.kubernetes.io/name: blazelog
+#     app.kubernetes.io/component: server
+#   annotations:
+#     # AWS annotations (uncomment for AWS)
+#     # service.beta.kubernetes.io/aws-load-balancer-type: nlb
+#     # service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+#     # GCP annotations (uncomment for GCP)
+#     # cloud.google.com/load-balancer-type: Internal
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     app.kubernetes.io/name: blazelog
+#     app.kubernetes.io/component: server
+#   ports:
+#     - name: http
+#       port: 80
+#       targetPort: http
+#       protocol: TCP
+#     - name: grpc
+#       port: 9443
+#       targetPort: grpc
+#       protocol: TCP

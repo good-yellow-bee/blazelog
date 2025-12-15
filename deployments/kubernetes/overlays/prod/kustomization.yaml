@@ -1,0 +1,98 @@
+# BlazeLog Kubernetes Production Overlay
+#
+# Production environment with:
+# - ClickHouse for log storage
+# - Production resource limits
+# - Network policies enabled
+# - HPA for auto-scaling
+#
+# Apply: kubectl apply -k deployments/kubernetes/overlays/prod
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: blazelog
+
+resources:
+  - ../../base
+  - hpa.yaml
+
+# Override images to specific version
+images:
+  - name: blazelog/server
+    newTag: "1.0.0"  # Pin to specific version
+  - name: blazelog/agent
+    newTag: "1.0.0"
+
+# Production ConfigMap patch to enable ClickHouse
+configMapGenerator:
+  - name: blazelog-server-config
+    behavior: merge
+    literals:
+      - clickhouse_enabled=true
+
+patches:
+  # Production server resources
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: blazelog-server
+      spec:
+        template:
+          spec:
+            containers:
+              - name: server
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 1Gi
+                  limits:
+                    cpu: "4"
+                    memory: 4Gi
+
+  # Production ClickHouse resources
+  - patch: |-
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: blazelog-clickhouse
+      spec:
+        template:
+          spec:
+            containers:
+              - name: clickhouse
+                resources:
+                  requests:
+                    cpu: "1"
+                    memory: 4Gi
+                  limits:
+                    cpu: "8"
+                    memory: 16Gi
+
+  # Production storage size
+  - patch: |-
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: blazelog-data
+      spec:
+        resources:
+          requests:
+            storage: 50Gi
+
+  # Update Ingress host
+  - patch: |-
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: blazelog
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+      spec:
+        tls:
+          - hosts:
+              - logs.example.com
+            secretName: blazelog-prod-tls
+        rules:
+          - host: logs.example.com

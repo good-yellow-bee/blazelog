@@ -1,0 +1,148 @@
+# BlazeLog Server Deployment
+#
+# Deploys the central BlazeLog server with:
+# - REST API for Web UI and management
+# - gRPC endpoint for agent connections
+# - Prometheus metrics endpoint
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blazelog-server
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1  # Single replica for SQLite; scale horizontally only with external DB
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: blazelog
+      app.kubernetes.io/component: server
+  strategy:
+    type: Recreate  # Required for PVC with ReadWriteOnce
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: blazelog
+        app.kubernetes.io/component: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: blazelog-server
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: server
+          image: blazelog/server:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-c"
+            - "/etc/blazelog/server.yaml"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 9443
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: BLAZELOG_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: blazelog-secrets
+                  key: master-key
+            - name: BLAZELOG_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: blazelog-secrets
+                  key: jwt-secret
+            - name: BLAZELOG_CSRF_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: blazelog-secrets
+                  key: csrf-secret
+                  optional: true
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: blazelog-secrets
+                  key: clickhouse-password
+                  optional: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/blazelog
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tls-certs
+              mountPath: /etc/blazelog/certs
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config
+          configMap:
+            name: blazelog-server-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: blazelog-data
+        - name: tls-certs
+          secret:
+            secretName: blazelog-tls
+            optional: true
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: blazelog
+                    app.kubernetes.io/component: server
+                topologyKey: kubernetes.io/hostname
+---
+# ServiceAccount for server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: blazelog-server
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: server
