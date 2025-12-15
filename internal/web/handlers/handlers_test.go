@@ -8,7 +8,7 @@ import (
 )
 
 func TestShowLogin_Success(t *testing.T) {
-	h := NewHandler(nil, nil, "test-csrf-key")
+	h := NewHandler(nil, nil, nil, "test-csrf-key")
 
 	req := httptest.NewRequest("GET", "/login", nil)
 	rec := httptest.NewRecorder()
@@ -26,7 +26,7 @@ func TestShowLogin_Success(t *testing.T) {
 }
 
 func TestHandleLogin_MissingCredentials(t *testing.T) {
-	h := NewHandler(nil, nil, "test-csrf-key")
+	h := NewHandler(nil, nil, nil, "test-csrf-key")
 
 	req := httptest.NewRequest("POST", "/login", strings.NewReader("username=&password="))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

@@ -8,61 +8,106 @@ import (
 )
 
 type DashboardStats struct {
-	TotalLogs     int
-	ErrorCount    int
-	WarningCount  int
-	ActiveAlerts  int
+	TotalLogs    int
+	ErrorCount   int
+	WarningCount int
+	ActiveAlerts int
 }
 
 templ Dashboard(user *session.Session, stats DashboardStats) {
 	@layouts.Base("Dashboard", user) {
-		<div class="space-y-6">
-			<h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-
-			<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-				@StatCard("Total Logs", formatNumber(stats.TotalLogs), "blue")
-				@StatCard("Errors (24h)", formatNumber(stats.ErrorCount), "red")
-				@StatCard("Warnings (24h)", formatNumber(stats.WarningCount), "yellow")
-				@StatCard("Active Alerts", formatNumber(stats.ActiveAlerts), "green")
+		<div x-data="dashboardController()" x-init="init()" class="space-y-6">
+			<!-- Header with Controls -->
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+				<h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+				<div class="flex items-center space-x-4">
+					@TimeRangeSelector()
+					@AutoRefreshToggle()
+				</div>
 			</div>
 
-			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-				<div class="bg-white shadow rounded-lg p-6">
-					<h3 class="text-lg font-medium text-gray-900 mb-4">Recent Logs</h3>
-					<div
-						hx-get="/api/v1/logs?limit=5"
-						hx-trigger="load"
-						hx-target="this"
-						class="text-gray-500"
-					>
-						Loading recent logs...
-					</div>
+			<!-- Stats Cards with HTMX refresh -->
+			<div id="stats-cards">
+				<div id="stats-container">
+					@StatsCards(stats)
 				</div>
+			</div>
 
-				<div class="bg-white shadow rounded-lg p-6">
-					<h3 class="text-lg font-medium text-gray-900 mb-4">Recent Alerts</h3>
-					<div
-						hx-get="/api/v1/alerts/history?limit=5"
-						hx-trigger="load"
-						hx-target="this"
-						class="text-gray-500"
-					>
-						Loading recent alerts...
-					</div>
-				</div>
+			<!-- Charts Grid - Row 1 -->
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+				@VolumeChart()
+				@LogLevelChart()
+			</div>
+
+			<!-- Charts Grid - Row 2 -->
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+				@TopSourcesChart()
+				@HTTPStatusChart()
 			</div>
 		</div>
+
+		<!-- ECharts CDN -->
+		<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+		@DashboardScript()
 	}
 }
 
-templ StatCard(title string, value string, color string) {
+templ TimeRangeSelector() {
+	<div class="flex items-center space-x-2">
+		<span class="text-sm text-gray-500">Range:</span>
+		<select
+			x-model="$store.dashboard.timeRange"
+			@change="refreshDashboard()"
+			class="rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500"
+		>
+			<option value="15m">15 min</option>
+			<option value="1h">1 hour</option>
+			<option value="6h">6 hours</option>
+			<option value="24h">24 hours</option>
+			<option value="7d">7 days</option>
+			<option value="30d">30 days</option>
+		</select>
+	</div>
+}
+
+templ AutoRefreshToggle() {
+	<div class="flex items-center space-x-2">
+		<span class="text-sm text-gray-500">Refresh:</span>
+		<select
+			x-model="$store.dashboard.refreshInterval"
+			@change="setRefreshInterval()"
+			class="rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500"
+		>
+			<option value="0">Off</option>
+			<option value="10">10s</option>
+			<option value="30">30s</option>
+			<option value="60">1m</option>
+			<option value="300">5m</option>
+		</select>
+		<span
+			x-show="$store.dashboard.refreshInterval > 0"
+			class="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+			title="Auto-refresh active"
+		></span>
+	</div>
+}
+
+// StatsCards renders the stats cards grid (HTMX partial)
+templ StatsCards(stats DashboardStats) {
+	<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+		@StatCard("Total Logs", formatNumber(stats.TotalLogs), "blue", "chart")
+		@StatCard("Errors", formatNumber(stats.ErrorCount), "red", "error")
+		@StatCard("Warnings", formatNumber(stats.WarningCount), "yellow", "warning")
+		@StatCard("Active Alerts", formatNumber(stats.ActiveAlerts), "green", "bell")
+	</div>
+}
+
+templ StatCard(title string, value string, color string, icon string) {
 	<div class="bg-white overflow-hidden shadow rounded-lg">
 		<div class="p-5">
 			<div class="flex items-center">
 				<div class={ "flex-shrink-0 rounded-md p-3 " + colorClass(color) }>
-					<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5"/>
-					</svg>
+					@cardIcon(icon)
 				</div>
 				<div class="ml-5 w-0 flex-1">
 					<dl>
@@ -73,6 +118,245 @@ templ StatCard(title string, value string, color string) {
 			</div>
 		</div>
 	</div>
+}
+
+templ cardIcon(icon string) {
+	switch icon {
+		case "error":
+			<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+			</svg>
+		case "warning":
+			<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+			</svg>
+		case "bell":
+			<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
+			</svg>
+		default:
+			<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+			</svg>
+	}
+}
+
+// Chart containers
+templ VolumeChart() {
+	<div class="bg-white shadow rounded-lg p-6">
+		<h3 class="text-lg font-medium text-gray-900 mb-4">Log Volume</h3>
+		<div id="volume-chart" class="h-64"></div>
+	</div>
+}
+
+templ LogLevelChart() {
+	<div class="bg-white shadow rounded-lg p-6">
+		<h3 class="text-lg font-medium text-gray-900 mb-4">Log Levels</h3>
+		<div id="level-chart" class="h-64"></div>
+	</div>
+}
+
+templ TopSourcesChart() {
+	<div class="bg-white shadow rounded-lg p-6">
+		<h3 class="text-lg font-medium text-gray-900 mb-4">Top Sources</h3>
+		<div id="sources-chart" class="h-64"></div>
+	</div>
+}
+
+templ HTTPStatusChart() {
+	<div class="bg-white shadow rounded-lg p-6">
+		<h3 class="text-lg font-medium text-gray-900 mb-4">HTTP Status</h3>
+		<div id="http-chart" class="h-64"></div>
+	</div>
+}
+
+templ DashboardScript() {
+	<script>
+	// Alpine.js store for dashboard state
+	document.addEventListener('alpine:init', () => {
+		Alpine.store('dashboard', {
+			timeRange: '24h',
+			refreshInterval: 30,
+			refreshTimer: null
+		});
+	});
+
+	function dashboardController() {
+		return {
+			charts: {},
+
+			init() {
+				this.initCharts();
+				this.loadData();
+				this.setRefreshInterval();
+			},
+
+			initCharts() {
+				// Volume chart (area)
+				this.charts.volume = echarts.init(document.getElementById('volume-chart'));
+				this.charts.volume.setOption({
+					tooltip: { trigger: 'axis' },
+					legend: { data: ['Total', 'Errors'], bottom: 0 },
+					grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+					xAxis: { type: 'category', data: [], boundaryGap: false },
+					yAxis: { type: 'value' },
+					series: [
+						{ name: 'Total', type: 'line', areaStyle: { opacity: 0.3 }, data: [], smooth: true, color: '#6366f1' },
+						{ name: 'Errors', type: 'line', data: [], smooth: true, color: '#ef4444' }
+					]
+				});
+
+				// Log level chart (donut)
+				this.charts.level = echarts.init(document.getElementById('level-chart'));
+				this.charts.level.setOption({
+					tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+					legend: { bottom: 0, left: 'center' },
+					series: [{
+						type: 'pie',
+						radius: ['40%', '70%'],
+						center: ['50%', '45%'],
+						avoidLabelOverlap: false,
+						label: { show: false },
+						data: []
+					}]
+				});
+
+				// Top sources chart (horizontal bar)
+				this.charts.sources = echarts.init(document.getElementById('sources-chart'));
+				this.charts.sources.setOption({
+					tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+					grid: { left: '3%', right: '10%', bottom: '3%', containLabel: true },
+					xAxis: { type: 'value' },
+					yAxis: { type: 'category', data: [] },
+					series: [{ type: 'bar', data: [], itemStyle: { color: '#6366f1' } }]
+				});
+
+				// HTTP status chart (bar)
+				this.charts.http = echarts.init(document.getElementById('http-chart'));
+				this.charts.http.setOption({
+					tooltip: { trigger: 'axis' },
+					grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+					xAxis: { type: 'category', data: ['2xx', '3xx', '4xx', '5xx'] },
+					yAxis: { type: 'value' },
+					series: [{
+						type: 'bar',
+						data: [],
+						itemStyle: {
+							color: function(params) {
+								const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
+								return colors[params.dataIndex];
+							}
+						}
+					}]
+				});
+			},
+
+			async loadData() {
+				const range = Alpine.store('dashboard').timeRange;
+				try {
+					const res = await fetch(`/dashboard/stats?range=${range}`);
+					if (!res.ok) throw new Error('Failed to fetch');
+					const data = await res.json();
+					this.updateCharts(data);
+					this.updateStatsCards(data);
+				} catch (err) {
+					console.error('Failed to load dashboard data:', err);
+				}
+			},
+
+			updateStatsCards(data) {
+				// Update stats via DOM (simpler than HTMX for this case)
+				const cards = document.querySelectorAll('#stats-container .text-lg');
+				if (cards.length >= 4) {
+					cards[0].textContent = this.formatNumber(data.total_logs || 0);
+					cards[1].textContent = this.formatNumber(data.error_count || 0);
+					cards[2].textContent = this.formatNumber(data.warning_count || 0);
+					cards[3].textContent = this.formatNumber(data.active_alerts || 0);
+				}
+			},
+
+			formatNumber(n) {
+				if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+				if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+				return n.toString();
+			},
+
+			updateCharts(data) {
+				// Volume chart
+				if (data.volume && data.volume.length > 0) {
+					this.charts.volume.setOption({
+						xAxis: { data: data.volume.map(v => v.timestamp) },
+						series: [
+							{ data: data.volume.map(v => v.total_count) },
+							{ data: data.volume.map(v => v.error_count) }
+						]
+					});
+				}
+
+				// Level chart
+				const infoCount = (data.total_logs || 0) - (data.error_count || 0) - (data.warning_count || 0) - (data.fatal_count || 0);
+				const levelData = [
+					{ value: Math.max(0, infoCount), name: 'Info', itemStyle: { color: '#3b82f6' } },
+					{ value: data.warning_count || 0, name: 'Warning', itemStyle: { color: '#f59e0b' } },
+					{ value: data.error_count || 0, name: 'Error', itemStyle: { color: '#ef4444' } },
+					{ value: data.fatal_count || 0, name: 'Fatal', itemStyle: { color: '#7c3aed' } }
+				].filter(d => d.value > 0);
+
+				this.charts.level.setOption({
+					series: [{ data: levelData }]
+				});
+
+				// Sources chart
+				if (data.top_sources && data.top_sources.length > 0) {
+					this.charts.sources.setOption({
+						yAxis: { data: data.top_sources.map(s => s.source).reverse() },
+						series: [{ data: data.top_sources.map(s => s.count).reverse() }]
+					});
+				}
+
+				// HTTP chart
+				if (data.http_stats) {
+					this.charts.http.setOption({
+						series: [{
+							data: [
+								data.http_stats.total_2xx || 0,
+								data.http_stats.total_3xx || 0,
+								data.http_stats.total_4xx || 0,
+								data.http_stats.total_5xx || 0
+							]
+						}]
+					});
+				}
+			},
+
+			refreshDashboard() {
+				this.loadData();
+			},
+
+			setRefreshInterval() {
+				const store = Alpine.store('dashboard');
+				if (store.refreshTimer) {
+					clearInterval(store.refreshTimer);
+					store.refreshTimer = null;
+				}
+				if (store.refreshInterval > 0) {
+					store.refreshTimer = setInterval(() => this.loadData(), store.refreshInterval * 1000);
+				}
+			}
+		};
+	}
+
+	// Handle chart resize on window resize
+	window.addEventListener('resize', () => {
+		['volume-chart', 'level-chart', 'sources-chart', 'http-chart'].forEach(id => {
+			const el = document.getElementById(id);
+			if (el) {
+				const chart = echarts.getInstanceByDom(el);
+				if (chart) chart.resize();
+			}
+		});
+	});
+	</script>
 }
 
 func colorClass(color string) string {

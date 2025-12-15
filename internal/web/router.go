@@ -34,6 +34,7 @@ func (s *Server) Routes() chi.Router {
 			http.Redirect(w, r, "/dashboard", http.StatusFound)
 		})
 		r.Get("/dashboard", s.handler.ShowDashboard)
+		r.Get("/dashboard/stats", s.handler.GetDashboardStats)
 		r.Post("/logout", s.handler.HandleLogout)
 
 		// Placeholder routes for future milestones

@@ -20,10 +20,10 @@ type Server struct {
 	csrfKey  []byte
 }
 
-func NewServer(storage storage.Storage, csrfKey string) *Server {
+func NewServer(storage storage.Storage, logStorage storage.LogStorage, csrfKey string) *Server {
 	sessions := session.NewStore(24 * time.Hour)
 	return &Server{
-		handler:  handlers.NewHandler(storage, sessions, csrfKey),
+		handler:  handlers.NewHandler(storage, logStorage, sessions, csrfKey),
 		sessions: sessions,
 		csrfKey:  []byte(csrfKey),
 	}
