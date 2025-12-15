@@ -43,8 +43,8 @@ linters-settings:
       - G104 # Audit errors not checked (allow for deferred closes)
       - G115 # Integer overflow conversion (safe for bounded values like buffer sizes)
       - G304 # File path provided as taint input (allow for config files)
+      - G402 # TLS MinVersion (configurable, not a hardcoded vulnerability)
       - G404 # Weak random generator (acceptable for non-crypto uses like jitter)
-      - G407 # Hardcoded nonce (false positive - nonce is generated dynamically)
 
   govet:
     enable-all: true

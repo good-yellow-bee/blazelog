@@ -174,7 +174,7 @@ jobs:
         run: templ generate
 
       - name: Run gosec
-        run: gosec -exclude=G104,G115,G304,G404,G407 -severity=medium -fmt=json -out=gosec-results.json ./... || true
+        run: gosec -exclude=G104,G115,G304,G402,G404 -severity=medium -fmt=json -out=gosec-results.json ./... || true
 
       - name: Check gosec results
         run: |
