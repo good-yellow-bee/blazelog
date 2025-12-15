@@ -18,7 +18,6 @@ linters:
     - bodyclose
     - noctx
     - sqlclosecheck
-    - exportloopref
     - gocritic
     - revive
 
