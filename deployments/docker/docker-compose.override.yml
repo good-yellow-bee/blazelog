@@ -1,0 +1,50 @@
+# Docker Compose Override for Local Development
+#
+# This file is automatically loaded by docker compose.
+# It adds development-specific configurations.
+#
+# To disable: rename or delete this file
+# To use production settings only: docker compose -f docker-compose.yml up
+
+services:
+  server:
+    # Use local build instead of pulling image
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.server
+    # Mount local config for easy editing (override read-only)
+    volumes:
+      - blazelog-data:/data
+      - ./config/server.yaml:/etc/blazelog/server.yaml:rw
+      - blazelog-certs:/etc/blazelog/certs:ro
+      - blazelog-ssh:/etc/blazelog/ssh:ro
+      - ./config/known_hosts:/etc/blazelog/known_hosts:rw
+    # Enable verbose logging
+    command: ["-c", "/etc/blazelog/server.yaml", "-v"]
+    # Faster health check for dev
+    healthcheck:
+      interval: 10s
+      start_period: 5s
+
+  # Development-only: ClickHouse for local testing
+  # Uncomment to enable ClickHouse in dev mode
+  # clickhouse-dev:
+  #   image: clickhouse/clickhouse-server:24.3
+  #   container_name: blazelog-clickhouse-dev
+  #   ports:
+  #     - "9000:9000"
+  #     - "8123:8123"
+  #   environment:
+  #     - CLICKHOUSE_DB=blazelog
+  #     - CLICKHOUSE_USER=blazelog
+  #     - CLICKHOUSE_PASSWORD=devpassword
+  #   volumes:
+  #     - clickhouse-dev-data:/var/lib/clickhouse
+  #   networks:
+  #     - blazelog
+  #   profiles:
+  #     - dev
+
+# volumes:
+#   clickhouse-dev-data:
+#     name: blazelog-clickhouse-dev-data

@@ -1,0 +1,49 @@
+# BlazeLog Agent Configuration for Docker
+#
+# This config is optimized for containerized deployment.
+# Mount log directories as volumes to collect logs.
+
+# Server connection settings
+server:
+  # BlazeLog server address (Docker service name)
+  address: "server:9443"
+
+  # TLS configuration for mTLS (mutual TLS)
+  # Uncomment to enable secure communication
+  tls:
+    enabled: false
+    # cert_file: "/etc/blazelog/certs/agent.crt"
+    # key_file: "/etc/blazelog/certs/agent.key"
+    # ca_file: "/etc/blazelog/certs/ca.crt"
+
+# Agent settings
+agent:
+  # Agent name (defaults to container hostname)
+  name: ""
+  batch_size: 100
+  flush_interval: 1s
+
+# Log sources to collect
+# Mount the log directories as volumes in docker-compose
+sources:
+  # Example: Nginx logs (mount /var/log/nginx to container)
+  - name: "nginx-access"
+    type: "nginx"
+    path: "/var/log/nginx/access.log"
+    follow: true
+
+  - name: "nginx-error"
+    type: "nginx"
+    path: "/var/log/nginx/error.log"
+    follow: true
+
+  # Add more sources as needed
+  # - name: "app-logs"
+  #   type: "auto"
+  #   path: "/var/log/app/*.log"
+  #   follow: true
+
+# Labels for categorization
+labels:
+  environment: "docker"
+  project: "blazelog"

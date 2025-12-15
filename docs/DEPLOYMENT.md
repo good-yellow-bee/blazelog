@@ -67,37 +67,99 @@ sudo chown -R blazelog:blazelog /var/lib/blazelog /var/log/blazelog
 - Docker 20.10+
 - Docker Compose 2.0+
 
-### Development Profile (SQLite)
+### Directory Structure
+
+```
+deployments/docker/
+├── config/
+│   ├── server.yaml          # Development server config (SQLite)
+│   ├── server-prod.yaml     # Production server config (ClickHouse)
+│   ├── agent.yaml           # Agent config
+│   ├── known_hosts          # SSH known hosts
+│   └── server.env.example   # Legacy env example
+├── scripts/
+│   └── agent-entrypoint.sh  # Agent initialization script
+├── docker-compose.yml       # Main compose file
+├── docker-compose.override.yml  # Dev overrides (auto-loaded)
+├── docker-compose.prod.yml  # Production overrides
+├── Dockerfile.server        # Server image (distroless)
+├── Dockerfile.agent         # Agent image (Alpine)
+├── .dockerignore
+└── .env.example             # Environment template
+```
+
+### Quick Start (Development)
 
 ```bash
 cd deployments/docker
 
-# Configure secrets
-cp config/server.env.example .env
-# Edit .env with generated secrets:
-# BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)
-# BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)
+# 1. Create environment file
+cp .env.example .env
 
-# Start server only
+# 2. Generate secrets
+echo "BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)" >> .env
+echo "BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)" >> .env
+echo "BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)" >> .env
+
+# 3. Start server (SQLite mode)
 docker compose --profile dev up -d
+
+# 4. Access Web UI
+open http://localhost:8080
 ```
 
-### Production Profile (ClickHouse)
+Default credentials: `admin` / `admin` (change immediately!)
+
+### Production Deployment (ClickHouse)
 
 ```bash
 cd deployments/docker
 
-# Configure secrets
-cp config/server.env.example .env
-# Edit .env:
-# BLAZELOG_MASTER_KEY=<generated>
-# BLAZELOG_JWT_SECRET=<generated>
-# BLAZELOG_CSRF_SECRET=<generated>
-# CLICKHOUSE_PASSWORD=<generated>
+# 1. Create environment file
+cp .env.example .env
 
-# Start full stack
-docker compose --profile prod up -d
+# 2. Generate ALL secrets
+cat >> .env << 'EOF'
+BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)
+BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)
+BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)
+CLICKHOUSE_PASSWORD=$(openssl rand -base64 32)
+EOF
+
+# 3. Start full stack with production config
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile prod up -d
+
+# 4. Verify all services are healthy
+docker compose ps
 ```
+
+### Profiles
+
+| Profile | Services | Storage | Use Case |
+|---------|----------|---------|----------|
+| `dev` | server | SQLite | Development, testing |
+| `prod` | server, clickhouse, agent | ClickHouse | Production |
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `BLAZELOG_MASTER_KEY` | Yes | - | Encryption key for sensitive data |
+| `BLAZELOG_JWT_SECRET` | Yes | - | JWT signing secret |
+| `BLAZELOG_CSRF_SECRET` | No | - | Web UI CSRF protection |
+| `CLICKHOUSE_PASSWORD` | Prod | - | ClickHouse password |
+| `BLAZELOG_HTTP_PORT` | No | 8080 | HTTP API port |
+| `BLAZELOG_GRPC_PORT` | No | 9443 | gRPC port |
+| `BLAZELOG_METRICS_PORT` | No | 9090 | Prometheus metrics port |
+
+### Volumes
+
+| Volume | Purpose |
+|--------|---------|
+| `blazelog-data` | SQLite database, audit logs |
+| `blazelog-certs` | mTLS certificates |
+| `blazelog-ssh` | SSH private keys |
+| `blazelog-clickhouse-data` | ClickHouse data (prod) |
 
 ### Building Multi-arch Images
 
@@ -131,6 +193,54 @@ docker compose logs -f server
 
 # Check health endpoint
 curl http://localhost:8080/health/ready
+
+# Health endpoints
+# GET /health       - Basic health check
+# GET /health/live  - Liveness probe (k8s)
+# GET /health/ready - Readiness probe (includes DB checks)
+```
+
+### mTLS Configuration
+
+To enable mutual TLS for agent-server communication:
+
+```bash
+# 1. Generate certificates (from project root)
+./build/blazectl ca init
+./build/blazectl cert server --output deployments/docker/certs/
+./build/blazectl cert agent --name agent-1 --output deployments/docker/certs/
+
+# 2. Copy certs to volume
+docker volume create blazelog-certs
+docker run --rm -v blazelog-certs:/certs -v $(pwd)/deployments/docker/certs:/src alpine cp -r /src/. /certs/
+
+# 3. Update config/server.yaml to enable TLS
+# server.tls.enabled: true
+# server.tls.cert_file: /etc/blazelog/certs/server.crt
+# ...
+
+# 4. Restart
+docker compose --profile prod restart
+```
+
+### Troubleshooting
+
+```bash
+# Server won't start
+docker compose logs server | tail -50
+
+# Check if ports are available
+ss -tlnp | grep -E '8080|9443|9090'
+
+# Database issues
+docker compose exec server cat /data/blazelog.db  # Should exist
+
+# ClickHouse connection issues
+docker compose exec clickhouse clickhouse-client --query "SELECT 1"
+
+# Reset everything
+docker compose down -v
+docker compose --profile dev up -d
 ```
 
 ---

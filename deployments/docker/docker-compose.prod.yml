@@ -1,0 +1,80 @@
+# Docker Compose Production Overrides
+#
+# Use with: docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile prod up -d
+#
+# This file contains production-specific settings:
+# - ClickHouse-enabled server config
+# - Resource limits
+# - Log rotation
+# - Security hardening
+
+services:
+  server:
+    # Use production config with ClickHouse enabled
+    volumes:
+      - blazelog-data:/data
+      - ./config/server-prod.yaml:/etc/blazelog/server.yaml:ro
+      - blazelog-certs:/etc/blazelog/certs:ro
+      - blazelog-ssh:/etc/blazelog/ssh:ro
+      - ./config/known_hosts:/etc/blazelog/known_hosts:ro
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # Production logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  clickhouse:
+    # Resource limits for ClickHouse
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    # Production logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    # ClickHouse settings for production
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  agent:
+    # Wait for server to be ready
+    environment:
+      - BLAZELOG_SERVER_ADDRESS=server:9443
+      - BLAZELOG_WAIT_FOR_SERVER=1
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    # Production logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
