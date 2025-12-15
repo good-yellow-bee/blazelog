@@ -37,8 +37,13 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/dashboard/stats", s.handler.GetDashboardStats)
 		r.Post("/logout", s.handler.HandleLogout)
 
+		// Log viewer routes
+		r.Get("/logs", s.handler.ShowLogs)
+		r.Get("/logs/data", s.handler.GetLogsData)
+		r.Get("/logs/export", s.handler.ExportLogs)
+		r.Get("/logs/stream", s.handler.StreamLogs)
+
 		// Placeholder routes for future milestones
-		r.Get("/logs", s.handler.ShowDashboard)     // TODO: Milestone 27
 		r.Get("/alerts", s.handler.ShowDashboard)   // TODO: Milestone 28
 		r.Get("/projects", s.handler.ShowDashboard) // TODO: Milestone 28
 		r.Get("/users", s.handler.ShowDashboard)    // TODO: Milestone 28
