@@ -4,23 +4,13 @@
 [extend]
 useDefault = true
 
-# Allow documentation examples with placeholder tokens
-[[rules]]
-id = "allow-doc-examples"
-description = "Allow example tokens in documentation"
-regex = '''YOUR_ACCESS_TOKEN|YOUR_REFRESH_TOKEN'''
-allowlist = true
-
-# Paths to ignore
 [allowlist]
-description = "Global allowlist"
-
+description = "Allow documentation examples, test files, and templates"
 paths = [
     '''_test\.go$''',
     '''\.templ$''',
     '''_templ\.go$''',
     '''docs/.*\.md$''',
-    '''internal/ssh/security_test\.go$''',
+    '''\.pb\.go$''',
 ]
-
 regexTarget = "match"

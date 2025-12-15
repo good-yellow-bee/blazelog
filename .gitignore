@@ -51,7 +51,7 @@ Desktop.ini
 
 # Log files (for testing)
 *.log
-logs/
+/logs/
 
 # Temporary files
 tmp/
