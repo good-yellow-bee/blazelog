@@ -306,3 +306,13 @@ Service files include these protections:
 ### Contact
 
 Report security issues: security@good-yellow-bee.com (PGP available)
+
+---
+
+## See Also
+
+- [mTLS Guide](guides/mtls.md) - Certificate management details
+- [SSH Collection](guides/ssh-collection.md) - SSH security configuration
+- [Configuration Reference](CONFIGURATION.md) - All security settings
+- [Architecture Overview](ARCHITECTURE.md) - Security model
+- [API Guide](api/API_GUIDE.md) - API authentication

@@ -349,3 +349,15 @@ ssh:
 ### Production (ClickHouse)
 
 Use Docker Compose with `--profile prod` or configure external ClickHouse.
+
+---
+
+## See Also
+
+- [Alert Rules Reference](guides/alerts.md) - Alert configuration details
+- [Notification Setup](guides/notifications.md) - Email/Slack/Teams configuration
+- [Log Formats](guides/log-formats/README.md) - Supported log formats
+- [mTLS Guide](guides/mtls.md) - Certificate configuration
+- [SSH Collection](guides/ssh-collection.md) - SSH connection setup
+- [Deployment Guide](DEPLOYMENT.md) - Installation and deployment
+- [Troubleshooting](TROUBLESHOOTING.md) - Common issues
