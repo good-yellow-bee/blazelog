@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+
 // benchServer creates a test server for benchmarking
 func benchServer(b *testing.B) (*Server, storage.Storage, func()) {
 	b.Helper()
@@ -94,15 +95,14 @@ func createBenchUser(b *testing.B, store storage.Storage, username, password str
 }
 
 // getAuthTokenBench gets a JWT token for benchmarking
-func getAuthTokenBench(b *testing.B, baseURL string) string {
+func getAuthTokenBench(b *testing.B, ts *httptest.Server) string {
 	b.Helper()
 
 	loginBody := `{"username":"benchadmin","password":"benchpassword"}`
-	resp, err := http.Post(
-		baseURL+"/api/auth/login",
-		"application/json",
-		bytes.NewBufferString(loginBody),
-	)
+	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/auth/login", bytes.NewBufferString(loginBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ts.Client().Do(req)
 	if err != nil {
 		b.Fatalf("login request: %v", err)
 	}
@@ -113,13 +113,15 @@ func getAuthTokenBench(b *testing.B, baseURL string) string {
 	}
 
 	var result struct {
-		AccessToken string `json:"access_token"`
+		Data struct {
+			AccessToken string `json:"access_token"`
+		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		b.Fatalf("decode response: %v", err)
 	}
 
-	return result.AccessToken
+	return result.Data.AccessToken
 }
 
 // BenchmarkAPI_Health benchmarks the health endpoint
@@ -130,9 +132,11 @@ func BenchmarkAPI_Health(b *testing.B) {
 	ts := httptest.NewServer(srv.server.Handler)
 	defer ts.Close()
 
+	client := ts.Client()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		resp, err := http.Get(ts.URL + "/health")
+		resp, err := client.Get(ts.URL + "/health")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -148,9 +152,11 @@ func BenchmarkAPI_HealthReady(b *testing.B) {
 	ts := httptest.NewServer(srv.server.Handler)
 	defer ts.Close()
 
+	client := ts.Client()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		resp, err := http.Get(ts.URL + "/health/ready")
+		resp, err := client.Get(ts.URL + "/health/ready")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -169,15 +175,14 @@ func BenchmarkAPI_Login(b *testing.B) {
 	ts := httptest.NewServer(srv.server.Handler)
 	defer ts.Close()
 
+	client := ts.Client()
 	loginBody := `{"username":"loginbench","password":"loginpassword"}`
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		resp, err := http.Post(
-			ts.URL+"/api/auth/login",
-			"application/json",
-			bytes.NewBufferString(loginBody),
-		)
+		req, _ := http.NewRequest("POST", ts.URL+"/api/v1/auth/login", bytes.NewBufferString(loginBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -201,14 +206,15 @@ func BenchmarkAPI_UsersList(b *testing.B) {
 	ts := httptest.NewServer(srv.server.Handler)
 	defer ts.Close()
 
-	token := getAuthTokenBench(b, ts.URL)
+	client := ts.Client()
+	token := getAuthTokenBench(b, ts)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", ts.URL+"/api/users", nil)
+		req, _ := http.NewRequest("GET", ts.URL+"/api/v1/users", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -239,14 +245,15 @@ func BenchmarkAPI_ProjectsList(b *testing.B) {
 	ts := httptest.NewServer(srv.server.Handler)
 	defer ts.Close()
 
-	token := getAuthTokenBench(b, ts.URL)
+	client := ts.Client()
+	token := getAuthTokenBench(b, ts)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", ts.URL+"/api/projects", nil)
+		req, _ := http.NewRequest("GET", ts.URL+"/api/v1/projects", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -290,14 +297,15 @@ func BenchmarkAPI_ConnectionsList(b *testing.B) {
 	ts := httptest.NewServer(srv.server.Handler)
 	defer ts.Close()
 
-	token := getAuthTokenBench(b, ts.URL)
+	client := ts.Client()
+	token := getAuthTokenBench(b, ts)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", ts.URL+"/api/connections", nil)
+		req, _ := http.NewRequest("GET", ts.URL+"/api/v1/connections", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -316,7 +324,8 @@ func BenchmarkAPI_Parallel(b *testing.B) {
 	ts := httptest.NewServer(srv.server.Handler)
 	defer ts.Close()
 
-	token := getAuthTokenBench(b, ts.URL)
+	client := ts.Client()
+	token := getAuthTokenBench(b, ts)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -324,7 +333,7 @@ func BenchmarkAPI_Parallel(b *testing.B) {
 			req, _ := http.NewRequest("GET", ts.URL+"/health", nil)
 			req.Header.Set("Authorization", "Bearer "+token)
 
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := client.Do(req)
 			if err != nil {
 				b.Fatal(err)
 			}
