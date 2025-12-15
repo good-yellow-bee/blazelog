@@ -1,4 +1,17 @@
-version: "3.9"
+# BlazeLog Docker Compose Configuration
+#
+# Profiles:
+#   dev  - Server only with SQLite (for development)
+#   prod - Full stack with ClickHouse (for production)
+#
+# Usage:
+#   docker compose --profile dev up -d     # Development
+#   docker compose --profile prod up -d    # Production
+#
+# Required environment variables (see .env.example):
+#   BLAZELOG_MASTER_KEY  - Encryption key for sensitive data
+#   BLAZELOG_JWT_SECRET  - JWT signing secret
+#   CLICKHOUSE_PASSWORD  - ClickHouse password (prod only)
 
 services:
   server:
@@ -12,23 +25,31 @@ services:
     image: blazelog/server:${VERSION:-latest}
     container_name: blazelog-server
     ports:
-      - "8080:8080"   # HTTP API / Web UI
-      - "9443:9443"   # gRPC (agents)
-      - "9090:9090"   # Prometheus metrics
+      - "${BLAZELOG_HTTP_PORT:-8080}:8080"   # HTTP API / Web UI
+      - "${BLAZELOG_GRPC_PORT:-9443}:9443"   # gRPC (agents)
+      - "${BLAZELOG_METRICS_PORT:-9090}:9090" # Prometheus metrics
     environment:
       - BLAZELOG_MASTER_KEY=${BLAZELOG_MASTER_KEY:?required}
       - BLAZELOG_JWT_SECRET=${BLAZELOG_JWT_SECRET:?required}
       - BLAZELOG_CSRF_SECRET=${BLAZELOG_CSRF_SECRET:-}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
     volumes:
+      # Data persistence (SQLite database)
       - blazelog-data:/data
+      # Configuration
       - ./config/server.yaml:/etc/blazelog/server.yaml:ro
+      # mTLS certificates (optional)
+      - blazelog-certs:/etc/blazelog/certs:ro
+      # SSH keys for agentless collection (optional)
+      - blazelog-ssh:/etc/blazelog/ssh:ro
+      # SSH known_hosts
+      - ./config/known_hosts:/etc/blazelog/known_hosts:ro
     healthcheck:
-      test: ["CMD", "/blazelog-server", "-c", "/etc/blazelog/server.yaml", "version"]
+      test: ["CMD", "/blazelog-server", "health", "--url", "http://localhost:8080/health/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
     restart: unless-stopped
     networks:
       - blazelog
@@ -40,12 +61,13 @@ services:
     image: clickhouse/clickhouse-server:24.3
     container_name: blazelog-clickhouse
     ports:
-      - "9000:9000"   # Native protocol
-      - "8123:8123"   # HTTP interface
+      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000"   # Native protocol
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"     # HTTP interface
     environment:
       - CLICKHOUSE_DB=blazelog
       - CLICKHOUSE_USER=blazelog
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:?required for prod}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - clickhouse-logs:/var/log/clickhouse-server
@@ -54,6 +76,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
     restart: unless-stopped
     networks:
       - blazelog
@@ -73,7 +96,11 @@ services:
     environment:
       - BLAZELOG_SERVER_ADDRESS=server:9443
     volumes:
+      # Configuration
       - ./config/agent.yaml:/etc/blazelog/agent.yaml:ro
+      # mTLS certificates (optional)
+      - blazelog-certs:/etc/blazelog/certs:ro
+      # Log directories to monitor (read-only)
       - /var/log:/var/log:ro
     depends_on:
       server:
@@ -87,6 +114,10 @@ services:
 volumes:
   blazelog-data:
     name: blazelog-data
+  blazelog-certs:
+    name: blazelog-certs
+  blazelog-ssh:
+    name: blazelog-ssh
   clickhouse-data:
     name: blazelog-clickhouse-data
   clickhouse-logs:

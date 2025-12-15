@@ -26,8 +26,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
 # Runtime stage - Alpine for filesystem access (needed for log collection)
 FROM alpine:3.21
 
-# Install ca-certificates and tzdata
-RUN apk add --no-cache ca-certificates tzdata \
+# Install ca-certificates, tzdata, and netcat for health checks
+RUN apk add --no-cache ca-certificates tzdata netcat-openbsd \
     && addgroup -g 1000 blazelog \
     && adduser -u 1000 -G blazelog -s /bin/sh -D blazelog
 
@@ -37,14 +37,22 @@ COPY --from=builder /blazelog-agent /usr/local/bin/blazelog-agent
 # Copy default config
 COPY --from=builder /build/configs/agent.yaml /etc/blazelog/agent.yaml
 
+# Copy entrypoint script
+COPY deployments/docker/scripts/agent-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Config volume
 VOLUME /etc/blazelog
 
 # Log directory mount point
 VOLUME /var/log
 
+# Data directory for agent state
+RUN mkdir -p /var/lib/blazelog && chown blazelog:blazelog /var/lib/blazelog
+VOLUME /var/lib/blazelog
+
 # Run as non-root user
 USER blazelog
 
-ENTRYPOINT ["blazelog-agent"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["-c", "/etc/blazelog/agent.yaml"]

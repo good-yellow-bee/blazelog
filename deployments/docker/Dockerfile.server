@@ -41,14 +41,23 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
         -X github.com/good-yellow-bee/blazelog/pkg/config.BuildTime=${BUILD_TIME}" \
     -o /blazelog-server ./cmd/server
 
-# Runtime stage - distroless for minimal attack surface
-FROM gcr.io/distroless/static-debian12:nonroot
+# Runtime stage - Alpine for better volume support
+FROM alpine:3.21
+
+# Install ca-certificates and create user
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -g 65532 nonroot \
+    && adduser -u 65532 -G nonroot -s /sbin/nologin -D nonroot
 
 # Copy binary
 COPY --from=builder /blazelog-server /blazelog-server
 
 # Copy default config
 COPY --from=builder /build/configs/server.yaml /etc/blazelog/server.yaml
+
+# Create data directory with correct permissions
+RUN mkdir -p /data /etc/blazelog/certs /var/log/blazelog \
+    && chown -R nonroot:nonroot /data /etc/blazelog /var/log/blazelog
 
 # Data and config volumes
 VOLUME /data

@@ -1,0 +1,65 @@
+# BlazeLog Server Configuration for Docker
+#
+# This config is optimized for containerized deployment.
+# Environment variables are used for secrets (see .env.example).
+
+server:
+  # gRPC listen address for agent connections
+  grpc_address: ":9443"
+
+  # HTTP listen address for REST API and Web UI
+  http_address: ":8080"
+
+  # TLS configuration for mTLS (mutual TLS)
+  # Uncomment to enable secure agent communication
+  tls:
+    enabled: false
+    # cert_file: "/etc/blazelog/certs/server.crt"
+    # key_file: "/etc/blazelog/certs/server.key"
+    # client_ca_file: "/etc/blazelog/certs/ca.crt"
+
+# Database configuration
+# SQLite database stored in /data volume
+database:
+  path: "/data/blazelog.db"
+
+# Authentication configuration
+# Secrets are loaded from environment variables
+auth:
+  jwt_secret_env: "BLAZELOG_JWT_SECRET"
+  csrf_secret_env: "BLAZELOG_CSRF_SECRET"
+  access_token_ttl: "15m"
+  refresh_token_ttl: "168h"  # 7 days
+  rate_limit_per_ip: 100
+  rate_limit_per_user: 1000
+  lockout_threshold: 5
+  lockout_duration: "15m"
+
+# SSH security settings (for agentless log collection)
+ssh:
+  host_key_file: "/etc/blazelog/known_hosts"
+  host_key_policy: "tofu"
+  audit_log: "/data/ssh-audit.log"
+  pool:
+    max_per_host: 5
+    idle_timeout: 5m
+
+# Metrics configuration
+metrics:
+  enabled: true
+  address: ":9090"
+
+# ClickHouse configuration (for prod profile)
+# Enable when using --profile prod
+clickhouse:
+  enabled: false
+  addresses:
+    - "clickhouse:9000"
+  database: "blazelog"
+  username: "blazelog"
+  password_env: "CLICKHOUSE_PASSWORD"
+  batch_size: 10000
+  flush_interval: "5s"
+  max_buffer_size: 100000
+  max_open_conns: 10
+  retention_days: 30

@@ -1,0 +1,8 @@
+# SSH Known Hosts File
+# Add trusted host keys here for SSH log collection
+#
+# Format: hostname/IP algorithm public_key
+# Example: server.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
+#
+# To add a host key:
+#   ssh-keyscan -t ed25519 server.example.com >> known_hosts

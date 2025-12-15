@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -43,18 +44,46 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var healthCmd = &cobra.Command{
+	Use:   "health",
+	Short: "Check server health (for Docker/k8s probes)",
+	RunE:  runHealthCheck,
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "config file path (optional)")
 	rootCmd.PersistentFlags().StringVarP(&grpcAddr, "address", "a", ":9443", "gRPC listen address")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(healthCmd)
+
+	healthCmd.Flags().String("url", "http://localhost:8080/health/ready", "health endpoint URL")
 }
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// runHealthCheck performs HTTP health check for Docker/k8s probes.
+func runHealthCheck(cmd *cobra.Command, args []string) error {
+	url, _ := cmd.Flags().GetString("url")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("health check failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unhealthy: status %d", resp.StatusCode)
+	}
+
+	fmt.Println("healthy")
+	return nil
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
