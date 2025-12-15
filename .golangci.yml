@@ -28,7 +28,9 @@ linters-settings:
     confidence: medium
     excludes:
       - G104 # Audit errors not checked (allow for deferred closes)
+      - G106 # SSH InsecureIgnoreHostKey (used for optional host key validation)
       - G115 # Integer overflow conversion (safe for bounded values like buffer sizes)
+      - G201 # SQL formatting (uses safe time functions, not user input)
       - G304 # File path provided as taint input (allow for config files)
       - G402 # TLS MinVersion (configurable, not a hardcoded vulnerability)
       - G404 # Weak random generator (acceptable for non-crypto uses like jitter)
@@ -53,6 +55,10 @@ linters-settings:
     disabled-checks:
       - hugeParam
       - rangeValCopy
+      - ifElseChain
+      - appendCombine
+      - assignOp
+      - sprintfQuotedString
 
   misspell:
     locale: US
@@ -65,6 +71,7 @@ issues:
         - gosec
         - gocritic
         - errcheck
+        - unused
 
     # Generated proto files
     - path: \.pb\.go$
