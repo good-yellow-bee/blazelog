@@ -1,0 +1,55 @@
+# BlazeLog Kubernetes Base Kustomization
+#
+# Base resources for all environments.
+# Use overlays for environment-specific customizations.
+#
+# Apply directly: kubectl apply -k deployments/kubernetes/base
+# Apply with overlay: kubectl apply -k deployments/kubernetes/overlays/prod
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: blazelog
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/version: latest
+
+resources:
+  # Namespace (apply first)
+  - namespace.yaml
+
+  # Secrets (template - replace with actual secrets or sealed-secrets)
+  - secrets.yaml
+
+  # Storage
+  - pvc.yaml
+
+  # Server components
+  - server-configmap.yaml
+  - server-deployment.yaml
+  - server-service.yaml
+
+  # Agent components
+  - agent-configmap.yaml
+  - agent-daemonset.yaml
+
+  # ClickHouse (optional - comment out for SQLite-only)
+  - clickhouse-statefulset.yaml
+  - clickhouse-service.yaml
+
+  # Networking
+  - ingress.yaml
+  - networkpolicy.yaml
+
+# Common labels
+commonLabels:
+  app.kubernetes.io/part-of: blazelog
+
+# Images - override in overlays
+images:
+  - name: blazelog/server
+    newTag: latest
+  - name: blazelog/agent
+    newTag: latest

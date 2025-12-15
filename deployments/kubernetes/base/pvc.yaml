@@ -1,0 +1,43 @@
+# BlazeLog PersistentVolumeClaims
+#
+# Storage for BlazeLog data:
+# - blazelog-data: SQLite database, SSH audit logs
+# - blazelog-certs: mTLS certificates (optional)
+---
+# Main data volume for SQLite and logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blazelog-data
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # Uncomment to use specific storage class:
+  # storageClassName: standard
+  # For SSD storage:
+  # storageClassName: fast-ssd
+---
+# Certificate volume for mTLS (optional)
+# Use if not using Kubernetes Secrets for TLS
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blazelog-certs
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 1Gi
+  # storageClassName: standard

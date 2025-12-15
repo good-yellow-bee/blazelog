@@ -1,0 +1,58 @@
+# BlazeLog ClickHouse Services
+#
+# Services for ClickHouse database access:
+# - Headless service for StatefulSet
+# - ClusterIP for internal access
+---
+# Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: blazelog-clickhouse-headless
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: clickhouse
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: clickhouse
+  ports:
+    - name: native
+      port: 9000
+      targetPort: native
+      protocol: TCP
+    - name: http
+      port: 8123
+      targetPort: http
+      protocol: TCP
+    - name: interserver
+      port: 9009
+      targetPort: interserver
+      protocol: TCP
+---
+# ClusterIP Service for application access
+apiVersion: v1
+kind: Service
+metadata:
+  name: blazelog-clickhouse
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: clickhouse
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: clickhouse
+  ports:
+    - name: native
+      port: 9000
+      targetPort: native
+      protocol: TCP
+    - name: http
+      port: 8123
+      targetPort: http
+      protocol: TCP

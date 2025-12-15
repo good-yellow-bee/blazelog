@@ -1,0 +1,83 @@
+# BlazeLog Agent ConfigMap
+#
+# Agent configuration for Kubernetes deployment
+# Collects logs from host directories mounted to the pod
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blazelog-agent-config
+  namespace: blazelog
+  labels:
+    app.kubernetes.io/name: blazelog
+    app.kubernetes.io/component: agent
+data:
+  agent.yaml: |
+    # BlazeLog Agent Configuration for Kubernetes
+    #
+    # Deployed as DaemonSet, collects logs from host volumes
+
+    # Server connection settings
+    server:
+      # BlazeLog server ClusterIP service
+      address: "blazelog-server:9443"
+
+      # TLS configuration for mTLS
+      # Enable for production with server authentication
+      tls:
+        enabled: false
+        # Uncomment when using TLS:
+        # cert_file: "/etc/blazelog/certs/tls.crt"
+        # key_file: "/etc/blazelog/certs/tls.key"
+        # ca_file: "/etc/blazelog/certs/ca.crt"
+
+    # Agent settings
+    agent:
+      # Name auto-set from NODE_NAME env var
+      name: ""
+      batch_size: 100
+      flush_interval: 1s
+
+    # Log sources from host volumes
+    # Paths are relative to volume mounts in DaemonSet
+    sources:
+      # System logs
+      - name: "syslog"
+        type: "auto"
+        path: "/var/log/syslog"
+        follow: true
+
+      - name: "messages"
+        type: "auto"
+        path: "/var/log/messages"
+        follow: true
+
+      # Container logs (Docker)
+      - name: "docker-containers"
+        type: "auto"
+        path: "/var/lib/docker/containers/*/*.log"
+        follow: true
+
+      # Container logs (containerd/CRI-O)
+      - name: "pod-logs"
+        type: "auto"
+        path: "/var/log/pods/*/*/*/*.log"
+        follow: true
+
+      # Kubernetes component logs
+      - name: "kubelet"
+        type: "auto"
+        path: "/var/log/kubelet.log"
+        follow: true
+
+      # Add application-specific sources as needed:
+      # - name: "nginx"
+      #   type: "nginx"
+      #   path: "/var/log/nginx/*.log"
+      #   follow: true
+
+    # Labels for categorization
+    # NODE_NAME injected via downward API
+    labels:
+      environment: "kubernetes"
+      collector: "daemonset"

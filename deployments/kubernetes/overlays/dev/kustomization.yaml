@@ -1,0 +1,84 @@
+# BlazeLog Kubernetes Development Overlay
+#
+# Development environment with:
+# - SQLite only (no ClickHouse)
+# - Reduced resource requests
+# - NodePort for local access
+#
+# Apply: kubectl apply -k deployments/kubernetes/overlays/dev
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: blazelog
+
+resources:
+  - ../../base
+
+# Override images to dev tag
+images:
+  - name: blazelog/server
+    newTag: dev
+  - name: blazelog/agent
+    newTag: dev
+
+# Patches for development
+patches:
+  # Reduce server resources
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: blazelog-server
+      spec:
+        template:
+          spec:
+            containers:
+              - name: server
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+
+  # Reduce agent resources
+  - patch: |-
+      apiVersion: apps/v1
+      kind: DaemonSet
+      metadata:
+        name: blazelog-agent
+      spec:
+        template:
+          spec:
+            containers:
+              - name: agent
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 32Mi
+                  limits:
+                    cpu: 100m
+                    memory: 128Mi
+
+  # Smaller PVC for dev
+  - patch: |-
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: blazelog-data
+      spec:
+        resources:
+          requests:
+            storage: 1Gi
+
+# Remove ClickHouse for dev (SQLite-only)
+# Uncomment to disable ClickHouse in dev
+# patchesStrategicMerge:
+#   - |-
+#     $patch: delete
+#     apiVersion: apps/v1
+#     kind: StatefulSet
+#     metadata:
+#       name: blazelog-clickhouse
