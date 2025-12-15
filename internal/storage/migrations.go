@@ -115,6 +115,30 @@ var migrations = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 		`,
 	},
+	{
+		Version: 3,
+		Name:    "add_alert_history",
+		Up: `
+			-- Alert history table
+			CREATE TABLE IF NOT EXISTS alert_history (
+				id TEXT PRIMARY KEY,
+				alert_id TEXT NOT NULL,
+				alert_name TEXT NOT NULL,
+				severity TEXT NOT NULL,
+				message TEXT NOT NULL,
+				matched_logs INTEGER DEFAULT 0,
+				notified_at DATETIME NOT NULL,
+				project_id TEXT,
+				created_at DATETIME NOT NULL,
+				FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE
+			);
+
+			-- Indexes for efficient lookups
+			CREATE INDEX IF NOT EXISTS idx_alert_history_alert_id ON alert_history(alert_id);
+			CREATE INDEX IF NOT EXISTS idx_alert_history_project_id ON alert_history(project_id);
+			CREATE INDEX IF NOT EXISTS idx_alert_history_created_at ON alert_history(created_at);
+		`,
+	},
 }
 
 // runMigrations applies all pending migrations.
