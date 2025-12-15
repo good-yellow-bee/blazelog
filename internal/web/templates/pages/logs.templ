@@ -1,0 +1,813 @@
+// internal/web/templates/pages/logs.templ
+package pages
+
+import (
+	"github.com/good-yellow-bee/blazelog/internal/web/templates/layouts"
+	"github.com/good-yellow-bee/blazelog/internal/web/session"
+)
+
+templ Logs(user *session.Session) {
+	@layouts.Base("Logs", user) {
+		<div x-data="logsController()" x-init="init()" class="space-y-6">
+			<!-- Header -->
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+				<h1 class="text-2xl font-bold text-gray-900">Log Viewer</h1>
+				<div class="flex items-center gap-2">
+					<button
+						@click="toggleLive()"
+						:class="isLive ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'"
+						class="flex items-center gap-2 px-4 py-2 text-white rounded-md text-sm font-medium transition-colors"
+					>
+						<span x-show="isLive" class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+						<span x-text="isLive ? 'Live' : 'Paused'"></span>
+					</button>
+					<button
+						@click="showExport = true"
+						class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+					>
+						Export
+					</button>
+				</div>
+			</div>
+
+			<!-- Filters -->
+			@LogFilters()
+
+			<!-- Log Table -->
+			<div id="logs-container" class="bg-white shadow rounded-lg overflow-hidden">
+				@LogTable()
+			</div>
+
+			<!-- Log Detail Modal -->
+			@LogDetailModal()
+
+			<!-- Export Modal -->
+			@ExportModal()
+		</div>
+
+		@LogsScript()
+	}
+}
+
+templ LogFilters() {
+	<div class="bg-white shadow rounded-lg p-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+			<!-- Search -->
+			<div class="lg:col-span-2">
+				<label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+				<div class="relative">
+					<input
+						type="text"
+						x-model="filters.q"
+						@input.debounce.300ms="applyFilters()"
+						placeholder="Search log messages..."
+						class="w-full rounded-md border-gray-300 shadow-sm pl-10 focus:ring-indigo-500 focus:border-indigo-500"
+					/>
+					<svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+					</svg>
+				</div>
+			</div>
+
+			<!-- Time Range -->
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-1">Time Range</label>
+				<select
+					x-model="filters.range"
+					@change="applyFilters()"
+					class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+				>
+					<option value="15m">Last 15 min</option>
+					<option value="1h">Last 1 hour</option>
+					<option value="6h">Last 6 hours</option>
+					<option value="24h">Last 24 hours</option>
+					<option value="7d">Last 7 days</option>
+					<option value="30d">Last 30 days</option>
+				</select>
+			</div>
+
+			<!-- Level Filter -->
+			<div>
+				<label class="block text-sm font-medium text-gray-700 mb-1">Level</label>
+				<select
+					x-model="filters.level"
+					@change="applyFilters()"
+					class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+				>
+					<option value="">All Levels</option>
+					<option value="debug">Debug</option>
+					<option value="info">Info</option>
+					<option value="warning">Warning</option>
+					<option value="error">Error</option>
+					<option value="fatal">Fatal</option>
+				</select>
+			</div>
+		</div>
+
+		<!-- Advanced Filters (collapsible) -->
+		<div x-show="showAdvanced" x-collapse class="mt-4 pt-4 border-t border-gray-200">
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+				<!-- Source -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-1">Source</label>
+					<input
+						type="text"
+						x-model="filters.source"
+						@input.debounce.300ms="applyFilters()"
+						placeholder="e.g., nginx, magento"
+						class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+					/>
+				</div>
+
+				<!-- Log Type -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+					<select
+						x-model="filters.type"
+						@change="applyFilters()"
+						class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+					>
+						<option value="">All Types</option>
+						<option value="nginx">Nginx</option>
+						<option value="apache">Apache</option>
+						<option value="magento">Magento</option>
+						<option value="prestashop">PrestaShop</option>
+						<option value="wordpress">WordPress</option>
+					</select>
+				</div>
+
+				<!-- Search Mode -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-1">Search Mode</label>
+					<select
+						x-model="filters.search_mode"
+						@change="applyFilters()"
+						class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+					>
+						<option value="token">Token (word match)</option>
+						<option value="substring">Substring</option>
+						<option value="phrase">Phrase</option>
+					</select>
+				</div>
+			</div>
+		</div>
+
+		<!-- Toggle Advanced -->
+		<div class="mt-4 flex justify-between items-center">
+			<button
+				@click="showAdvanced = !showAdvanced"
+				class="text-sm text-indigo-600 hover:text-indigo-800"
+			>
+				<span x-text="showAdvanced ? 'Hide Advanced' : 'Show Advanced'"></span>
+			</button>
+			<button
+				@click="resetFilters()"
+				class="text-sm text-gray-500 hover:text-gray-700"
+			>
+				Reset Filters
+			</button>
+		</div>
+	</div>
+}
+
+templ LogTable() {
+	<div class="overflow-x-auto">
+		<table class="min-w-full divide-y divide-gray-200">
+			<thead class="bg-gray-50">
+				<tr>
+					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-44">
+						Timestamp
+					</th>
+					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+						Level
+					</th>
+					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+						Source
+					</th>
+					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+						Message
+					</th>
+				</tr>
+			</thead>
+			<tbody id="logs-tbody" class="bg-white divide-y divide-gray-200">
+				<!-- Populated by JavaScript using safe DOM methods -->
+				<tr>
+					<td colspan="4" class="px-4 py-8 text-center text-gray-500">
+						<div class="flex flex-col items-center">
+							<svg class="animate-spin h-8 w-8 text-indigo-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							Loading logs...
+						</div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+
+	<!-- Pagination -->
+	<div id="logs-pagination" class="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200">
+		<div class="flex-1 flex justify-between sm:hidden">
+			<button
+				@click="prevPage()"
+				:disabled="page <= 1"
+				class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+			>
+				Previous
+			</button>
+			<button
+				@click="nextPage()"
+				:disabled="page >= totalPages"
+				class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+			>
+				Next
+			</button>
+		</div>
+		<div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+			<div>
+				<p class="text-sm text-gray-700">
+					Showing <span x-text="((page - 1) * perPage) + 1"></span> to
+					<span x-text="Math.min(page * perPage, total)"></span> of
+					<span x-text="total"></span> results
+				</p>
+			</div>
+			<div class="flex items-center gap-4">
+				<select
+					x-model="perPage"
+					@change="applyFilters()"
+					class="rounded-md border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+				>
+					<option value="25">25 per page</option>
+					<option value="50">50 per page</option>
+					<option value="100">100 per page</option>
+				</select>
+				<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+					<button
+						@click="prevPage()"
+						:disabled="page <= 1"
+						class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+					>
+						<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
+						</svg>
+					</button>
+					<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+						<span x-text="page"></span> / <span x-text="totalPages"></span>
+					</span>
+					<button
+						@click="nextPage()"
+						:disabled="page >= totalPages"
+						class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+					>
+						<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+						</svg>
+					</button>
+				</nav>
+			</div>
+		</div>
+	</div>
+}
+
+templ LogDetailModal() {
+	<div
+		x-show="selectedLog !== null"
+		x-transition:enter="ease-out duration-200"
+		x-transition:enter-start="opacity-0"
+		x-transition:enter-end="opacity-100"
+		x-transition:leave="ease-in duration-150"
+		x-transition:leave-start="opacity-100"
+		x-transition:leave-end="opacity-0"
+		class="fixed inset-0 z-50 overflow-y-auto"
+		@keydown.escape.window="selectedLog = null"
+	>
+		<div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+			<!-- Backdrop -->
+			<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="selectedLog = null"></div>
+
+			<!-- Modal -->
+			<div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+				<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+					<!-- Header -->
+					<div class="flex justify-between items-start mb-4">
+						<h3 class="text-lg font-medium text-gray-900">Log Details</h3>
+						<button @click="selectedLog = null" class="text-gray-400 hover:text-gray-500">
+							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+							</svg>
+						</button>
+					</div>
+
+					<!-- Metadata Grid -->
+					<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+						<div>
+							<span class="text-gray-500">Timestamp</span>
+							<p class="font-mono" x-text="selectedLog?.timestamp"></p>
+						</div>
+						<div>
+							<span class="text-gray-500">Level</span>
+							<p>
+								<span
+									class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+									:class="levelClass(selectedLog?.level)"
+									x-text="selectedLog?.level?.toUpperCase()"
+								></span>
+							</p>
+						</div>
+						<div>
+							<span class="text-gray-500">Source</span>
+							<p x-text="selectedLog?.source || '-'"></p>
+						</div>
+						<div>
+							<span class="text-gray-500">Type</span>
+							<p x-text="selectedLog?.type || '-'"></p>
+						</div>
+						<div>
+							<span class="text-gray-500">Agent ID</span>
+							<p class="font-mono text-xs" x-text="selectedLog?.agent_id || '-'"></p>
+						</div>
+						<div>
+							<span class="text-gray-500">File Path</span>
+							<p class="font-mono text-xs truncate" x-text="selectedLog?.file_path || '-'"></p>
+						</div>
+						<div>
+							<span class="text-gray-500">Line</span>
+							<p x-text="selectedLog?.line_number || '-'"></p>
+						</div>
+						<div>
+							<span class="text-gray-500">ID</span>
+							<p class="font-mono text-xs truncate" x-text="selectedLog?.id"></p>
+						</div>
+					</div>
+
+					<!-- HTTP Info (if present) -->
+					<template x-if="selectedLog?.http_status">
+						<div class="mb-4 p-3 bg-gray-50 rounded-lg">
+							<h4 class="text-sm font-medium text-gray-700 mb-2">HTTP Request</h4>
+							<div class="grid grid-cols-3 gap-4 text-sm">
+								<div>
+									<span class="text-gray-500">Method</span>
+									<p class="font-mono" x-text="selectedLog?.http_method"></p>
+								</div>
+								<div>
+									<span class="text-gray-500">Status</span>
+									<p class="font-mono" x-text="selectedLog?.http_status"></p>
+								</div>
+								<div>
+									<span class="text-gray-500">URI</span>
+									<p class="font-mono text-xs truncate" x-text="selectedLog?.uri"></p>
+								</div>
+							</div>
+						</div>
+					</template>
+
+					<!-- Message -->
+					<div class="mb-4">
+						<h4 class="text-sm font-medium text-gray-700 mb-2">Message</h4>
+						<pre id="log-message-display" class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap" x-text="selectedLog?.message"></pre>
+					</div>
+
+					<!-- Fields (if any) -->
+					<template x-if="selectedLog?.fields && Object.keys(selectedLog.fields).length > 0">
+						<div class="mb-4">
+							<h4 class="text-sm font-medium text-gray-700 mb-2">Fields</h4>
+							<pre class="bg-gray-50 p-4 rounded-lg overflow-x-auto text-sm font-mono" x-text="JSON.stringify(selectedLog.fields, null, 2)"></pre>
+						</div>
+					</template>
+
+					<!-- Labels (if any) -->
+					<template x-if="selectedLog?.labels && Object.keys(selectedLog.labels).length > 0">
+						<div>
+							<h4 class="text-sm font-medium text-gray-700 mb-2">Labels</h4>
+							<div id="log-labels-container" class="flex flex-wrap gap-2">
+								<!-- Labels populated via safe DOM methods -->
+							</div>
+						</div>
+					</template>
+				</div>
+
+				<!-- Footer -->
+				<div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+					<button
+						@click="copyLog()"
+						class="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:ml-3 sm:w-auto sm:text-sm"
+					>
+						Copy JSON
+					</button>
+					<button
+						@click="selectedLog = null"
+						class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm"
+					>
+						Close
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ ExportModal() {
+	<div
+		x-show="showExport"
+		x-transition:enter="ease-out duration-200"
+		x-transition:enter-start="opacity-0"
+		x-transition:enter-end="opacity-100"
+		x-transition:leave="ease-in duration-150"
+		x-transition:leave-start="opacity-100"
+		x-transition:leave-end="opacity-0"
+		class="fixed inset-0 z-50 overflow-y-auto"
+		@keydown.escape.window="showExport = false"
+	>
+		<div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+			<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showExport = false"></div>
+
+			<div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+				<div class="bg-white px-4 pt-5 pb-4 sm:p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4">Export Logs</h3>
+
+					<div class="space-y-4">
+						<div>
+							<label class="block text-sm font-medium text-gray-700 mb-1">Format</label>
+							<select
+								x-model="exportFormat"
+								class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+							>
+								<option value="json">JSON</option>
+								<option value="csv">CSV</option>
+							</select>
+						</div>
+
+						<div>
+							<label class="block text-sm font-medium text-gray-700 mb-1">Max Records</label>
+							<select
+								x-model="exportLimit"
+								class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+							>
+								<option value="100">100</option>
+								<option value="500">500</option>
+								<option value="1000">1,000</option>
+								<option value="5000">5,000</option>
+							</select>
+						</div>
+
+						<p id="export-filter-summary" class="text-sm text-gray-500">
+							Export will use current filters
+						</p>
+					</div>
+				</div>
+
+				<div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+					<button
+						@click="exportLogs()"
+						:disabled="exporting"
+						class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm"
+					>
+						<span x-show="exporting" class="mr-2">
+							<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+							</svg>
+						</span>
+						<span x-text="exporting ? 'Exporting...' : 'Export'"></span>
+					</button>
+					<button
+						@click="showExport = false"
+						class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm"
+					>
+						Cancel
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ LogsScript() {
+	<script>
+	function logsController() {
+		return {
+			// State
+			logs: [],
+			page: 1,
+			perPage: 50,
+			total: 0,
+			totalPages: 0,
+			loading: false,
+			isLive: false,
+			eventSource: null,
+			selectedLog: null,
+			showAdvanced: false,
+			showExport: false,
+			exportFormat: 'json',
+			exportLimit: '1000',
+			exporting: false,
+			filters: {
+				q: '',
+				range: '24h',
+				level: '',
+				source: '',
+				type: '',
+				search_mode: 'token'
+			},
+
+			init() {
+				this.loadLogs();
+				this.$watch('selectedLog', (log) => {
+					if (log && log.labels) {
+						this.renderLabels(log.labels);
+					}
+				});
+			},
+
+			getTimeRange() {
+				const now = new Date();
+				let start;
+				switch (this.filters.range) {
+					case '15m': start = new Date(now - 15 * 60 * 1000); break;
+					case '1h': start = new Date(now - 60 * 60 * 1000); break;
+					case '6h': start = new Date(now - 6 * 60 * 60 * 1000); break;
+					case '24h': start = new Date(now - 24 * 60 * 60 * 1000); break;
+					case '7d': start = new Date(now - 7 * 24 * 60 * 60 * 1000); break;
+					case '30d': start = new Date(now - 30 * 24 * 60 * 60 * 1000); break;
+					default: start = new Date(now - 24 * 60 * 60 * 1000);
+				}
+				return { start: start.toISOString(), end: now.toISOString() };
+			},
+
+			buildQueryParams() {
+				const { start, end } = this.getTimeRange();
+				const params = new URLSearchParams({
+					start,
+					end,
+					page: this.page.toString(),
+					per_page: this.perPage.toString()
+				});
+				if (this.filters.q) params.set('q', this.filters.q);
+				if (this.filters.level) params.set('level', this.filters.level);
+				if (this.filters.source) params.set('source', this.filters.source);
+				if (this.filters.type) params.set('type', this.filters.type);
+				if (this.filters.search_mode !== 'token') params.set('search_mode', this.filters.search_mode);
+				return params;
+			},
+
+			async loadLogs() {
+				this.loading = true;
+				try {
+					const params = this.buildQueryParams();
+					const res = await fetch(`/logs/data?${params}`);
+					if (!res.ok) throw new Error('Failed to fetch logs');
+					const data = await res.json();
+					this.logs = data.items || [];
+					this.total = data.total || 0;
+					this.totalPages = data.total_pages || 0;
+					this.renderLogs();
+				} catch (err) {
+					console.error('Failed to load logs:', err);
+					this.showError('Failed to load logs');
+				} finally {
+					this.loading = false;
+				}
+			},
+
+			// XSS-safe DOM rendering using createElement and textContent
+			renderLogs() {
+				const tbody = document.getElementById('logs-tbody');
+				if (!tbody) return;
+
+				// Clear existing rows safely
+				while (tbody.firstChild) {
+					tbody.removeChild(tbody.firstChild);
+				}
+
+				if (this.logs.length === 0) {
+					const tr = document.createElement('tr');
+					const td = document.createElement('td');
+					td.setAttribute('colspan', '4');
+					td.className = 'px-4 py-8 text-center text-gray-500';
+					td.textContent = 'No logs found matching your filters';
+					tr.appendChild(td);
+					tbody.appendChild(tr);
+					return;
+				}
+
+				this.logs.forEach((log, index) => {
+					const tr = document.createElement('tr');
+					tr.className = 'hover:bg-gray-50 cursor-pointer';
+					tr.addEventListener('click', () => this.selectLog(index));
+
+					// Timestamp cell
+					const tdTime = document.createElement('td');
+					tdTime.className = 'px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-600';
+					tdTime.textContent = this.formatTimestamp(log.timestamp);
+					tr.appendChild(tdTime);
+
+					// Level cell
+					const tdLevel = document.createElement('td');
+					tdLevel.className = 'px-4 py-3 whitespace-nowrap';
+					const levelSpan = document.createElement('span');
+					levelSpan.className = 'inline-flex px-2 py-1 text-xs font-semibold rounded-full ' + this.levelClass(log.level);
+					levelSpan.textContent = (log.level || 'unknown').toUpperCase();
+					tdLevel.appendChild(levelSpan);
+					tr.appendChild(tdLevel);
+
+					// Source cell
+					const tdSource = document.createElement('td');
+					tdSource.className = 'px-4 py-3 whitespace-nowrap text-sm text-gray-600';
+					tdSource.textContent = log.source || '-';
+					tr.appendChild(tdSource);
+
+					// Message cell
+					const tdMessage = document.createElement('td');
+					tdMessage.className = 'px-4 py-3 text-sm text-gray-900 truncate max-w-xl';
+					tdMessage.textContent = log.message || '';
+					tr.appendChild(tdMessage);
+
+					tbody.appendChild(tr);
+				});
+			},
+
+			// Render labels safely
+			renderLabels(labels) {
+				const container = document.getElementById('log-labels-container');
+				if (!container) return;
+
+				while (container.firstChild) {
+					container.removeChild(container.firstChild);
+				}
+
+				Object.entries(labels).forEach(([key, value]) => {
+					const span = document.createElement('span');
+					span.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800';
+					span.textContent = `${key}: ${value}`;
+					container.appendChild(span);
+				});
+			},
+
+			formatTimestamp(ts) {
+				if (!ts) return '-';
+				const d = new Date(ts);
+				return d.toLocaleString('en-US', {
+					month: 'short', day: '2-digit',
+					hour: '2-digit', minute: '2-digit', second: '2-digit',
+					hour12: false
+				});
+			},
+
+			levelClass(level) {
+				switch ((level || '').toLowerCase()) {
+					case 'debug': return 'bg-gray-100 text-gray-800';
+					case 'info': return 'bg-blue-100 text-blue-800';
+					case 'warning': return 'bg-yellow-100 text-yellow-800';
+					case 'error': return 'bg-red-100 text-red-800';
+					case 'fatal': return 'bg-purple-100 text-purple-800';
+					default: return 'bg-gray-100 text-gray-800';
+				}
+			},
+
+			selectLog(index) {
+				this.selectedLog = this.logs[index];
+			},
+
+			copyLog() {
+				if (this.selectedLog) {
+					navigator.clipboard.writeText(JSON.stringify(this.selectedLog, null, 2));
+				}
+			},
+
+			applyFilters() {
+				this.page = 1;
+				if (this.isLive) {
+					this.stopLive();
+					this.startLive();
+				} else {
+					this.loadLogs();
+				}
+			},
+
+			resetFilters() {
+				this.filters = {
+					q: '', range: '24h', level: '',
+					source: '', type: '', search_mode: 'token'
+				};
+				this.applyFilters();
+			},
+
+			prevPage() {
+				if (this.page > 1) {
+					this.page--;
+					this.loadLogs();
+				}
+			},
+
+			nextPage() {
+				if (this.page < this.totalPages) {
+					this.page++;
+					this.loadLogs();
+				}
+			},
+
+			toggleLive() {
+				if (this.isLive) {
+					this.stopLive();
+				} else {
+					this.startLive();
+				}
+			},
+
+			startLive() {
+				this.isLive = true;
+				const { start } = this.getTimeRange();
+				const params = new URLSearchParams({ start });
+				if (this.filters.q) params.set('q', this.filters.q);
+				if (this.filters.level) params.set('level', this.filters.level);
+				if (this.filters.type) params.set('type', this.filters.type);
+
+				this.eventSource = new EventSource(`/logs/stream?${params}`);
+
+				this.eventSource.addEventListener('log', (e) => {
+					const log = JSON.parse(e.data);
+					this.logs.unshift(log);
+					if (this.logs.length > 100) this.logs.pop();
+					this.total++;
+					this.renderLogs();
+				});
+
+				this.eventSource.addEventListener('error', () => {
+					console.error('SSE error, reconnecting...');
+				});
+
+				this.eventSource.addEventListener('close', () => {
+					this.stopLive();
+				});
+			},
+
+			stopLive() {
+				this.isLive = false;
+				if (this.eventSource) {
+					this.eventSource.close();
+					this.eventSource = null;
+				}
+			},
+
+			showError(msg) {
+				const tbody = document.getElementById('logs-tbody');
+				if (!tbody) return;
+
+				while (tbody.firstChild) {
+					tbody.removeChild(tbody.firstChild);
+				}
+
+				const tr = document.createElement('tr');
+				const td = document.createElement('td');
+				td.setAttribute('colspan', '4');
+				td.className = 'px-4 py-8 text-center text-red-500';
+				td.textContent = msg;
+				tr.appendChild(td);
+				tbody.appendChild(tr);
+			},
+
+			getFilterSummary() {
+				const parts = [];
+				if (this.filters.q) parts.push('search: "' + this.filters.q + '"');
+				if (this.filters.level) parts.push('level: ' + this.filters.level);
+				if (this.filters.type) parts.push('type: ' + this.filters.type);
+				parts.push('range: ' + this.filters.range);
+				return parts.join(', ');
+			},
+
+			async exportLogs() {
+				this.exporting = true;
+				try {
+					const { start, end } = this.getTimeRange();
+					const params = new URLSearchParams({
+						start, end,
+						format: this.exportFormat,
+						limit: this.exportLimit
+					});
+					if (this.filters.q) params.set('q', this.filters.q);
+					if (this.filters.level) params.set('level', this.filters.level);
+					if (this.filters.type) params.set('type', this.filters.type);
+
+					const res = await fetch(`/logs/export?${params}`);
+					if (!res.ok) throw new Error('Export failed');
+
+					const blob = await res.blob();
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = 'logs-export-' + new Date().toISOString().slice(0,10) + '.' + this.exportFormat;
+					a.click();
+					URL.revokeObjectURL(url);
+					this.showExport = false;
+				} catch (err) {
+					console.error('Export failed:', err);
+					alert('Export failed. Please try again.');
+				} finally {
+					this.exporting = false;
+				}
+			}
+		};
+	}
+	</script>
+}
