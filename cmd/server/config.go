@@ -11,11 +11,18 @@ import (
 // Config represents the server configuration.
 type Config struct {
 	Server         ServerConfig      `yaml:"server"`
+	Metrics        MetricsConfig     `yaml:"metrics"`         // Metrics configuration
 	Database       DatabaseConfig    `yaml:"database"`        // Database configuration
 	ClickHouse     ClickHouseConfig  `yaml:"clickhouse"`      // ClickHouse log storage configuration
 	SSHConnections []SSHConnection   `yaml:"ssh_connections"` // SSH connections for remote log collection
 	Auth           AuthConfig        `yaml:"auth"`            // Authentication configuration
 	Verbose        bool              `yaml:"-"`               // set via CLI flag
+}
+
+// MetricsConfig contains Prometheus metrics settings.
+type MetricsConfig struct {
+	Enabled bool   `yaml:"enabled"` // Enable metrics server (default: true)
+	Address string `yaml:"address"` // Metrics server address (default: :9090)
 }
 
 // AuthConfig contains authentication settings.
@@ -119,6 +126,11 @@ func (c *Config) setDefaults() {
 	}
 	if c.Server.HTTPAddress == "" {
 		c.Server.HTTPAddress = ":8080"
+	}
+	// Metrics defaults (enabled by default)
+	if c.Metrics.Address == "" {
+		c.Metrics.Address = ":9090"
+		c.Metrics.Enabled = true
 	}
 	if c.Database.Path == "" {
 		c.Database.Path = "./data/blazelog.db"

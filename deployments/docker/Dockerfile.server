@@ -1,0 +1,64 @@
+# Build stage
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates libstdc++
+
+# Install templ
+RUN go install github.com/a-h/templ/cmd/templ@latest
+
+# Install tailwindcss standalone (musl variant for Alpine)
+RUN ARCH=$(uname -m | sed 's/x86_64/x64/g; s/aarch64/arm64/g') && \
+    wget -q -O /usr/local/bin/tailwindcss \
+        "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-${ARCH}-musl" && \
+    chmod +x /usr/local/bin/tailwindcss
+
+WORKDIR /build
+
+# Copy go modules first (cache layer)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
+COPY . .
+
+# Generate templ templates
+RUN templ generate
+
+# Build Tailwind CSS
+RUN /usr/local/bin/tailwindcss -i internal/web/static/css/input.css -o internal/web/static/css/output.css --minify
+
+# Build static binary
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -trimpath \
+    -ldflags "-s -w \
+        -X github.com/good-yellow-bee/blazelog/pkg/config.Version=${VERSION} \
+        -X github.com/good-yellow-bee/blazelog/pkg/config.Commit=${COMMIT} \
+        -X github.com/good-yellow-bee/blazelog/pkg/config.BuildTime=${BUILD_TIME}" \
+    -o /blazelog-server ./cmd/server
+
+# Runtime stage - distroless for minimal attack surface
+FROM gcr.io/distroless/static-debian12:nonroot
+
+# Copy binary
+COPY --from=builder /blazelog-server /blazelog-server
+
+# Copy default config
+COPY --from=builder /build/configs/server.yaml /etc/blazelog/server.yaml
+
+# Data and config volumes
+VOLUME /data
+VOLUME /etc/blazelog
+
+# Expose ports: HTTP API, gRPC, Metrics
+EXPOSE 8080 9443 9090
+
+# Run as non-root user
+USER nonroot:nonroot
+
+ENTRYPOINT ["/blazelog-server"]
+CMD ["-c", "/etc/blazelog/server.yaml"]

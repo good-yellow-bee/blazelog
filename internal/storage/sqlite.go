@@ -91,6 +91,11 @@ func (s *SQLiteStorage) Close() error {
 	return s.db.Close()
 }
 
+// DB returns the underlying database connection for health checks.
+func (s *SQLiteStorage) DB() *sql.DB {
+	return s.db
+}
+
 // Migrate runs database migrations.
 func (s *SQLiteStorage) Migrate() error {
 	return runMigrations(s.db)

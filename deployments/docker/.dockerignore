@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+build/
+bin/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Development data
+data/
+*.db
+coverage.*
+*.out
+*.test
+*.prof
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# AI/Dev tools
+.claude/
+.serena/
+.history/
+
+# Pre-built binaries (will be rebuilt)
+blazelog-agent
+blazelog-server
+blazectl
+
+# Tests
+*_test.go
+testdata/
+e2e/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (avoid recursive context)
+deployments/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak

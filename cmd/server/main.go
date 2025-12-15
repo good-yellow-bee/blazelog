@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/api"
+	"github.com/good-yellow-bee/blazelog/internal/api/health"
+	"github.com/good-yellow-bee/blazelog/internal/metrics"
 	"github.com/good-yellow-bee/blazelog/internal/server"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/pkg/config"
@@ -150,6 +152,19 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("init api server: %w", err)
 	}
 
+	// Register health checkers
+	apiServer.RegisterHealthChecker(health.NewSQLiteChecker(store.DB()))
+	if logStore != nil {
+		apiServer.RegisterHealthChecker(health.NewClickHouseChecker(logStore))
+	}
+
+	// Initialize metrics server (if enabled)
+	var metricsServer *metrics.Server
+	if cfg.Metrics.Enabled {
+		metrics.SetBuildInfo(config.Version, config.Commit, config.BuildTime)
+		metricsServer = metrics.NewServer(cfg.Metrics.Address)
+	}
+
 	// Setup signal handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -167,7 +182,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	log.Printf("starting blazelog-server %s", config.Version)
 	log.Printf("gRPC listening on %s", cfg.Server.GRPCAddress)
 
-	errChan := make(chan error, 2)
+	errChan := make(chan error, 3)
 
 	// Start gRPC server
 	go func() {
@@ -183,9 +198,26 @@ func runServer(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	// Start metrics server (if enabled)
+	if metricsServer != nil {
+		go func() {
+			if err := metricsServer.Start(); err != nil {
+				errChan <- fmt.Errorf("metrics server: %w", err)
+			}
+		}()
+	}
+
 	// Wait for shutdown or error
 	select {
 	case <-ctx.Done():
+		// Gracefully shutdown metrics server
+		if metricsServer != nil {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+			if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+				log.Printf("metrics server shutdown error: %v", err)
+			}
+		}
 		log.Printf("server stopped")
 	case err := <-errChan:
 		cancel()

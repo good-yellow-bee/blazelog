@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	"github.com/good-yellow-bee/blazelog/internal/metrics"
 	blazelogv1 "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1"
 	"google.golang.org/grpc"
 )
@@ -52,6 +53,7 @@ func (h *Handler) Register(ctx context.Context, req *blazelogv1.RegisterRequest)
 
 	// Store agent info
 	h.agents.Store(agentID, agent)
+	metrics.GRPCAgentsRegistered.Inc()
 
 	log.Printf("agent registered: id=%s name=%s hostname=%s sources=%d",
 		agentID, agent.Name, agent.Hostname, len(agent.Sources))
@@ -70,7 +72,11 @@ func (h *Handler) Register(ctx context.Context, req *blazelogv1.RegisterRequest)
 // StreamLogs handles bidirectional log streaming from agents.
 func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch, blazelogv1.StreamResponse]) error {
 	atomic.AddInt32(&h.activeStreams, 1)
-	defer atomic.AddInt32(&h.activeStreams, -1)
+	metrics.GRPCStreamsActive.Inc()
+	defer func() {
+		atomic.AddInt32(&h.activeStreams, -1)
+		metrics.GRPCStreamsActive.Dec()
+	}()
 
 	if h.verbose {
 		log.Printf("stream started, active streams: %d", atomic.LoadInt32(&h.activeStreams))
@@ -91,6 +97,7 @@ func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch
 		// Process the batch
 		if err := h.processor.ProcessBatch(batch); err != nil {
 			log.Printf("process batch error: %v", err)
+			metrics.GRPCBatchProcessErrors.Inc()
 			// Send error response but continue
 			if sendErr := stream.Send(&blazelogv1.StreamResponse{
 				AckedSequence: batch.Sequence,
@@ -104,6 +111,8 @@ func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch
 		// Update metrics
 		atomic.AddUint64(&h.totalBatches, 1)
 		atomic.AddUint64(&h.totalEntries, uint64(len(batch.Entries)))
+		metrics.GRPCBatchesTotal.Inc()
+		metrics.GRPCEntriesTotal.Add(float64(len(batch.Entries)))
 
 		// Send acknowledgement
 		if err := stream.Send(&blazelogv1.StreamResponse{
