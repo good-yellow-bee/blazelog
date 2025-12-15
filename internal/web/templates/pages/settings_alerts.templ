@@ -1,0 +1,586 @@
+// internal/web/templates/pages/settings_alerts.templ
+package pages
+
+import (
+	"github.com/good-yellow-bee/blazelog/internal/web/session"
+	"github.com/good-yellow-bee/blazelog/internal/web/templates/layouts"
+	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
+)
+
+templ SettingsAlerts(user *session.Session) {
+	@layouts.Base("Alerts", user) {
+		<div x-data="alertsController()" x-init="init()" class="space-y-6">
+			<!-- Header -->
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+				<div>
+					<h1 class="text-2xl font-bold text-gray-900">Alert Rules</h1>
+					<p class="mt-1 text-sm text-gray-500">Manage alert rules for log monitoring</p>
+				</div>
+				if user.Role == "admin" || user.Role == "operator" {
+					<button
+						@click="openCreate()"
+						class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+					>
+						<svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+						</svg>
+						Create Alert
+					</button>
+				}
+			</div>
+
+			<!-- Filters -->
+			<div class="bg-white shadow rounded-lg p-4">
+				<div class="flex flex-col sm:flex-row gap-4">
+					<div class="flex-1">
+						<label class="label">Search</label>
+						<input
+							type="text"
+							x-model="search"
+							@input.debounce.300ms="filterAlerts()"
+							placeholder="Search alerts..."
+							class="input-field"
+						/>
+					</div>
+					<div class="sm:w-48">
+						<label class="label">Project</label>
+						<select x-model="filterProject" @change="loadAlerts()" class="select-field">
+							<option value="">All Projects</option>
+							<template x-for="p in projects" :key="p.id">
+								<option :value="p.id" x-text="p.name"></option>
+							</template>
+						</select>
+					</div>
+					<div class="sm:w-36">
+						<label class="label">Type</label>
+						<select x-model="filterType" @change="filterAlerts()" class="select-field">
+							<option value="">All Types</option>
+							<option value="pattern">Pattern</option>
+							<option value="threshold">Threshold</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<!-- Alerts Table -->
+			<div class="bg-white shadow rounded-lg overflow-hidden">
+				<!-- Loading state -->
+				<div x-show="loading" class="p-8 text-center">
+					<svg class="animate-spin h-8 w-8 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+					</svg>
+					<p class="mt-2 text-gray-500">Loading alerts...</p>
+				</div>
+
+				<!-- Empty state -->
+				<div x-show="!loading && filteredAlerts.length === 0" class="p-8 text-center">
+					<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+					</svg>
+					<h3 class="mt-2 text-sm font-medium text-gray-900">No alerts found</h3>
+					<p class="mt-1 text-sm text-gray-500">Get started by creating a new alert rule.</p>
+				</div>
+
+				<!-- Table -->
+				<div x-show="!loading && filteredAlerts.length > 0" class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
+								<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+							</tr>
+						</thead>
+						<tbody id="alerts-tbody" class="bg-white divide-y divide-gray-200">
+							<!-- Rows rendered by Alpine.js -->
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- Create/Edit Modal -->
+			if user.Role == "admin" || user.Role == "operator" {
+				@AlertFormModal(user.Role)
+			}
+
+			<!-- Delete Confirmation -->
+			if user.Role == "admin" {
+				@components.ConfirmDialogDynamic(
+					"showDeleteModal",
+					"deleteAlert()",
+					"'Delete Alert'",
+					"'Are you sure you want to delete \"' + (selectedAlert?.name || '') + '\"? This action cannot be undone.'",
+				)
+			}
+		</div>
+
+		@AlertsScript(user.Role)
+	}
+}
+
+templ AlertFormModal(role string) {
+	@components.ModalWithFooter("showFormModal", "formTitle") {
+		@components.ModalBody() {
+			<div class="space-y-4">
+				<!-- Name -->
+				<div>
+					<label class="label">Name <span class="text-red-500">*</span></label>
+					<input
+						type="text"
+						x-model="form.name"
+						class="input-field"
+						placeholder="Alert name"
+					/>
+					<p x-show="errors.name" x-text="errors.name" class="mt-1 text-sm text-red-600"></p>
+				</div>
+
+				<!-- Description -->
+				<div>
+					<label class="label">Description</label>
+					<textarea
+						x-model="form.description"
+						class="input-field"
+						rows="2"
+						placeholder="Optional description"
+					></textarea>
+				</div>
+
+				<!-- Type -->
+				<div>
+					<label class="label">Type <span class="text-red-500">*</span></label>
+					<select x-model="form.type" class="select-field">
+						<option value="pattern">Pattern Match</option>
+						<option value="threshold">Threshold</option>
+					</select>
+				</div>
+
+				<!-- Condition -->
+				<div>
+					<label class="label">Condition <span class="text-red-500">*</span></label>
+					<textarea
+						x-model="form.condition"
+						class="input-field font-mono text-sm"
+						rows="3"
+						placeholder='{"pattern": "ERROR|FATAL"}'
+					></textarea>
+					<p class="mt-1 text-xs text-gray-500">JSON condition for the alert rule</p>
+				</div>
+
+				<!-- Severity -->
+				<div>
+					<label class="label">Severity <span class="text-red-500">*</span></label>
+					<select x-model="form.severity" class="select-field">
+						<option value="low">Low</option>
+						<option value="medium">Medium</option>
+						<option value="high">High</option>
+						<option value="critical">Critical</option>
+					</select>
+				</div>
+
+				<!-- Window and Cooldown -->
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="label">Window</label>
+						<input
+							type="text"
+							x-model="form.window"
+							class="input-field"
+							placeholder="5m"
+						/>
+						<p class="mt-1 text-xs text-gray-500">e.g., 5m, 1h</p>
+					</div>
+					<div>
+						<label class="label">Cooldown</label>
+						<input
+							type="text"
+							x-model="form.cooldown"
+							class="input-field"
+							placeholder="15m"
+						/>
+						<p class="mt-1 text-xs text-gray-500">Min time between alerts</p>
+					</div>
+				</div>
+
+				<!-- Project -->
+				<div>
+					<label class="label">Project</label>
+					<select x-model="form.project_id" class="select-field">
+						<option value="">No Project (Global)</option>
+						<template x-for="p in projects" :key="p.id">
+							<option :value="p.id" x-text="p.name"></option>
+						</template>
+					</select>
+				</div>
+
+				<!-- Notify Channels -->
+				<div>
+					<label class="label">Notification Channels</label>
+					<div class="space-y-2">
+						<label class="flex items-center">
+							<input type="checkbox" x-model="form.notify" value="email" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"/>
+							<span class="ml-2 text-sm text-gray-700">Email</span>
+						</label>
+						<label class="flex items-center">
+							<input type="checkbox" x-model="form.notify" value="slack" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"/>
+							<span class="ml-2 text-sm text-gray-700">Slack</span>
+						</label>
+						<label class="flex items-center">
+							<input type="checkbox" x-model="form.notify" value="teams" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"/>
+							<span class="ml-2 text-sm text-gray-700">Microsoft Teams</span>
+						</label>
+					</div>
+				</div>
+
+				<!-- Enabled -->
+				<div>
+					<label class="flex items-center">
+						<input type="checkbox" x-model="form.enabled" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"/>
+						<span class="ml-2 text-sm text-gray-700">Enabled</span>
+					</label>
+				</div>
+
+				<!-- Error message -->
+				<div x-show="formError" class="p-3 bg-red-50 text-red-700 rounded-md text-sm" x-text="formError"></div>
+			</div>
+		}
+		@components.ModalFooter() {
+			<button
+				type="button"
+				@click="showFormModal = false"
+				class="btn-secondary"
+			>
+				Cancel
+			</button>
+			<button
+				type="button"
+				@click="saveAlert()"
+				:disabled="saving"
+				class="btn-primary w-auto"
+			>
+				<span x-show="!saving">Save</span>
+				<span x-show="saving" class="flex items-center">
+					<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+					</svg>
+					Saving...
+				</span>
+			</button>
+		}
+	}
+}
+
+templ AlertsScript(role string) {
+	<script>
+		function alertsController() {
+			return {
+				// Data
+				alerts: [],
+				filteredAlerts: [],
+				projects: [],
+				loading: false,
+				saving: false,
+
+				// Filters
+				search: '',
+				filterProject: '',
+				filterType: '',
+
+				// Modal state
+				showFormModal: false,
+				showDeleteModal: false,
+				selectedAlert: null,
+				formTitle: 'Create Alert',
+				formError: '',
+				errors: {},
+
+				// Form data
+				form: {
+					name: '',
+					description: '',
+					type: 'pattern',
+					condition: '',
+					severity: 'medium',
+					window: '5m',
+					cooldown: '15m',
+					notify: [],
+					enabled: true,
+					project_id: ''
+				},
+
+				// User role for RBAC
+				userRole: '{{ role }}',
+
+				init() {
+					this.loadProjects();
+					this.loadAlerts();
+				},
+
+				async loadProjects() {
+					try {
+						const res = await fetch('/api/v1/projects');
+						if (res.ok) {
+							const data = await res.json();
+							this.projects = data.data || [];
+						}
+					} catch (e) {
+						console.error('Failed to load projects:', e);
+					}
+				},
+
+				async loadAlerts() {
+					this.loading = true;
+					try {
+						const params = new URLSearchParams();
+						if (this.filterProject) {
+							params.set('project_id', this.filterProject);
+						}
+						const res = await fetch(`/api/v1/alerts?${params}`);
+						if (res.ok) {
+							const data = await res.json();
+							this.alerts = data.data || [];
+							this.filterAlerts();
+						}
+					} catch (e) {
+						console.error('Failed to load alerts:', e);
+					} finally {
+						this.loading = false;
+					}
+				},
+
+				filterAlerts() {
+					let filtered = [...this.alerts];
+
+					if (this.search) {
+						const q = this.search.toLowerCase();
+						filtered = filtered.filter(a =>
+							a.name.toLowerCase().includes(q) ||
+							(a.description && a.description.toLowerCase().includes(q))
+						);
+					}
+
+					if (this.filterType) {
+						filtered = filtered.filter(a => a.type === this.filterType);
+					}
+
+					this.filteredAlerts = filtered;
+					this.renderTable();
+				},
+
+				renderTable() {
+					const tbody = document.getElementById('alerts-tbody');
+					if (!tbody) return;
+
+					while (tbody.firstChild) {
+						tbody.removeChild(tbody.firstChild);
+					}
+
+					const canEdit = this.userRole === 'admin' || this.userRole === 'operator';
+					const canDelete = this.userRole === 'admin';
+
+					this.filteredAlerts.forEach(alert => {
+						const tr = document.createElement('tr');
+						tr.className = 'hover:bg-gray-50';
+
+						// Name cell
+						const tdName = document.createElement('td');
+						tdName.className = 'px-6 py-4 whitespace-nowrap';
+						const nameDiv = document.createElement('div');
+						nameDiv.className = 'text-sm font-medium text-gray-900';
+						nameDiv.textContent = alert.name;
+						tdName.appendChild(nameDiv);
+						if (alert.description) {
+							const descDiv = document.createElement('div');
+							descDiv.className = 'text-sm text-gray-500 truncate max-w-xs';
+							descDiv.textContent = alert.description;
+							tdName.appendChild(descDiv);
+						}
+						tr.appendChild(tdName);
+
+						// Type cell
+						const tdType = document.createElement('td');
+						tdType.className = 'px-6 py-4 whitespace-nowrap';
+						const typeSpan = document.createElement('span');
+						typeSpan.className = 'badge badge-gray';
+						typeSpan.textContent = alert.type;
+						tdType.appendChild(typeSpan);
+						tr.appendChild(tdType);
+
+						// Severity cell
+						const tdSeverity = document.createElement('td');
+						tdSeverity.className = 'px-6 py-4 whitespace-nowrap';
+						const sevSpan = document.createElement('span');
+						sevSpan.className = this.getSeverityBadgeClass(alert.severity);
+						sevSpan.textContent = alert.severity;
+						tdSeverity.appendChild(sevSpan);
+						tr.appendChild(tdSeverity);
+
+						// Status cell
+						const tdStatus = document.createElement('td');
+						tdStatus.className = 'px-6 py-4 whitespace-nowrap';
+						const statusSpan = document.createElement('span');
+						statusSpan.className = alert.enabled ? 'badge badge-green' : 'badge badge-gray';
+						statusSpan.textContent = alert.enabled ? 'Enabled' : 'Disabled';
+						tdStatus.appendChild(statusSpan);
+						tr.appendChild(tdStatus);
+
+						// Project cell
+						const tdProject = document.createElement('td');
+						tdProject.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+						const project = this.projects.find(p => p.id === alert.project_id);
+						tdProject.textContent = project ? project.name : '-';
+						tr.appendChild(tdProject);
+
+						// Actions cell
+						const tdActions = document.createElement('td');
+						tdActions.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2';
+
+						if (canEdit) {
+							const editBtn = document.createElement('button');
+							editBtn.className = 'text-indigo-600 hover:text-indigo-900';
+							editBtn.textContent = 'Edit';
+							editBtn.onclick = () => this.openEdit(alert);
+							tdActions.appendChild(editBtn);
+						}
+
+						if (canDelete) {
+							const delBtn = document.createElement('button');
+							delBtn.className = 'text-red-600 hover:text-red-900';
+							delBtn.textContent = 'Delete';
+							delBtn.onclick = () => this.openDelete(alert);
+							tdActions.appendChild(delBtn);
+						}
+
+						tr.appendChild(tdActions);
+						tbody.appendChild(tr);
+					});
+				},
+
+				getSeverityBadgeClass(severity) {
+					switch (severity) {
+						case 'critical': return 'badge badge-red';
+						case 'high': return 'badge badge-yellow';
+						case 'medium': return 'badge badge-blue';
+						case 'low': return 'badge badge-gray';
+						default: return 'badge badge-gray';
+					}
+				},
+
+				resetForm() {
+					this.form = {
+						name: '',
+						description: '',
+						type: 'pattern',
+						condition: '',
+						severity: 'medium',
+						window: '5m',
+						cooldown: '15m',
+						notify: [],
+						enabled: true,
+						project_id: ''
+					};
+					this.errors = {};
+					this.formError = '';
+				},
+
+				openCreate() {
+					this.resetForm();
+					this.selectedAlert = null;
+					this.formTitle = 'Create Alert';
+					this.showFormModal = true;
+				},
+
+				openEdit(alert) {
+					this.selectedAlert = alert;
+					this.formTitle = 'Edit Alert';
+					this.form = {
+						name: alert.name,
+						description: alert.description || '',
+						type: alert.type,
+						condition: alert.condition,
+						severity: alert.severity,
+						window: alert.window || '5m',
+						cooldown: alert.cooldown || '15m',
+						notify: alert.notify || [],
+						enabled: alert.enabled,
+						project_id: alert.project_id || ''
+					};
+					this.errors = {};
+					this.formError = '';
+					this.showFormModal = true;
+				},
+
+				openDelete(alert) {
+					this.selectedAlert = alert;
+					this.showDeleteModal = true;
+				},
+
+				async saveAlert() {
+					this.errors = {};
+					this.formError = '';
+
+					// Validate
+					if (!this.form.name.trim()) {
+						this.errors.name = 'Name is required';
+						return;
+					}
+					if (!this.form.condition.trim()) {
+						this.errors.condition = 'Condition is required';
+						return;
+					}
+
+					this.saving = true;
+					try {
+						const url = this.selectedAlert
+							? `/api/v1/alerts/${this.selectedAlert.id}`
+							: '/api/v1/alerts';
+						const method = this.selectedAlert ? 'PUT' : 'POST';
+
+						const res = await fetch(url, {
+							method: method,
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify(this.form)
+						});
+
+						if (res.ok) {
+							this.showFormModal = false;
+							this.loadAlerts();
+						} else {
+							const data = await res.json();
+							this.formError = data.error?.message || 'Failed to save alert';
+						}
+					} catch (e) {
+						this.formError = 'Network error. Please try again.';
+					} finally {
+						this.saving = false;
+					}
+				},
+
+				async deleteAlert() {
+					if (!this.selectedAlert) return;
+
+					try {
+						const res = await fetch(`/api/v1/alerts/${this.selectedAlert.id}`, {
+							method: 'DELETE'
+						});
+
+						if (res.ok) {
+							this.showDeleteModal = false;
+							this.selectedAlert = null;
+							this.loadAlerts();
+						} else {
+							const data = await res.json();
+							alert(data.error?.message || 'Failed to delete alert');
+						}
+					} catch (e) {
+						alert('Network error. Please try again.');
+					}
+				}
+			};
+		}
+	</script>
+}

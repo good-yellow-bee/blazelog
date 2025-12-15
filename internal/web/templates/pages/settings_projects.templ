@@ -1,0 +1,530 @@
+// internal/web/templates/pages/settings_projects.templ
+package pages
+
+import (
+	"github.com/good-yellow-bee/blazelog/internal/web/session"
+	"github.com/good-yellow-bee/blazelog/internal/web/templates/layouts"
+	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
+)
+
+templ SettingsProjects(user *session.Session) {
+	@layouts.Base("Projects", user) {
+		<div x-data="projectsController()" x-init="init()" class="space-y-6">
+			<!-- Header -->
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+				<div>
+					<h1 class="text-2xl font-bold text-gray-900">Projects</h1>
+					<p class="mt-1 text-sm text-gray-500">Manage projects and team members</p>
+				</div>
+				<button
+					@click="openCreate()"
+					class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+				>
+					<svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+					</svg>
+					Create Project
+				</button>
+			</div>
+
+			<!-- Search -->
+			<div class="bg-white shadow rounded-lg p-4">
+				<div class="max-w-md">
+					<label class="label">Search</label>
+					<input
+						type="text"
+						x-model="search"
+						@input.debounce.300ms="filterProjects()"
+						placeholder="Search projects..."
+						class="input-field"
+					/>
+				</div>
+			</div>
+
+			<!-- Projects Table -->
+			<div class="bg-white shadow rounded-lg overflow-hidden">
+				<!-- Loading state -->
+				<div x-show="loading" class="p-8 text-center">
+					<svg class="animate-spin h-8 w-8 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+					</svg>
+					<p class="mt-2 text-gray-500">Loading projects...</p>
+				</div>
+
+				<!-- Empty state -->
+				<div x-show="!loading && filteredProjects.length === 0" class="p-8 text-center">
+					<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+					</svg>
+					<h3 class="mt-2 text-sm font-medium text-gray-900">No projects found</h3>
+					<p class="mt-1 text-sm text-gray-500">Get started by creating a new project.</p>
+				</div>
+
+				<!-- Table -->
+				<div x-show="!loading && filteredProjects.length > 0" class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+								<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+							</tr>
+						</thead>
+						<tbody id="projects-tbody" class="bg-white divide-y divide-gray-200">
+							<!-- Rows rendered by Alpine.js -->
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- Create/Edit Modal -->
+			@ProjectFormModal()
+
+			<!-- Members Modal -->
+			@ProjectMembersModal()
+
+			<!-- Delete Confirmation -->
+			@components.ConfirmDialogDynamic(
+				"showDeleteModal",
+				"deleteProject()",
+				"'Delete Project'",
+				"'Are you sure you want to delete \"' + (selectedProject?.name || '') + '\"? This action cannot be undone.'",
+			)
+		</div>
+
+		@ProjectsScript()
+	}
+}
+
+templ ProjectFormModal() {
+	@components.ModalWithFooter("showFormModal", "formTitle") {
+		@components.ModalBody() {
+			<div class="space-y-4">
+				<!-- Name -->
+				<div>
+					<label class="label">Name <span class="text-red-500">*</span></label>
+					<input
+						type="text"
+						x-model="form.name"
+						class="input-field"
+						placeholder="Project name"
+					/>
+					<p x-show="errors.name" x-text="errors.name" class="mt-1 text-sm text-red-600"></p>
+				</div>
+
+				<!-- Description -->
+				<div>
+					<label class="label">Description</label>
+					<textarea
+						x-model="form.description"
+						class="input-field"
+						rows="3"
+						placeholder="Optional project description"
+					></textarea>
+				</div>
+
+				<!-- Error message -->
+				<div x-show="formError" class="p-3 bg-red-50 text-red-700 rounded-md text-sm" x-text="formError"></div>
+			</div>
+		}
+		@components.ModalFooter() {
+			<button type="button" @click="showFormModal = false" class="btn-secondary">Cancel</button>
+			<button
+				type="button"
+				@click="saveProject()"
+				:disabled="saving"
+				class="btn-primary w-auto"
+			>
+				<span x-show="!saving">Save</span>
+				<span x-show="saving">Saving...</span>
+			</button>
+		}
+	}
+}
+
+templ ProjectMembersModal() {
+	@components.ModalWithFooter("showMembersModal", "'Members: ' + (selectedProject?.name || '')") {
+		@components.ModalBody() {
+			<div class="space-y-4">
+				<!-- Members list -->
+				<div x-show="!loadingMembers && members.length > 0" class="divide-y divide-gray-200">
+					<template x-for="member in members" :key="member.user_id">
+						<div class="py-3 flex items-center justify-between">
+							<div class="flex items-center">
+								<div class="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+									<span class="text-white text-sm font-medium" x-text="member.username.charAt(0).toUpperCase()"></span>
+								</div>
+								<div class="ml-3">
+									<p class="text-sm font-medium text-gray-900" x-text="member.username"></p>
+									<p class="text-sm text-gray-500" x-text="member.email"></p>
+								</div>
+							</div>
+							<div class="flex items-center gap-2">
+								<span
+									class="badge"
+									:class="member.role === 'admin' ? 'badge-indigo' : member.role === 'operator' ? 'badge-blue' : 'badge-gray'"
+									x-text="member.role"
+								></span>
+								<button
+									@click="removeMember(member.user_id)"
+									class="text-red-600 hover:text-red-900 text-sm"
+								>
+									Remove
+								</button>
+							</div>
+						</div>
+					</template>
+				</div>
+
+				<!-- Empty members -->
+				<div x-show="!loadingMembers && members.length === 0" class="text-center py-4 text-gray-500 text-sm">
+					No members yet
+				</div>
+
+				<!-- Loading members -->
+				<div x-show="loadingMembers" class="text-center py-4">
+					<svg class="animate-spin h-6 w-6 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+					</svg>
+				</div>
+
+				<!-- Add member form -->
+				<div class="pt-4 border-t border-gray-200">
+					<h4 class="text-sm font-medium text-gray-900 mb-3">Add Member</h4>
+					<div class="flex gap-2">
+						<select x-model="addMemberForm.user_id" class="select-field flex-1">
+							<option value="">Select user...</option>
+							<template x-for="u in availableUsers" :key="u.id">
+								<option :value="u.id" x-text="u.username + ' (' + u.email + ')'"></option>
+							</template>
+						</select>
+						<select x-model="addMemberForm.role" class="select-field w-32">
+							<option value="viewer">Viewer</option>
+							<option value="operator">Operator</option>
+							<option value="admin">Admin</option>
+						</select>
+						<button
+							@click="addMember()"
+							:disabled="!addMemberForm.user_id"
+							class="btn-primary w-auto px-4"
+						>
+							Add
+						</button>
+					</div>
+				</div>
+			</div>
+		}
+		@components.ModalFooter() {
+			<button type="button" @click="showMembersModal = false" class="btn-secondary">Close</button>
+		}
+	}
+}
+
+templ ProjectsScript() {
+	<script>
+		function projectsController() {
+			return {
+				// Data
+				projects: [],
+				filteredProjects: [],
+				members: [],
+				allUsers: [],
+				loading: false,
+				saving: false,
+				loadingMembers: false,
+
+				// Filters
+				search: '',
+
+				// Modal state
+				showFormModal: false,
+				showMembersModal: false,
+				showDeleteModal: false,
+				selectedProject: null,
+				formTitle: 'Create Project',
+				formError: '',
+				errors: {},
+
+				// Form data
+				form: {
+					name: '',
+					description: ''
+				},
+
+				// Add member form
+				addMemberForm: {
+					user_id: '',
+					role: 'viewer'
+				},
+
+				get availableUsers() {
+					const memberIds = this.members.map(m => m.user_id);
+					return this.allUsers.filter(u => !memberIds.includes(u.id));
+				},
+
+				init() {
+					this.loadProjects();
+					this.loadUsers();
+				},
+
+				async loadUsers() {
+					try {
+						const res = await fetch('/api/v1/users');
+						if (res.ok) {
+							const data = await res.json();
+							this.allUsers = data.data || [];
+						}
+					} catch (e) {
+						console.error('Failed to load users:', e);
+					}
+				},
+
+				async loadProjects() {
+					this.loading = true;
+					try {
+						const res = await fetch('/api/v1/projects');
+						if (res.ok) {
+							const data = await res.json();
+							this.projects = data.data || [];
+							this.filterProjects();
+						}
+					} catch (e) {
+						console.error('Failed to load projects:', e);
+					} finally {
+						this.loading = false;
+					}
+				},
+
+				filterProjects() {
+					if (!this.search) {
+						this.filteredProjects = [...this.projects];
+					} else {
+						const q = this.search.toLowerCase();
+						this.filteredProjects = this.projects.filter(p =>
+							p.name.toLowerCase().includes(q) ||
+							(p.description && p.description.toLowerCase().includes(q))
+						);
+					}
+					this.renderTable();
+				},
+
+				renderTable() {
+					const tbody = document.getElementById('projects-tbody');
+					if (!tbody) return;
+
+					while (tbody.firstChild) {
+						tbody.removeChild(tbody.firstChild);
+					}
+
+					this.filteredProjects.forEach(project => {
+						const tr = document.createElement('tr');
+						tr.className = 'hover:bg-gray-50';
+
+						// Name cell
+						const tdName = document.createElement('td');
+						tdName.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900';
+						tdName.textContent = project.name;
+						tr.appendChild(tdName);
+
+						// Description cell
+						const tdDesc = document.createElement('td');
+						tdDesc.className = 'px-6 py-4 text-sm text-gray-500 max-w-xs truncate';
+						tdDesc.textContent = project.description || '-';
+						tr.appendChild(tdDesc);
+
+						// Members cell - placeholder count
+						const tdMembers = document.createElement('td');
+						tdMembers.className = 'px-6 py-4 whitespace-nowrap';
+						const membersBtn = document.createElement('button');
+						membersBtn.className = 'text-indigo-600 hover:text-indigo-900 text-sm';
+						membersBtn.textContent = 'Manage';
+						membersBtn.onclick = () => this.openMembers(project);
+						tdMembers.appendChild(membersBtn);
+						tr.appendChild(tdMembers);
+
+						// Created cell
+						const tdCreated = document.createElement('td');
+						tdCreated.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+						tdCreated.textContent = new Date(project.created_at).toLocaleDateString();
+						tr.appendChild(tdCreated);
+
+						// Actions cell
+						const tdActions = document.createElement('td');
+						tdActions.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2';
+
+						const editBtn = document.createElement('button');
+						editBtn.className = 'text-indigo-600 hover:text-indigo-900';
+						editBtn.textContent = 'Edit';
+						editBtn.onclick = () => this.openEdit(project);
+						tdActions.appendChild(editBtn);
+
+						const delBtn = document.createElement('button');
+						delBtn.className = 'text-red-600 hover:text-red-900';
+						delBtn.textContent = 'Delete';
+						delBtn.onclick = () => this.openDelete(project);
+						tdActions.appendChild(delBtn);
+
+						tr.appendChild(tdActions);
+						tbody.appendChild(tr);
+					});
+				},
+
+				resetForm() {
+					this.form = { name: '', description: '' };
+					this.errors = {};
+					this.formError = '';
+				},
+
+				openCreate() {
+					this.resetForm();
+					this.selectedProject = null;
+					this.formTitle = 'Create Project';
+					this.showFormModal = true;
+				},
+
+				openEdit(project) {
+					this.selectedProject = project;
+					this.formTitle = 'Edit Project';
+					this.form = {
+						name: project.name,
+						description: project.description || ''
+					};
+					this.errors = {};
+					this.formError = '';
+					this.showFormModal = true;
+				},
+
+				openDelete(project) {
+					this.selectedProject = project;
+					this.showDeleteModal = true;
+				},
+
+				async openMembers(project) {
+					this.selectedProject = project;
+					this.members = [];
+					this.addMemberForm = { user_id: '', role: 'viewer' };
+					this.showMembersModal = true;
+					await this.loadMembers();
+				},
+
+				async loadMembers() {
+					if (!this.selectedProject) return;
+					this.loadingMembers = true;
+					try {
+						const res = await fetch(`/api/v1/projects/${this.selectedProject.id}/users`);
+						if (res.ok) {
+							const data = await res.json();
+							this.members = data.data || [];
+						}
+					} catch (e) {
+						console.error('Failed to load members:', e);
+					} finally {
+						this.loadingMembers = false;
+					}
+				},
+
+				async saveProject() {
+					this.errors = {};
+					this.formError = '';
+
+					if (!this.form.name.trim()) {
+						this.errors.name = 'Name is required';
+						return;
+					}
+
+					this.saving = true;
+					try {
+						const url = this.selectedProject
+							? `/api/v1/projects/${this.selectedProject.id}`
+							: '/api/v1/projects';
+						const method = this.selectedProject ? 'PUT' : 'POST';
+
+						const res = await fetch(url, {
+							method: method,
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify(this.form)
+						});
+
+						if (res.ok) {
+							this.showFormModal = false;
+							this.loadProjects();
+						} else {
+							const data = await res.json();
+							this.formError = data.error?.message || 'Failed to save project';
+						}
+					} catch (e) {
+						this.formError = 'Network error. Please try again.';
+					} finally {
+						this.saving = false;
+					}
+				},
+
+				async deleteProject() {
+					if (!this.selectedProject) return;
+
+					try {
+						const res = await fetch(`/api/v1/projects/${this.selectedProject.id}`, {
+							method: 'DELETE'
+						});
+
+						if (res.ok) {
+							this.showDeleteModal = false;
+							this.selectedProject = null;
+							this.loadProjects();
+						} else {
+							const data = await res.json();
+							alert(data.error?.message || 'Failed to delete project');
+						}
+					} catch (e) {
+						alert('Network error. Please try again.');
+					}
+				},
+
+				async addMember() {
+					if (!this.selectedProject || !this.addMemberForm.user_id) return;
+
+					try {
+						const res = await fetch(`/api/v1/projects/${this.selectedProject.id}/users`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify(this.addMemberForm)
+						});
+
+						if (res.ok) {
+							this.addMemberForm = { user_id: '', role: 'viewer' };
+							await this.loadMembers();
+						} else {
+							const data = await res.json();
+							alert(data.error?.message || 'Failed to add member');
+						}
+					} catch (e) {
+						alert('Network error. Please try again.');
+					}
+				},
+
+				async removeMember(userId) {
+					if (!this.selectedProject) return;
+
+					try {
+						const res = await fetch(`/api/v1/projects/${this.selectedProject.id}/users/${userId}`, {
+							method: 'DELETE'
+						});
+
+						if (res.ok) {
+							await this.loadMembers();
+						} else {
+							const data = await res.json();
+							alert(data.error?.message || 'Failed to remove member');
+						}
+					} catch (e) {
+						alert('Network error. Please try again.');
+					}
+				}
+			};
+		}
+	</script>
+}
