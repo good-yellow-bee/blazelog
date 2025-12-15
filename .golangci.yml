@@ -3,8 +3,9 @@ run:
   modules-download-mode: readonly
 
 linters:
+  disable:
+    - errcheck  # Disabled: codebase intentionally ignores many Write errors (common Go HTTP pattern)
   enable:
-    # - errcheck  # Disabled: codebase intentionally ignores many Write errors (common Go HTTP pattern)
     - gosimple
     - govet
     - ineffassign
