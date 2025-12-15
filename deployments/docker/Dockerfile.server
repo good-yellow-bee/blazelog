@@ -2,19 +2,16 @@
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates
+RUN apk add --no-cache git ca-certificates libstdc++
 
 # Install templ
 RUN go install github.com/a-h/templ/cmd/templ@latest
 
-# Install tailwindcss standalone
-ARG TARGETOS
-ARG TARGETARCH
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        wget -q -O /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-${TARGETOS}-arm64; \
-    else \
-        wget -q -O /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-${TARGETOS}-x64; \
-    fi && chmod +x /usr/local/bin/tailwindcss
+# Install tailwindcss standalone (musl variant for Alpine)
+RUN ARCH=$(uname -m | sed 's/x86_64/x64/g; s/aarch64/arm64/g') && \
+    wget -q -O /usr/local/bin/tailwindcss \
+        "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-${ARCH}-musl" && \
+    chmod +x /usr/local/bin/tailwindcss
 
 WORKDIR /build
 
@@ -29,7 +26,7 @@ COPY . .
 RUN templ generate
 
 # Build Tailwind CSS
-RUN tailwindcss -i internal/web/static/css/input.css -o internal/web/static/css/output.css --minify
+RUN /usr/local/bin/tailwindcss -i internal/web/static/css/input.css -o internal/web/static/css/output.css --minify
 
 # Build static binary
 ARG VERSION=dev
