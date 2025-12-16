@@ -230,7 +230,7 @@ func TestDiskBuffer_EmptyRead(t *testing.T) {
 		t.Fatalf("Read empty: %v", err)
 	}
 
-	if read != nil && len(read) != 0 {
+	if len(read) != 0 {
 		t.Errorf("expected nil or empty, got %d entries", len(read))
 	}
 }

@@ -252,7 +252,7 @@ func TestTeamsNotifierContextCancellation(t *testing.T) {
 
 	err := notifier.Send(ctx, alert)
 	if err == nil {
-		t.Fatal("expected error for cancelled context")
+		t.Fatal("expected error for canceled context")
 	}
 }
 

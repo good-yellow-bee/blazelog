@@ -51,7 +51,7 @@ Desktop.ini
 
 # Log files (for testing)
 *.log
-logs/
+/logs/
 
 # Temporary files
 tmp/
@@ -71,6 +71,12 @@ __debug_bin*
 
 # Generated proto files
 internal/proto/
+
+# SQLite database files
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
 
 # AI related file
 .claude

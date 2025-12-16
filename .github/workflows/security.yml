@@ -1,0 +1,99 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 0 * * 0" # Sunday at 00:00 UTC
+  workflow_dispatch:
+
+env:
+  GO_VERSION: "1.24"
+
+jobs:
+  dependency-scan:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install tools
+        run: |
+          go install github.com/bufbuild/buf/cmd/buf@latest
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Generate proto files
+        run: cd proto && buf generate
+
+      - name: Run govulncheck
+        run: govulncheck ./...
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xzf - -C /usr/local/bin gitleaks
+
+      - name: Run gitleaks
+        run: gitleaks detect --source . --config .gitleaks.toml --verbose
+
+  container-scan:
+    name: Container Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deployments/docker/Dockerfile.server
+          push: false
+          load: true
+          tags: blazelog-server:scan
+          cache-from: type=gha
+
+      - name: Scan server image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: blazelog-server:scan
+          format: table
+          exit-code: 1
+          severity: CRITICAL
+          ignore-unfixed: true
+
+      - name: Build agent image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deployments/docker/Dockerfile.agent
+          push: false
+          load: true
+          tags: blazelog-agent:scan
+          cache-from: type=gha
+
+      - name: Scan agent image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: blazelog-agent:scan
+          format: table
+          exit-code: 1
+          severity: CRITICAL
+          ignore-unfixed: true

@@ -29,8 +29,8 @@ type Client struct {
 	agentID  string
 	sequence uint64
 
-	mu       sync.Mutex
-	closed   bool
+	mu     sync.Mutex
+	closed bool
 }
 
 // NewClient creates a new gRPC client for the given server address.
@@ -113,8 +113,8 @@ func (c *Client) SendBatch(ctx context.Context, entries []*blazelogv1.LogEntry) 
 
 	seq := atomic.AddUint64(&c.sequence, 1)
 	batch := &blazelogv1.LogBatch{
-		Entries: entries,
-		AgentId: c.agentID,
+		Entries:  entries,
+		AgentId:  c.agentID,
 		Sequence: seq,
 	}
 
@@ -197,9 +197,7 @@ func (c *Client) Close() error {
 	c.closed = true
 
 	if c.stream != nil {
-		if err := c.stream.CloseSend(); err != nil {
-			// Log but don't fail
-		}
+		_ = c.stream.CloseSend() // Log but don't fail
 	}
 
 	return c.conn.Close()

@@ -62,12 +62,12 @@ func DefaultConnManagerConfig() ConnManagerConfig {
 
 // ConnManager manages the connection lifecycle with automatic reconnection.
 type ConnManager struct {
-	config    ConnManagerConfig
-	client    *Client
-	backoff   *Backoff
-	state     atomic.Int32
-	agentID   string
-	verbose   bool
+	config  ConnManagerConfig
+	client  *Client
+	backoff *Backoff
+	state   atomic.Int32
+	agentID string
+	verbose bool
 
 	// Callbacks
 	onConnected    func()
@@ -187,7 +187,7 @@ func (cm *ConnManager) TriggerReconnect() {
 	}
 }
 
-// RunReconnectLoop runs the reconnection loop until context is cancelled.
+// RunReconnectLoop runs the reconnection loop until context is canceled.
 func (cm *ConnManager) RunReconnectLoop(ctx context.Context) {
 	for {
 		select {

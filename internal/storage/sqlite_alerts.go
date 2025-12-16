@@ -158,10 +158,6 @@ func (r *sqliteAlertRepo) scanAlerts(rows *sql.Rows) ([]*models.AlertRule, error
 	return alerts, rows.Err()
 }
 
-type scanner interface {
-	Scan(dest ...interface{}) error
-}
-
 func (r *sqliteAlertRepo) scanAlert(row *sql.Row) (*models.AlertRule, error) {
 	alert := &models.AlertRule{}
 	var description, projectID sql.NullString

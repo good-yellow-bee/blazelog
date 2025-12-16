@@ -1,0 +1,16 @@
+# Gitleaks configuration
+# See: https://github.com/gitleaks/gitleaks#configuration
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow documentation examples, test files, and templates"
+paths = [
+    '''_test\.go$''',
+    '''\.templ$''',
+    '''_templ\.go$''',
+    '''docs/.*\.md$''',
+    '''\.pb\.go$''',
+]
+regexTarget = "match"

@@ -1,6 +1,11 @@
 # Build stage
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
+# Install buf and protoc plugins
+RUN go install github.com/bufbuild/buf/cmd/buf@latest && \
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
 WORKDIR /build
 
 # Copy go modules first (cache layer)
@@ -9,6 +14,9 @@ RUN go mod download
 
 # Copy source
 COPY . .
+
+# Generate proto files
+RUN cd proto && buf generate
 
 # Build static binary
 ARG VERSION=dev

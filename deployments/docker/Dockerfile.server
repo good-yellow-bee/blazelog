@@ -4,8 +4,11 @@ FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates libstdc++
 
-# Install templ
-RUN go install github.com/a-h/templ/cmd/templ@latest
+# Install templ, buf, and protoc plugins
+RUN go install github.com/a-h/templ/cmd/templ@latest && \
+    go install github.com/bufbuild/buf/cmd/buf@latest && \
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # Install tailwindcss standalone (musl variant for Alpine)
 RUN ARCH=$(uname -m | sed 's/x86_64/x64/g; s/aarch64/arm64/g') && \
@@ -21,6 +24,9 @@ RUN go mod download
 
 # Copy source
 COPY . .
+
+# Generate proto files
+RUN cd proto && buf generate
 
 # Generate templ templates
 RUN templ generate

@@ -38,11 +38,11 @@ type AgentConfig struct {
 
 // Agent is the main BlazeLog agent with reliability features.
 type Agent struct {
-	config     *AgentConfig
-	connMgr    *ConnManager
+	config      *AgentConfig
+	connMgr     *ConnManager
 	heartbeater *Heartbeater
-	buffer     buffer.Buffer
-	collectors []*Collector
+	buffer      buffer.Buffer
+	collectors  []*Collector
 
 	entriesChan chan *models.LogEntry
 	batchBuffer []*blazelogv1.LogEntry
@@ -97,7 +97,7 @@ func New(cfg *AgentConfig) (*Agent, error) {
 	}, nil
 }
 
-// Run starts the agent and blocks until the context is cancelled.
+// Run starts the agent and blocks until the context is canceled.
 func (a *Agent) Run(ctx context.Context) error {
 	defer a.buffer.Close()
 
