@@ -19,9 +19,11 @@ var (
 )
 
 // lenBufPool pools 4-byte length buffers to reduce allocations
+// Uses *[]byte to satisfy SA6002 (sync.Pool argument should be pointer-like)
 var lenBufPool = sync.Pool{
 	New: func() any {
-		return make([]byte, 4)
+		buf := make([]byte, 4)
+		return &buf
 	},
 }
 
@@ -142,8 +144,9 @@ func (b *DiskBuffer) Write(entries []*blazelogv1.LogEntry) error {
 	}
 
 	// Get pooled length buffer
-	lenBuf := lenBufPool.Get().([]byte)
-	defer lenBufPool.Put(lenBuf)
+	lenBufPtr := lenBufPool.Get().(*[]byte)
+	lenBuf := *lenBufPtr
+	defer lenBufPool.Put(lenBufPtr)
 
 	for _, entry := range entries {
 		data, err := proto.Marshal(entry)
@@ -207,8 +210,9 @@ func (b *DiskBuffer) Read(n int) ([]*blazelogv1.LogEntry, error) {
 	}
 
 	// Get pooled length buffer
-	lenBuf := lenBufPool.Get().([]byte)
-	defer lenBufPool.Put(lenBuf)
+	lenBufPtr := lenBufPool.Get().(*[]byte)
+	lenBuf := *lenBufPtr
+	defer lenBufPool.Put(lenBufPtr)
 
 	// Read entries
 	entries := make([]*blazelogv1.LogEntry, 0, n)
@@ -296,8 +300,9 @@ func (b *DiskBuffer) countEntries() (int, error) {
 		return 0, err
 	}
 
-	lenBuf := lenBufPool.Get().([]byte)
-	defer lenBufPool.Put(lenBuf)
+	lenBufPtr := lenBufPool.Get().(*[]byte)
+	lenBuf := *lenBufPtr
+	defer lenBufPool.Put(lenBufPtr)
 
 	count := 0
 	for {
@@ -327,8 +332,9 @@ func (b *DiskBuffer) dropOldest(needed int64) error {
 		return err
 	}
 
-	lenBuf := lenBufPool.Get().([]byte)
-	defer lenBufPool.Put(lenBuf)
+	lenBufPtr := lenBufPool.Get().(*[]byte)
+	lenBuf := *lenBufPtr
+	defer lenBufPool.Put(lenBufPtr)
 
 	// Find how many entries to drop
 	bytesToDrop := int64(0)
