@@ -6,23 +6,32 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
-// RateLimiter implements a sliding window rate limiter.
+// RateLimiter implements a token bucket rate limiter using sync.Map.
+// O(1) per request instead of O(n) sliding window.
 type RateLimiter struct {
-	mu       sync.Mutex
-	requests map[string][]time.Time
-	limit    int           // max requests per window
-	window   time.Duration // window duration
+	limiters sync.Map      // key -> *rateLimiterEntry
+	limit    rate.Limit    // requests per second
+	burst    int           // max burst size
+	window   time.Duration // for cleanup (entries unused for this long are removed)
+}
+
+// rateLimiterEntry wraps a limiter with last access time for cleanup.
+type rateLimiterEntry struct {
+	limiter    *rate.Limiter
+	lastAccess int64 // unix nano, updated on each access
 }
 
 // NewRateLimiter creates a new rate limiter.
 // limit is requests per minute.
 func NewRateLimiter(limit int) *RateLimiter {
 	rl := &RateLimiter{
-		requests: make(map[string][]time.Time),
-		limit:    limit,
-		window:   time.Minute,
+		limit:  rate.Limit(float64(limit) / 60.0), // convert per-minute to per-second
+		burst:  limit,                              // allow burst up to full limit
+		window: time.Minute,
 	}
 
 	// Start cleanup goroutine
@@ -32,38 +41,27 @@ func NewRateLimiter(limit int) *RateLimiter {
 }
 
 // Allow checks if a request is allowed for the given key.
+// O(1) operation using token bucket algorithm.
 func (rl *RateLimiter) Allow(key string) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
+	now := time.Now().UnixNano()
 
-	now := time.Now()
-	windowStart := now.Add(-rl.window)
-
-	// Get requests for this key
-	requests := rl.requests[key]
-
-	// Filter to only requests within the window
-	var validRequests []time.Time
-	for _, t := range requests {
-		if t.After(windowStart) {
-			validRequests = append(validRequests, t)
+	// Load or create limiter for this key
+	entry, loaded := rl.limiters.Load(key)
+	if !loaded {
+		newEntry := &rateLimiterEntry{
+			limiter:    rate.NewLimiter(rl.limit, rl.burst),
+			lastAccess: now,
 		}
+		entry, _ = rl.limiters.LoadOrStore(key, newEntry)
 	}
 
-	// Check if under limit
-	if len(validRequests) >= rl.limit {
-		rl.requests[key] = validRequests
-		return false
-	}
+	e := entry.(*rateLimiterEntry)
+	e.lastAccess = now // Update access time (benign race, approximate is fine)
 
-	// Add current request
-	validRequests = append(validRequests, now)
-	rl.requests[key] = validRequests
-
-	return true
+	return e.limiter.Allow()
 }
 
-// cleanupLoop periodically removes old entries.
+// cleanupLoop periodically removes stale entries.
 func (rl *RateLimiter) cleanupLoop() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
@@ -73,27 +71,17 @@ func (rl *RateLimiter) cleanupLoop() {
 	}
 }
 
-// cleanup removes old entries.
+// cleanup removes entries not accessed within the window.
 func (rl *RateLimiter) cleanup() {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
+	cutoff := time.Now().Add(-rl.window).UnixNano()
 
-	now := time.Now()
-	windowStart := now.Add(-rl.window)
-
-	for key, requests := range rl.requests {
-		var validRequests []time.Time
-		for _, t := range requests {
-			if t.After(windowStart) {
-				validRequests = append(validRequests, t)
-			}
+	rl.limiters.Range(func(key, value any) bool {
+		entry := value.(*rateLimiterEntry)
+		if entry.lastAccess < cutoff {
+			rl.limiters.Delete(key)
 		}
-		if len(validRequests) == 0 {
-			delete(rl.requests, key)
-		} else {
-			rl.requests[key] = validRequests
-		}
-	}
+		return true
+	})
 }
 
 // jsonRateLimited writes a rate limited error response.

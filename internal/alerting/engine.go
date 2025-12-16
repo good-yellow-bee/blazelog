@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/models"
@@ -25,13 +26,12 @@ type Engine struct {
 	stats *EngineStats
 }
 
-// EngineStats tracks engine statistics.
+// EngineStats tracks engine statistics using atomic operations for lock-free access.
 type EngineStats struct {
-	mu              sync.RWMutex
-	EntriesEvaluated int64
-	PatternMatches   int64
-	ThresholdTriggers int64
-	AlertsSuppressed  int64
+	EntriesEvaluated  atomic.Int64
+	PatternMatches    atomic.Int64
+	ThresholdTriggers atomic.Int64
+	AlertsSuppressed  atomic.Int64
 }
 
 // EngineOptions configures the alert engine.
@@ -80,9 +80,7 @@ func (e *Engine) EvaluateAt(entry *models.LogEntry, now time.Time) []*Alert {
 	rules := e.rules
 	e.mu.RUnlock()
 
-	e.stats.mu.Lock()
-	e.stats.EntriesEvaluated++
-	e.stats.mu.Unlock()
+	e.stats.EntriesEvaluated.Add(1)
 
 	var alerts []*Alert
 
@@ -135,15 +133,11 @@ func (e *Engine) evaluatePattern(rule *Rule, entry *models.LogEntry, now time.Ti
 		return nil
 	}
 
-	e.stats.mu.Lock()
-	e.stats.PatternMatches++
-	e.stats.mu.Unlock()
+	e.stats.PatternMatches.Add(1)
 
 	// Check cooldown
 	if e.cooldown.IsOnCooldown(rule.Name, now) {
-		e.stats.mu.Lock()
-		e.stats.AlertsSuppressed++
-		e.stats.mu.Unlock()
+		e.stats.AlertsSuppressed.Add(1)
 		return nil
 	}
 
@@ -180,15 +174,11 @@ func (e *Engine) evaluateThreshold(rule *Rule, entry *models.LogEntry, now time.
 		return nil
 	}
 
-	e.stats.mu.Lock()
-	e.stats.ThresholdTriggers++
-	e.stats.mu.Unlock()
+	e.stats.ThresholdTriggers.Add(1)
 
 	// Check cooldown
 	if e.cooldown.IsOnCooldown(rule.Name, now) {
-		e.stats.mu.Lock()
-		e.stats.AlertsSuppressed++
-		e.stats.mu.Unlock()
+		e.stats.AlertsSuppressed.Add(1)
 		return nil
 	}
 
@@ -286,16 +276,21 @@ func (e *Engine) ReloadRules(rules []*Rule) error {
 	return nil
 }
 
-// Stats returns engine statistics.
-func (e *Engine) Stats() EngineStats {
-	e.stats.mu.RLock()
-	defer e.stats.mu.RUnlock()
+// EngineStatsSnapshot is a snapshot of engine statistics for reporting.
+type EngineStatsSnapshot struct {
+	EntriesEvaluated  int64
+	PatternMatches    int64
+	ThresholdTriggers int64
+	AlertsSuppressed  int64
+}
 
-	return EngineStats{
-		EntriesEvaluated:  e.stats.EntriesEvaluated,
-		PatternMatches:    e.stats.PatternMatches,
-		ThresholdTriggers: e.stats.ThresholdTriggers,
-		AlertsSuppressed:  e.stats.AlertsSuppressed,
+// Stats returns a snapshot of engine statistics.
+func (e *Engine) Stats() EngineStatsSnapshot {
+	return EngineStatsSnapshot{
+		EntriesEvaluated:  e.stats.EntriesEvaluated.Load(),
+		PatternMatches:    e.stats.PatternMatches.Load(),
+		ThresholdTriggers: e.stats.ThresholdTriggers.Load(),
+		AlertsSuppressed:  e.stats.AlertsSuppressed.Load(),
 	}
 }
 

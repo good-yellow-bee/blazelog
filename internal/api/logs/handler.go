@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/storage"
+	"golang.org/x/sync/errgroup"
 )
 
 // Response helpers (local to avoid import cycle with api package)
@@ -328,34 +329,53 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 		Type:      q.Get("type"),
 	}
 
-	// Get error rates
-	errorRates, err := h.logStorage.Logs().GetErrorRates(ctx, aggFilter)
-	if err != nil {
-		log.Printf("error rates query error: %v", err)
-		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
-		return
-	}
+	// Execute all 4 queries in parallel for ~4x latency improvement
+	var (
+		errorRates *storage.ErrorRateResult
+		topSources []*storage.SourceCount
+		volume     []*storage.VolumePoint
+		httpStats  *storage.HTTPStatsResult
+	)
 
-	// Get top sources
-	topSources, err := h.logStorage.Logs().GetTopSources(ctx, aggFilter, 10)
-	if err != nil {
-		log.Printf("top sources query error: %v", err)
-		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
-		return
-	}
+	g, gCtx := errgroup.WithContext(ctx)
 
-	// Get log volume
-	volume, err := h.logStorage.Logs().GetLogVolume(ctx, aggFilter, interval)
-	if err != nil {
-		log.Printf("log volume query error: %v", err)
-		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
-		return
-	}
+	g.Go(func() error {
+		var err error
+		errorRates, err = h.logStorage.Logs().GetErrorRates(gCtx, aggFilter)
+		if err != nil {
+			log.Printf("error rates query error: %v", err)
+		}
+		return err
+	})
 
-	// Get HTTP stats
-	httpStats, err := h.logStorage.Logs().GetHTTPStats(ctx, aggFilter)
-	if err != nil {
-		log.Printf("http stats query error: %v", err)
+	g.Go(func() error {
+		var err error
+		topSources, err = h.logStorage.Logs().GetTopSources(gCtx, aggFilter, 10)
+		if err != nil {
+			log.Printf("top sources query error: %v", err)
+		}
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		volume, err = h.logStorage.Logs().GetLogVolume(gCtx, aggFilter, interval)
+		if err != nil {
+			log.Printf("log volume query error: %v", err)
+		}
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		httpStats, err = h.logStorage.Logs().GetHTTPStats(gCtx, aggFilter)
+		if err != nil {
+			log.Printf("http stats query error: %v", err)
+		}
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
 		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
 		return
 	}

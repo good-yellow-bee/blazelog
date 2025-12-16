@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,17 +16,18 @@ import (
 
 // mockLogRepository implements storage.LogRepository for testing.
 type mockLogRepository struct {
-	entries      []*storage.LogRecord
-	total        int64
-	errorRates   *storage.ErrorRateResult
-	topSources   []*storage.SourceCount
-	volume       []*storage.VolumePoint
-	httpStats    *storage.HTTPStatsResult
-	queryError   error
-	countError   error
-	statsError   error
-	lastFilter   *storage.LogFilter
+	entries       []*storage.LogRecord
+	total         int64
+	errorRates    *storage.ErrorRateResult
+	topSources    []*storage.SourceCount
+	volume        []*storage.VolumePoint
+	httpStats     *storage.HTTPStatsResult
+	queryError    error
+	countError    error
+	statsError    error
+	lastFilter    *storage.LogFilter
 	lastAggFilter *storage.AggregationFilter
+	mu            sync.Mutex // protects lastAggFilter for concurrent Stats calls
 }
 
 func (m *mockLogRepository) InsertBatch(ctx context.Context, entries []*storage.LogRecord) error {
@@ -56,7 +58,9 @@ func (m *mockLogRepository) DeleteBefore(ctx context.Context, before time.Time) 
 }
 
 func (m *mockLogRepository) GetErrorRates(ctx context.Context, filter *storage.AggregationFilter) (*storage.ErrorRateResult, error) {
+	m.mu.Lock()
 	m.lastAggFilter = filter
+	m.mu.Unlock()
 	if m.statsError != nil {
 		return nil, m.statsError
 	}
@@ -67,7 +71,9 @@ func (m *mockLogRepository) GetErrorRates(ctx context.Context, filter *storage.A
 }
 
 func (m *mockLogRepository) GetTopSources(ctx context.Context, filter *storage.AggregationFilter, limit int) ([]*storage.SourceCount, error) {
+	m.mu.Lock()
 	m.lastAggFilter = filter
+	m.mu.Unlock()
 	if m.statsError != nil {
 		return nil, m.statsError
 	}
@@ -75,7 +81,9 @@ func (m *mockLogRepository) GetTopSources(ctx context.Context, filter *storage.A
 }
 
 func (m *mockLogRepository) GetLogVolume(ctx context.Context, filter *storage.AggregationFilter, interval string) ([]*storage.VolumePoint, error) {
+	m.mu.Lock()
 	m.lastAggFilter = filter
+	m.mu.Unlock()
 	if m.statsError != nil {
 		return nil, m.statsError
 	}
@@ -83,7 +91,9 @@ func (m *mockLogRepository) GetLogVolume(ctx context.Context, filter *storage.Ag
 }
 
 func (m *mockLogRepository) GetHTTPStats(ctx context.Context, filter *storage.AggregationFilter) (*storage.HTTPStatsResult, error) {
+	m.mu.Lock()
 	m.lastAggFilter = filter
+	m.mu.Unlock()
 	if m.statsError != nil {
 		return nil, m.statsError
 	}
