@@ -215,6 +215,10 @@ type HostStats struct {
 func (p *Pool) getFromHostPool(ctx context.Context, hp *hostPool, cfg *ClientConfig, key string) (*Client, error) {
 	hp.mu.Lock()
 
+	// Collect dead clients to remove from clientKeys after releasing hp.mu
+	// This avoids holding hp.mu while acquiring p.mu (lock order issue)
+	var deadClients []*Client
+
 	// Try to find an idle connection
 	for _, conn := range hp.connections {
 		if !conn.inUse {
@@ -223,12 +227,18 @@ func (p *Pool) getFromHostPool(ctx context.Context, hp *hostPool, cfg *ClientCon
 				conn.inUse = true
 				conn.lastUsed = time.Now()
 				hp.mu.Unlock()
+				// Clean up any dead clients collected before finding healthy one
+				if len(deadClients) > 0 {
+					p.mu.Lock()
+					for _, c := range deadClients {
+						delete(p.clientKeys, c)
+					}
+					p.mu.Unlock()
+				}
 				return conn.client, nil
 			}
-			// Connection is dead - remove it and its key mapping
-			p.mu.Lock()
-			delete(p.clientKeys, conn.client)
-			p.mu.Unlock()
+			// Connection is dead - collect for cleanup after releasing hp.mu
+			deadClients = append(deadClients, conn.client)
 			conn.client.Close()
 			hp.connections = removeConnection(hp.connections, conn)
 		}
@@ -237,6 +247,14 @@ func (p *Pool) getFromHostPool(ctx context.Context, hp *hostPool, cfg *ClientCon
 	// Check if we can create a new connection
 	if len(hp.connections) >= p.config.MaxPerHost {
 		hp.mu.Unlock()
+		// Clean up dead clients after releasing hp.mu
+		if len(deadClients) > 0 {
+			p.mu.Lock()
+			for _, c := range deadClients {
+				delete(p.clientKeys, c)
+			}
+			p.mu.Unlock()
+		}
 		return nil, fmt.Errorf("max connections (%d) reached for host %s", p.config.MaxPerHost, cfg.Host)
 	}
 
@@ -250,6 +268,15 @@ func (p *Pool) getFromHostPool(ctx context.Context, hp *hostPool, cfg *ClientCon
 	}
 	hp.connections = append(hp.connections, conn)
 	hp.mu.Unlock()
+
+	// Clean up dead clients after releasing hp.mu
+	if len(deadClients) > 0 {
+		p.mu.Lock()
+		for _, c := range deadClients {
+			delete(p.clientKeys, c)
+		}
+		p.mu.Unlock()
+	}
 
 	if err := client.Connect(ctx); err != nil {
 		// Remove failed connection from pool

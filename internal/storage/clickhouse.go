@@ -303,17 +303,17 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 // Uses limit+1 optimization to determine HasMore without a separate COUNT query.
 // Only computes Total when on first page (offset=0) for pagination UI.
 func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQueryResult, error) {
+	// Use local copy to avoid mutating input filter
 	// Fetch limit+1 to efficiently detect if there are more results
-	originalLimit := filter.Limit
-	if originalLimit > 0 {
-		filter.Limit = originalLimit + 1
+	queryFilter := *filter
+	if queryFilter.Limit > 0 {
+		queryFilter.Limit = filter.Limit + 1
 	}
 
-	query, args := r.buildQuery(filter, false)
+	query, args := r.buildQuery(&queryFilter, false)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		filter.Limit = originalLimit // Restore original limit
 		return nil, fmt.Errorf("query: %w", err)
 	}
 	defer rows.Close()
@@ -341,7 +341,6 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 			&entry.URI,
 		)
 		if err != nil {
-			filter.Limit = originalLimit // Restore original limit
 			return nil, fmt.Errorf("scan: %w", err)
 		}
 
@@ -356,17 +355,15 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 		entries = append(entries, entry)
 	}
 
-	filter.Limit = originalLimit // Restore original limit
-
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows: %w", err)
 	}
 
 	// Determine HasMore from fetched data (O(1) instead of separate COUNT)
 	hasMore := false
-	if originalLimit > 0 && len(entries) > originalLimit {
+	if filter.Limit > 0 && len(entries) > filter.Limit {
 		hasMore = true
-		entries = entries[:originalLimit] // Return only requested limit
+		entries = entries[:filter.Limit] // Return only requested limit
 	}
 
 	// Only compute Total for first page (offset=0) to enable pagination UI
