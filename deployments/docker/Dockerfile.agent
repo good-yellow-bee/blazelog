@@ -32,7 +32,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -o /blazelog-agent ./cmd/agent
 
 # Runtime stage - Alpine for filesystem access (needed for log collection)
-FROM alpine:3.21
+FROM alpine:3.23
 
 # Install ca-certificates, tzdata, and netcat for health checks
 RUN apk add --no-cache ca-certificates tzdata netcat-openbsd \
