@@ -72,6 +72,12 @@ __debug_bin*
 # Generated proto files
 internal/proto/
 
+# SQLite database files
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+
 # AI related file
 .claude
 .serena
