@@ -24,6 +24,10 @@ type WordPressParser struct {
 	regex *regexp.Regexp
 	// Regex to detect the start of a new log entry
 	startRegex *regexp.Regexp
+	// Regex to extract PHP file location: "in /path/file.php on line 123"
+	inLineRegex *regexp.Regexp
+	// Regex to extract PHP file location: "in /path/file.php:123"
+	colonRegex *regexp.Regexp
 }
 
 // WordPress timestamp format: 15-Jan-2024 10:23:45
@@ -38,6 +42,10 @@ func NewWordPressParser(opts *ParserOptions) *WordPressParser {
 		regex: regexp.MustCompile(`^\[(\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2}) ([A-Z]{2,4})\] (.*)$`),
 		// Pattern to detect start of a new entry
 		startRegex: regexp.MustCompile(`^\[\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2}`),
+		// Pattern: in /path/to/file.php on line 123
+		inLineRegex: regexp.MustCompile(` in ([^\s]+\.php) on line (\d+)`),
+		// Pattern: in /path/to/file.php:123
+		colonRegex: regexp.MustCompile(` in ([^\s]+\.php):(\d+)`),
 	}
 }
 
@@ -85,7 +93,7 @@ func (p *WordPressParser) ParseWithContext(ctx context.Context, line string) (*m
 		entry.Message = cleanMessage
 
 		// Extract file and line from PHP errors
-		extractPHPLocation(entry, cleanMessage)
+		p.extractPHPLocation(entry, cleanMessage)
 	} else if strings.HasPrefix(message, "WordPress database error") {
 		entry.SetField("source_type", "wordpress_database")
 		entry.Level = models.LevelError
@@ -137,18 +145,16 @@ func parseWordPressPHPLevel(message string) (models.LogLevel, string) {
 // extractPHPLocation extracts file path and line number from PHP error messages.
 // Common format: "... in /path/to/file.php on line 123"
 // Or: "... in /path/to/file.php:123"
-func extractPHPLocation(entry *models.LogEntry, message string) {
+func (p *WordPressParser) extractPHPLocation(entry *models.LogEntry, message string) {
 	// Pattern: in /path/to/file.php on line 123
-	inLinePattern := regexp.MustCompile(` in ([^\s]+\.php) on line (\d+)`)
-	if matches := inLinePattern.FindStringSubmatch(message); matches != nil {
+	if matches := p.inLineRegex.FindStringSubmatch(message); matches != nil {
 		entry.SetField("php_file", matches[1])
 		entry.SetField("php_line", matches[2])
 		return
 	}
 
 	// Pattern: in /path/to/file.php:123
-	colonPattern := regexp.MustCompile(` in ([^\s]+\.php):(\d+)`)
-	if matches := colonPattern.FindStringSubmatch(message); matches != nil {
+	if matches := p.colonRegex.FindStringSubmatch(message); matches != nil {
 		entry.SetField("php_file", matches[1])
 		entry.SetField("php_line", matches[2])
 	}

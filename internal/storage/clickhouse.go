@@ -300,11 +300,20 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 }
 
 // Query retrieves logs matching the filter.
+// Uses limit+1 optimization to determine HasMore without a separate COUNT query.
+// Only computes Total when on first page (offset=0) for pagination UI.
 func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQueryResult, error) {
+	// Fetch limit+1 to efficiently detect if there are more results
+	originalLimit := filter.Limit
+	if originalLimit > 0 {
+		filter.Limit = originalLimit + 1
+	}
+
 	query, args := r.buildQuery(filter, false)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
+		filter.Limit = originalLimit // Restore original limit
 		return nil, fmt.Errorf("query: %w", err)
 	}
 	defer rows.Close()
@@ -332,6 +341,7 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 			&entry.URI,
 		)
 		if err != nil {
+			filter.Limit = originalLimit // Restore original limit
 			return nil, fmt.Errorf("scan: %w", err)
 		}
 
@@ -346,20 +356,47 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 		entries = append(entries, entry)
 	}
 
+	filter.Limit = originalLimit // Restore original limit
+
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows: %w", err)
 	}
 
-	// Get total count
-	total, err := r.Count(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("count: %w", err)
+	// Determine HasMore from fetched data (O(1) instead of separate COUNT)
+	hasMore := false
+	if originalLimit > 0 && len(entries) > originalLimit {
+		hasMore = true
+		entries = entries[:originalLimit] // Return only requested limit
+	}
+
+	// Only compute Total for first page (offset=0) to enable pagination UI
+	// For subsequent pages, Total is approximated from offset + len
+	var total int64
+	if filter.Offset == 0 {
+		if hasMore {
+			// If there are more results, we need actual count for pagination
+			total, err = r.Count(ctx, filter)
+			if err != nil {
+				return nil, fmt.Errorf("count: %w", err)
+			}
+		} else {
+			// No more results, total is just the count we have
+			total = int64(len(entries))
+		}
+	} else {
+		// For non-first pages, estimate total from what we know
+		// This is an approximation but avoids the COUNT query
+		if hasMore {
+			total = int64(filter.Offset + len(entries) + 1) // At least this many
+		} else {
+			total = int64(filter.Offset + len(entries))
+		}
 	}
 
 	return &LogQueryResult{
 		Entries: entries,
 		Total:   total,
-		HasMore: int64(filter.Offset+len(entries)) < total,
+		HasMore: hasMore,
 	}, nil
 }
 

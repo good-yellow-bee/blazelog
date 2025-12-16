@@ -29,11 +29,12 @@ func DefaultPoolConfig() PoolConfig {
 
 // Pool manages a pool of SSH connections for reuse.
 type Pool struct {
-	config  PoolConfig
-	clients map[string]*hostPool
-	mu      sync.Mutex
-	closed  bool
-	closeCh chan struct{}
+	config     PoolConfig
+	clients    map[string]*hostPool
+	clientKeys map[*Client]string // Maps client to its pool key for O(1) release lookup
+	mu         sync.Mutex
+	closed     bool
+	closeCh    chan struct{}
 }
 
 // hostPool manages connections to a single host.
@@ -63,9 +64,10 @@ func NewPool(config PoolConfig) *Pool {
 	}
 
 	p := &Pool{
-		config:  config,
-		clients: make(map[string]*hostPool),
-		closeCh: make(chan struct{}),
+		config:     config,
+		clients:    make(map[string]*hostPool),
+		clientKeys: make(map[*Client]string),
+		closeCh:    make(chan struct{}),
 	}
 
 	go p.cleanupLoop()
@@ -95,33 +97,48 @@ func (p *Pool) Get(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 }
 
 // Release returns a connection to the pool for reuse.
+// Uses O(1) lookup via clientKeys map instead of O(n) search.
 func (p *Pool) Release(client *Client) {
 	if client == nil {
 		return
 	}
 
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if p.closed {
+		p.mu.Unlock()
 		client.Close()
 		return
 	}
 
-	for _, hp := range p.clients {
-		hp.mu.Lock()
-		for _, conn := range hp.connections {
-			if conn.client == client {
-				conn.inUse = false
-				conn.lastUsed = time.Now()
-				hp.mu.Unlock()
-				return
-			}
-		}
-		hp.mu.Unlock()
+	// O(1) lookup of the host pool key
+	key, ok := p.clientKeys[client]
+	if !ok {
+		p.mu.Unlock()
+		client.Close()
+		return
 	}
 
-	// Client not found in pool - close it
+	hp, exists := p.clients[key]
+	p.mu.Unlock() // Release pool mutex before acquiring host mutex
+
+	if !exists {
+		client.Close()
+		return
+	}
+
+	// Now only lock the specific host pool
+	hp.mu.Lock()
+	for _, conn := range hp.connections {
+		if conn.client == client {
+			conn.inUse = false
+			conn.lastUsed = time.Now()
+			hp.mu.Unlock()
+			return
+		}
+	}
+	hp.mu.Unlock()
+
+	// Client not found in this host pool - close it
 	client.Close()
 }
 
@@ -150,6 +167,7 @@ func (p *Pool) Close() error {
 	}
 
 	p.clients = make(map[string]*hostPool)
+	p.clientKeys = make(map[*Client]string)
 	return firstErr
 }
 
@@ -207,7 +225,10 @@ func (p *Pool) getFromHostPool(ctx context.Context, hp *hostPool, cfg *ClientCon
 				hp.mu.Unlock()
 				return conn.client, nil
 			}
-			// Connection is dead - remove it
+			// Connection is dead - remove it and its key mapping
+			p.mu.Lock()
+			delete(p.clientKeys, conn.client)
+			p.mu.Unlock()
 			conn.client.Close()
 			hp.connections = removeConnection(hp.connections, conn)
 		}
@@ -238,6 +259,11 @@ func (p *Pool) getFromHostPool(ctx context.Context, hp *hostPool, cfg *ClientCon
 		return nil, err
 	}
 
+	// Add client to key mapping for O(1) release lookup
+	p.mu.Lock()
+	p.clientKeys[client] = key
+	p.mu.Unlock()
+
 	return client, nil
 }
 
@@ -257,24 +283,28 @@ func (p *Pool) cleanupLoop() {
 
 func (p *Pool) cleanup() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if p.closed {
+		p.mu.Unlock()
 		return
 	}
 
 	now := time.Now()
+	// Collect clients to remove from key map
+	var clientsToRemove []*Client
+
 	for _, hp := range p.clients {
 		hp.mu.Lock()
 		var remaining []*pooledConnection
 		for _, conn := range hp.connections {
 			// Close idle connections that have exceeded timeout
 			if !conn.inUse && now.Sub(conn.lastUsed) > p.config.IdleTimeout {
+				clientsToRemove = append(clientsToRemove, conn.client)
 				conn.client.Close()
 				continue
 			}
 			// Close dead connections
 			if !conn.inUse && !conn.client.IsConnected() {
+				clientsToRemove = append(clientsToRemove, conn.client)
 				conn.client.Close()
 				continue
 			}
@@ -283,6 +313,12 @@ func (p *Pool) cleanup() {
 		hp.connections = remaining
 		hp.mu.Unlock()
 	}
+
+	// Remove closed clients from key map
+	for _, client := range clientsToRemove {
+		delete(p.clientKeys, client)
+	}
+	p.mu.Unlock()
 }
 
 // configKey generates a unique key for a ClientConfig.
