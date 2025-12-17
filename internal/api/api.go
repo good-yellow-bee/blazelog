@@ -17,6 +17,7 @@ type Config struct {
 	Address          string
 	JWTSecret        []byte
 	CSRFSecret       string // For web UI CSRF protection
+	WebUIEnabled     bool   // Enable web UI (default: true)
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
 	RateLimitPerIP   int

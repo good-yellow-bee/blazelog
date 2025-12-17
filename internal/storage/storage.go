@@ -77,6 +77,8 @@ type ConnectionRepository interface {
 	List(ctx context.Context) ([]*models.Connection, error)
 	ListByProject(ctx context.Context, projectID string) ([]*models.Connection, error)
 	UpdateStatus(ctx context.Context, id string, status models.ConnectionStatus, testedAt time.Time) error
+	EncryptCredentials(plaintext []byte) ([]byte, error)
+	DecryptCredentials(encrypted []byte) ([]byte, error)
 }
 
 // TokenRepository defines operations for refresh token management.

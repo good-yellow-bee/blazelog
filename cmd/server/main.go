@@ -278,6 +278,9 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 		csrfSecret = os.Getenv(cfg.Auth.CSRFSecretEnv)
 	}
 
+	// Check if Web UI is enabled (default: true)
+	webUIEnabled := os.Getenv("BLAZELOG_WEB_UI_ENABLED") != "false"
+
 	// Parse durations
 	accessTTL, err := time.ParseDuration(cfg.Auth.AccessTokenTTL)
 	if err != nil {
@@ -296,6 +299,7 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 		Address:          cfg.Server.HTTPAddress,
 		JWTSecret:        []byte(jwtSecret),
 		CSRFSecret:       csrfSecret,
+		WebUIEnabled:     webUIEnabled,
 		AccessTokenTTL:   accessTTL,
 		RefreshTokenTTL:  refreshTTL,
 		RateLimitPerIP:   cfg.Auth.RateLimitPerIP,

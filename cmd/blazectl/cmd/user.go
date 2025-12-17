@@ -38,13 +38,13 @@ for system administrators to manage users outside of the web interface.
 
 Examples:
   # List all users
-  blazelog user list --db ./data/blazelog.db
+  blazectl user list
 
   # Create an admin user
-  blazelog user create --db ./data/blazelog.db --username admin --email admin@example.com --role admin
+  blazectl user create --username admin --email admin@example.com --role admin
 
   # Change a user's password
-  blazelog user passwd --db ./data/blazelog.db --username admin`,
+  blazectl user passwd --username admin`,
 }
 
 // userListCmd lists all users
@@ -57,12 +57,8 @@ Displays username, email, role, and creation date for each user.
 Passwords are never displayed.
 
 Example:
-  blazelog user list --db ./data/blazelog.db`,
+  blazectl user list`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if userDBPath == "" {
-			return fmt.Errorf("--db is required")
-		}
-
 		store, err := openDatabase(userDBPath)
 		if err != nil {
 			return err
@@ -122,7 +118,7 @@ Available roles:
   - viewer: Read-only access
 
 Example:
-  blazelog user create --db ./data/blazelog.db --username john --email john@example.com --role operator`,
+  blazectl user create --username john --email john@example.com --role operator`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := validateCreateFlags(); err != nil {
 			return err
@@ -241,11 +237,8 @@ Password requirements:
   - At least 1 special character (!@#$%^&*...)
 
 Example:
-  blazelog user passwd --db ./data/blazelog.db --username admin`,
+  blazectl user passwd --username admin`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if userDBPath == "" {
-			return fmt.Errorf("--db is required")
-		}
 		if userUsername == "" {
 			return fmt.Errorf("--username is required")
 		}
@@ -322,10 +315,9 @@ func init() {
 	userCmd.AddCommand(userCreateCmd)
 	userCmd.AddCommand(userPasswdCmd)
 
-	// Common flags
+	// Common flags (db has default value)
 	for _, cmd := range []*cobra.Command{userListCmd, userCreateCmd, userPasswdCmd} {
-		cmd.Flags().StringVar(&userDBPath, "db", "", "path to SQLite database file (required)")
-		cmd.MarkFlagRequired("db")
+		cmd.Flags().StringVar(&userDBPath, "db", defaultDBPath, "path to SQLite database file")
 	}
 
 	// Create-specific flags
@@ -341,9 +333,6 @@ func init() {
 }
 
 func validateCreateFlags() error {
-	if userDBPath == "" {
-		return fmt.Errorf("--db is required")
-	}
 	if userUsername == "" {
 		return fmt.Errorf("--username is required")
 	}
