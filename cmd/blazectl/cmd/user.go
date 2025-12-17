@@ -362,7 +362,7 @@ func promptPassword(prompt string) (string, error) {
 	fmt.Print(prompt)
 
 	// Check if stdin is a terminal
-	fd := int(syscall.Stdin)
+	fd := syscall.Stdin
 	if term.IsTerminal(fd) {
 		// Read password without echo
 		passwordBytes, err := term.ReadPassword(fd)
