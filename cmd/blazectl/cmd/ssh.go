@@ -450,7 +450,13 @@ func init() {
 
 // openSSHDB opens the SQLite database.
 func openSSHDB() (*storage.SQLiteStorage, error) {
-	store := storage.NewSQLiteStorage(sshDBPath, nil)
+	// Get master key from environment for credential encryption
+	var masterKey []byte
+	if key := os.Getenv("BLAZELOG_MASTER_KEY"); key != "" {
+		masterKey = []byte(key)
+	}
+
+	store := storage.NewSQLiteStorage(sshDBPath, masterKey)
 	if err := store.Open(); err != nil {
 		return nil, fmt.Errorf("open database at %s: %w", sshDBPath, err)
 	}
