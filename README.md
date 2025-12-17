@@ -18,6 +18,7 @@ BlazeLog is a universal log analyzer built in Go that provides real-time streami
 - **Distributed collection** — Lightweight agents with mTLS/gRPC, offline buffering
 - **SSH collection** — Pull logs from remote servers via SSH
 - **Web dashboard** — Templ + HTMX + Alpine.js, real-time metrics, log search
+- **CLI management** — Full project/user management via `blazectl`
 
 ## Architecture
 
@@ -39,7 +40,7 @@ BlazeLog is a universal log analyzer built in Go that provides real-time streami
 │                              ▼                                              │
 │  ┌───────────────────────────────────────────────────────────────────┐     │
 │  │                     BLAZELOG CENTRAL SERVER                        │     │
-│  │  Log Processor │ Alert Engine │ Notifier │ SSH Connector │ REST API│     │
+│  │ Log Processor │ Alert Engine │ Notifier │ SSH Connector │ REST API│     │
 │  └───────────────────────────────────────────────────────────────────┘     │
 │                              │                                              │
 │                              ▼                                              │
@@ -160,6 +161,32 @@ rules:
 
 See [configs/](configs/) for full examples.
 
+## CLI Management
+
+BlazeLog includes `blazectl` for full administrative control:
+
+```bash
+# User management
+blazectl user list
+blazectl user create --username admin --email admin@example.com --role admin
+blazectl user passwd --username admin
+
+# Project management
+blazectl project list
+blazectl project create --name myapp --description "My Application"
+blazectl project add-member --name myapp --username alice --role operator
+blazectl project members --name myapp
+```
+
+API-only mode (disable Web UI):
+
+```bash
+export BLAZELOG_WEB_UI_ENABLED=false
+./blazelog-server
+```
+
+See [docs/CLI.md](docs/CLI.md) for full reference.
+
 ## Technology Stack
 
 | Component | Technology |
@@ -180,12 +207,12 @@ See [configs/](configs/) for full examples.
 |-------|-------------|--------|
 | A | CLI Foundation (parsers) | ✅ Complete |
 | B | Real-time & Alerting | ✅ Complete |
-| C | Distributed Collection | 🔄 In Progress |
-| D | SSH Collection | ⏳ Planned |
-| E | Storage (ClickHouse) | ⏳ Planned |
-| F | REST API | ⏳ Planned |
-| G | Web UI | ⏳ Planned |
-| H | Batch & Production | ⏳ Planned |
+| C | Distributed Collection | ✅ Complete |
+| D | Storage (ClickHouse) | ✅ Complete |
+| E | REST API | ✅ Complete |
+| F | Web UI | ✅ Complete |
+| G | CLI Management | ✅ Complete |
+| H | Production Hardening | 🔄 In Progress |
 
 See [PLAN.md](PLAN.md) for detailed milestones.
 

@@ -14,7 +14,22 @@
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `BLAZELOG_CSRF_SECRET` | CSRF protection secret (enables Web UI) | - |
+| `BLAZELOG_WEB_UI_ENABLED` | Enable Web UI (`true`/`false`) | `true` |
 | `CLICKHOUSE_PASSWORD` | ClickHouse password (prod profile) | - |
+
+### Disabling Web UI
+
+To run BlazeLog in API-only mode (for security or CLI-only deployments):
+
+```bash
+export BLAZELOG_WEB_UI_ENABLED=false
+./blazelog-server
+```
+
+When disabled:
+- All `/api/v1/*` endpoints remain available
+- Web UI routes return 404
+- CLI management still works via `blazectl`
 
 ---
 
@@ -68,51 +83,6 @@ auth:
   # CSRF secret environment variable name (Web UI)
   csrf_secret_env: "BLAZELOG_CSRF_SECRET"
 
-# SSH settings for agentless log collection
-ssh:
-  # Known hosts file for host key verification
-  host_key_file: "/etc/blazelog/known_hosts"
-
-  # Host key policy: strict | tofu | warn
-  host_key_policy: "tofu"  # default
-
-  # SSH operation audit log
-  audit_log: "/var/log/blazelog/ssh-audit.log"
-
-  # Connection pool settings
-  pool:
-    max_per_host: 5      # Max connections per host
-    idle_timeout: 5m     # Idle connection timeout
-
-# SSH connections (agentless mode)
-ssh_connections:
-  - name: "web-server-1"
-    host: "web1.example.com:22"
-    user: "blazelog"
-    key_file: "/etc/blazelog/ssh/web1.key"
-    # key_file: "/etc/blazelog/ssh/web1.key.enc"  # Encrypted key
-    # key_passphrase: ""  # Optional passphrase
-    sources:
-      - path: "/var/log/nginx/access.log"
-        type: "nginx"
-        follow: true
-      - path: "/var/log/nginx/error.log"
-        type: "nginx"
-        follow: true
-
-  # Connection via jump host
-  - name: "internal-server"
-    host: "internal.example.com:22"
-    user: "blazelog"
-    key_file: "/etc/blazelog/ssh/internal.key"
-    jump_host:
-      host: "bastion.example.com:22"
-      user: "blazelog"
-      key_file: "/etc/blazelog/ssh/bastion.key"
-    sources:
-      - path: "/var/log/app/*.log"
-        type: "auto"
-        follow: true
 ```
 
 ---
@@ -236,24 +206,6 @@ BlazeLog enforces TLS 1.3 minimum for all connections.
 
 ---
 
-## SSH Key Encryption
-
-Encrypt SSH keys with the master key:
-
-```bash
-# Encrypt a key file
-blazectl ssh encrypt-key \
-  --input /path/to/key \
-  --output /etc/blazelog/ssh/key.enc
-
-# Reference in config
-ssh_connections:
-  - name: "server"
-    key_file: "/etc/blazelog/ssh/key.enc"
-```
-
----
-
 ## Rate Limiting
 
 Built-in rate limiting is enabled by default:
@@ -341,9 +293,6 @@ metrics:
 database:
   path: "/var/lib/blazelog/blazelog.db"
 
-ssh:
-  host_key_policy: "strict"
-  audit_log: "/var/log/blazelog/ssh-audit.log"
 ```
 
 ### Production (ClickHouse)
@@ -354,10 +303,10 @@ Use Docker Compose with `--profile prod` or configure external ClickHouse.
 
 ## See Also
 
+- [CLI Reference](CLI.md) - Full CLI command documentation
 - [Alert Rules Reference](guides/alerts.md) - Alert configuration details
 - [Notification Setup](guides/notifications.md) - Email/Slack/Teams configuration
 - [Log Formats](guides/log-formats/README.md) - Supported log formats
 - [mTLS Guide](guides/mtls.md) - Certificate configuration
-- [SSH Collection](guides/ssh-collection.md) - SSH connection setup
 - [Deployment Guide](DEPLOYMENT.md) - Installation and deployment
 - [Troubleshooting](TROUBLESHOOTING.md) - Common issues

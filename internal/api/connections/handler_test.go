@@ -119,6 +119,14 @@ func (m *mockConnectionRepository) UpdateStatus(ctx context.Context, id string, 
 	return nil
 }
 
+func (m *mockConnectionRepository) EncryptCredentials(plaintext []byte) ([]byte, error) {
+	return plaintext, nil // mock: return plaintext unchanged
+}
+
+func (m *mockConnectionRepository) DecryptCredentials(encrypted []byte) ([]byte, error) {
+	return encrypted, nil // mock: return encrypted unchanged
+}
+
 type mockStorage struct {
 	connRepo *mockConnectionRepository
 }

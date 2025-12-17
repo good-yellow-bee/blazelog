@@ -83,10 +83,10 @@ data/*.db-journal
 .serena
 .history
 
-# Built binaries
-agent
-server
-blazectl
+# Built binaries (root level only)
+/agent
+/server
+/blazectl
 
 # Generated Tailwind CSS
 web/static/css/output.css

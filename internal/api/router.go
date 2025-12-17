@@ -201,7 +201,7 @@ func (s *Server) setupRouter() *chi.Mux {
 	r.Get("/health/ready", s.healthHandler.Ready)
 
 	// Web UI routes (mounted at root, but API routes take precedence)
-	if s.config.CSRFSecret != "" {
+	if s.config.WebUIEnabled && s.config.CSRFSecret != "" {
 		webServer := web.NewServer(s.storage, s.logStorage, s.config.CSRFSecret)
 		r.Mount("/", webServer.Routes())
 	}
