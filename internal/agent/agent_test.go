@@ -232,8 +232,11 @@ func (s *mockLogServer) Heartbeat(ctx context.Context, req *blazelogv1.Heartbeat
 }
 
 func TestClientRegister(t *testing.T) {
+	ctx := context.Background()
+
 	// Start mock server
-	lis, err := net.Listen("tcp", "localhost:0")
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", "localhost:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -254,7 +257,6 @@ func TestClientRegister(t *testing.T) {
 	defer client.Close()
 
 	// Register
-	ctx := context.Background()
 	info := &blazelogv1.AgentInfo{
 		AgentId:  "my-agent",
 		Name:     "test-agent",
@@ -284,8 +286,11 @@ func TestClientRegister(t *testing.T) {
 }
 
 func TestClientSendBatch(t *testing.T) {
+	ctx := context.Background()
+
 	// Start mock server
-	lis, err := net.Listen("tcp", "localhost:0")
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", "localhost:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -315,7 +320,6 @@ func TestClientSendBatch(t *testing.T) {
 	}
 
 	// Start stream
-	ctx := context.Background()
 	if err := client.StartStream(ctx); err != nil {
 		t.Fatalf("StartStream: %v", err)
 	}

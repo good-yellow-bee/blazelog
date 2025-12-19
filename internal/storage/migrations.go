@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -143,8 +144,10 @@ var migrations = []Migration{
 
 // runMigrations applies all pending migrations.
 func runMigrations(db *sql.DB) error {
+	ctx := context.Background()
+
 	// Create migrations table if not exists
-	_, err := db.Exec(`
+	_, err := db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version INTEGER PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -157,7 +160,7 @@ func runMigrations(db *sql.DB) error {
 
 	// Get current version
 	var currentVersion int
-	err = db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&currentVersion)
+	err = db.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&currentVersion)
 	if err != nil {
 		return fmt.Errorf("get current version: %w", err)
 	}
@@ -169,18 +172,19 @@ func runMigrations(db *sql.DB) error {
 		}
 
 		// Run migration in transaction
-		tx, err := db.Begin()
+		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("begin transaction for migration %d: %w", m.Version, err)
 		}
 
-		_, err = tx.Exec(m.Up)
+		_, err = tx.ExecContext(ctx, m.Up)
 		if err != nil {
 			tx.Rollback()
 			return fmt.Errorf("execute migration %d (%s): %w", m.Version, m.Name, err)
 		}
 
-		_, err = tx.Exec(
+		_, err = tx.ExecContext(
+			ctx,
 			"INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
 			m.Version, m.Name, time.Now(),
 		)

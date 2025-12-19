@@ -39,6 +39,8 @@ func NewSQLiteStorage(path string, masterKey []byte) *SQLiteStorage {
 
 // Open initializes the database connection.
 func (s *SQLiteStorage) Open() error {
+	ctx := context.Background()
+
 	// Connection string
 	dsn := fmt.Sprintf("file:%s", s.path)
 
@@ -53,7 +55,7 @@ func (s *SQLiteStorage) Open() error {
 	db.SetConnMaxLifetime(0) // Keep connection alive
 
 	// Test connection
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		db.Close()
 		return fmt.Errorf("ping database: %w", err)
 	}
@@ -64,7 +66,7 @@ func (s *SQLiteStorage) Open() error {
 		"PRAGMA journal_mode = WAL",
 	}
 	for _, pragma := range pragmas {
-		if _, err := db.Exec(pragma); err != nil {
+		if _, err := db.ExecContext(ctx, pragma); err != nil {
 			db.Close()
 			return fmt.Errorf("execute %s: %w", pragma, err)
 		}
