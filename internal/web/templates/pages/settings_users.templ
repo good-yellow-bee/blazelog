@@ -7,8 +7,8 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
 )
 
-templ SettingsUsers(user *session.Session) {
-	@layouts.Base("Users", user) {
+templ SettingsUsers(user *session.Session, csrfToken string) {
+	@layouts.Base("Users", user, csrfToken) {
 		<div x-data="usersController()" x-init="init()" class="space-y-6">
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -338,7 +338,7 @@ templ UsersScript(currentUserID string) {
 				async loadUsers() {
 					this.loading = true;
 					try {
-						const res = await fetch('/api/v1/users');
+						const res = await csrfFetch('/api/v1/users');
 						if (res.ok) {
 							const data = await res.json();
 							this.users = data.data || [];
@@ -531,7 +531,7 @@ templ UsersScript(currentUserID string) {
 
 					this.saving = true;
 					try {
-						const res = await fetch('/api/v1/users', {
+						const res = await csrfFetch('/api/v1/users', {
 							method: 'POST',
 							headers: { 'Content-Type': 'application/json' },
 							body: JSON.stringify(this.createForm)
@@ -562,7 +562,7 @@ templ UsersScript(currentUserID string) {
 
 					this.saving = true;
 					try {
-						const res = await fetch('/api/v1/users/' + this.selectedUser.id, {
+						const res = await csrfFetch('/api/v1/users/' + this.selectedUser.id, {
 							method: 'PUT',
 							headers: { 'Content-Type': 'application/json' },
 							body: JSON.stringify(this.editForm)
@@ -602,7 +602,7 @@ templ UsersScript(currentUserID string) {
 					this.saving = true;
 					try {
 						// For admin resetting another user's password, use PUT /users/:id with password field
-						const res = await fetch('/api/v1/users/' + this.selectedUser.id + '/password', {
+						const res = await csrfFetch('/api/v1/users/' + this.selectedUser.id + '/password', {
 							method: 'PUT',
 							headers: { 'Content-Type': 'application/json' },
 							body: JSON.stringify({ password: this.passwordForm.password })
@@ -626,7 +626,7 @@ templ UsersScript(currentUserID string) {
 					if (!this.selectedUser) return;
 
 					try {
-						const res = await fetch('/api/v1/users/' + this.selectedUser.id, {
+						const res = await csrfFetch('/api/v1/users/' + this.selectedUser.id, {
 							method: 'DELETE'
 						});
 

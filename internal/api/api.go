@@ -10,14 +10,16 @@ import (
 
 	"github.com/good-yellow-bee/blazelog/internal/api/health"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
+	"github.com/good-yellow-bee/blazelog/internal/web/session"
 )
 
 // Config contains HTTP API server configuration.
 type Config struct {
 	Address          string
 	JWTSecret        []byte
-	CSRFSecret       string // For web UI CSRF protection
-	WebUIEnabled     bool   // Enable web UI (default: true)
+	CSRFSecret       string   // For web UI CSRF protection
+	TrustedOrigins   []string // Trusted origins for CSRF (e.g., "localhost:8080")
+	WebUIEnabled     bool     // Enable web UI (default: true)
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
 	RateLimitPerIP   int
@@ -57,6 +59,7 @@ type Server struct {
 	config        *Config
 	storage       storage.Storage
 	logStorage    storage.LogStorage
+	sessions      *session.Store
 	server        *http.Server
 	healthHandler *health.Handler
 }
@@ -76,10 +79,14 @@ func New(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*Serv
 
 	cfg.SetDefaults()
 
+	// Create session store for web UI authentication (24 hour TTL)
+	sessions := session.NewStore(24 * time.Hour)
+
 	s := &Server{
 		config:        cfg,
 		storage:       store,
 		logStorage:    logStore,
+		sessions:      sessions,
 		healthHandler: health.NewHandler(),
 	}
 
@@ -96,6 +103,11 @@ func New(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*Serv
 	return s, nil
 }
 
+// Sessions returns the session store for web UI integration.
+func (s *Server) Sessions() *session.Store {
+	return s.sessions
+}
+
 // Run starts the HTTP server and blocks until context is canceled.
 func (s *Server) Run(ctx context.Context) error {
 	errChan := make(chan error, 1)
@@ -110,6 +122,7 @@ func (s *Server) Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		log.Printf("shutting down HTTP API server...")
+		s.sessions.Close()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return s.server.Shutdown(shutdownCtx)

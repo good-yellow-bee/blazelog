@@ -7,8 +7,8 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
 )
 
-templ SettingsAlerts(user *session.Session) {
-	@layouts.Base("Alerts", user) {
+templ SettingsAlerts(user *session.Session, csrfToken string) {
+	@layouts.Base("Alerts", user, csrfToken) {
 		<div x-data="alertsController()" x-init="init()" class="space-y-6">
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -322,7 +322,7 @@ templ AlertsScript(role string) {
 
 				async loadProjects() {
 					try {
-						const res = await fetch('/api/v1/projects');
+						const res = await csrfFetch('/api/v1/projects');
 						if (res.ok) {
 							const data = await res.json();
 							this.projects = data.data || [];
@@ -339,7 +339,7 @@ templ AlertsScript(role string) {
 						if (this.filterProject) {
 							params.set('project_id', this.filterProject);
 						}
-						const res = await fetch(`/api/v1/alerts?${params}`);
+						const res = await csrfFetch(`/api/v1/alerts?${params}`);
 						if (res.ok) {
 							const data = await res.json();
 							this.alerts = data.data || [];
@@ -540,7 +540,7 @@ templ AlertsScript(role string) {
 							: '/api/v1/alerts';
 						const method = this.selectedAlert ? 'PUT' : 'POST';
 
-						const res = await fetch(url, {
+						const res = await csrfFetch(url, {
 							method: method,
 							headers: { 'Content-Type': 'application/json' },
 							body: JSON.stringify(this.form)
@@ -564,7 +564,7 @@ templ AlertsScript(role string) {
 					if (!this.selectedAlert) return;
 
 					try {
-						const res = await fetch(`/api/v1/alerts/${this.selectedAlert.id}`, {
+						const res = await csrfFetch(`/api/v1/alerts/${this.selectedAlert.id}`, {
 							method: 'DELETE'
 						});
 

@@ -6,8 +6,8 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/web/session"
 )
 
-templ Logs(user *session.Session) {
-	@layouts.Base("Logs", user) {
+templ Logs(user *session.Session, csrfToken string) {
+	@layouts.Base("Logs", user, csrfToken) {
 		<div x-data="logsController()" x-init="init()" class="space-y-6">
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

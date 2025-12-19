@@ -3,7 +3,7 @@ package components
 
 import "github.com/good-yellow-bee/blazelog/internal/web/session"
 
-templ Sidebar(user *session.Session) {
+templ Sidebar(user *session.Session, csrfToken string) {
 	<!-- Mobile menu button -->
 	<button
 		@click="$store.sidebar.toggle()"
@@ -142,7 +142,8 @@ templ Sidebar(user *session.Session) {
 					</div>
 				</div>
 				<form method="POST" action="/logout">
-					<button
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				<button
 						type="submit"
 						class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
 						title="Logout"

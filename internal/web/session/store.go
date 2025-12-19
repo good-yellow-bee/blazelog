@@ -20,12 +20,14 @@ type Store struct {
 	mu       sync.RWMutex
 	sessions map[string]*Session
 	ttl      time.Duration
+	stopCh   chan struct{}
 }
 
 func NewStore(ttl time.Duration) *Store {
 	s := &Store{
 		sessions: make(map[string]*Session),
 		ttl:      ttl,
+		stopCh:   make(chan struct{}),
 	}
 	go s.cleanup()
 	return s
@@ -72,15 +74,26 @@ func (s *Store) Delete(id string) {
 
 func (s *Store) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
-	for range ticker.C {
-		s.mu.Lock()
-		for id, session := range s.sessions {
-			if time.Now().After(session.ExpiresAt) {
-				delete(s.sessions, id)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.mu.Lock()
+			for id, session := range s.sessions {
+				if time.Now().After(session.ExpiresAt) {
+					delete(s.sessions, id)
+				}
 			}
+			s.mu.Unlock()
+		case <-s.stopCh:
+			return
 		}
-		s.mu.Unlock()
 	}
+}
+
+// Close stops the cleanup goroutine.
+func (s *Store) Close() {
+	close(s.stopCh)
 }
 
 func generateSessionID() (string, error) {

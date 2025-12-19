@@ -27,14 +27,15 @@ type MetricsConfig struct {
 
 // AuthConfig contains authentication settings.
 type AuthConfig struct {
-	JWTSecretEnv     string `yaml:"jwt_secret_env"`      // Env var name for JWT secret (default: BLAZELOG_JWT_SECRET)
-	CSRFSecretEnv    string `yaml:"csrf_secret_env"`     // Env var name for CSRF secret (optional, for web UI)
-	AccessTokenTTL   string `yaml:"access_token_ttl"`    // Access token TTL (default: 15m)
-	RefreshTokenTTL  string `yaml:"refresh_token_ttl"`   // Refresh token TTL (default: 168h / 7 days)
-	RateLimitPerIP   int    `yaml:"rate_limit_per_ip"`   // Login rate limit per IP (default: 5/min)
-	RateLimitPerUser int    `yaml:"rate_limit_per_user"` // API rate limit per user (default: 100/min)
-	LockoutThreshold int    `yaml:"lockout_threshold"`   // Failed attempts before lockout (default: 5)
-	LockoutDuration  string `yaml:"lockout_duration"`    // Lockout duration (default: 15m)
+	JWTSecretEnv     string   `yaml:"jwt_secret_env"`      // Env var name for JWT secret (default: BLAZELOG_JWT_SECRET)
+	CSRFSecretEnv    string   `yaml:"csrf_secret_env"`     // Env var name for CSRF secret (optional, for web UI)
+	TrustedOrigins   []string `yaml:"trusted_origins"`     // Trusted origins for CSRF (default: localhost:8080, 127.0.0.1:8080)
+	AccessTokenTTL   string   `yaml:"access_token_ttl"`    // Access token TTL (default: 15m)
+	RefreshTokenTTL  string   `yaml:"refresh_token_ttl"`   // Refresh token TTL (default: 168h / 7 days)
+	RateLimitPerIP   int      `yaml:"rate_limit_per_ip"`   // Login rate limit per IP (default: 5/min)
+	RateLimitPerUser int      `yaml:"rate_limit_per_user"` // API rate limit per user (default: 100/min)
+	LockoutThreshold int      `yaml:"lockout_threshold"`   // Failed attempts before lockout (default: 5)
+	LockoutDuration  string   `yaml:"lockout_duration"`    // Lockout duration (default: 15m)
 }
 
 // ClickHouseConfig contains ClickHouse settings.
@@ -166,6 +167,9 @@ func (c *Config) setDefaults() {
 	}
 	if c.Auth.CSRFSecretEnv == "" {
 		c.Auth.CSRFSecretEnv = "BLAZELOG_CSRF_SECRET"
+	}
+	if len(c.Auth.TrustedOrigins) == 0 {
+		c.Auth.TrustedOrigins = []string{"localhost:8080", "127.0.0.1:8080"}
 	}
 	if c.Auth.AccessTokenTTL == "" {
 		c.Auth.AccessTokenTTL = "15m"

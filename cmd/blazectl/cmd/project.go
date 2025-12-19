@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -13,7 +14,14 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 )
 
-const defaultDBPath = "./data/blazelog.db"
+// defaultDBPath is the default database path, can be overridden via BLAZELOG_DB_PATH env var
+var defaultDBPath = "/data/blazelog.db"
+
+func init() {
+	if envPath := os.Getenv("BLAZELOG_DB_PATH"); envPath != "" {
+		defaultDBPath = envPath
+	}
+}
 
 var (
 	projectDBPath     string
@@ -87,7 +95,10 @@ Example:
 		fmt.Println(strings.Repeat("-", 110))
 
 		for _, p := range projects {
-			members, _ := store.Projects().GetProjectMembers(ctx, p.ID)
+			members, err := store.Projects().GetProjectMembers(ctx, p.ID)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: could not fetch members for %s: %v\n", p.Name, err)
+			}
 			desc := p.Description
 			if len(desc) > 28 {
 				desc = desc[:28] + ".."
@@ -128,7 +139,10 @@ Example:
 		ctx := context.Background()
 
 		// Check name uniqueness
-		existing, _ := store.Projects().GetByName(ctx, strings.TrimSpace(projectName))
+		existing, err := store.Projects().GetByName(ctx, strings.TrimSpace(projectName))
+		if err != nil {
+			return fmt.Errorf("check existing project: %w", err)
+		}
 		if existing != nil {
 			return fmt.Errorf("project name already exists: %s", projectName)
 		}
@@ -179,7 +193,10 @@ Examples:
 			return err
 		}
 
-		members, _ := store.Projects().GetProjectMembers(ctx, project.ID)
+		members, err := store.Projects().GetProjectMembers(ctx, project.ID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not fetch members: %v\n", err)
+		}
 
 		fmt.Println("\nProject Details:")
 		fmt.Printf("  ID:          %s\n", project.ID)
@@ -222,7 +239,10 @@ Examples:
 
 		if projectNewName != "" {
 			// Check uniqueness of new name
-			existing, _ := store.Projects().GetByName(ctx, strings.TrimSpace(projectNewName))
+			existing, err := store.Projects().GetByName(ctx, strings.TrimSpace(projectNewName))
+			if err != nil {
+				return fmt.Errorf("check existing project: %w", err)
+			}
 			if existing != nil && existing.ID != project.ID {
 				return fmt.Errorf("project name already exists: %s", projectNewName)
 			}
