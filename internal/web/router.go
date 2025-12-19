@@ -11,11 +11,13 @@ import (
 func (s *Server) Routes() chi.Router {
 	r := chi.NewRouter()
 
-	// CSRF protection
+	// CSRF protection options
+	// Note: TrustedOrigins removed due to vulnerability GO-2025-3884
 	csrfMiddleware := csrf.Protect(
 		s.csrfKey,
-		csrf.Secure(false), // Set to true in production
+		csrf.Secure(false),           // Set to true in production with HTTPS
 		csrf.Path("/"),
+		csrf.FieldName("csrf_token"), // Match the form field name
 	)
 	r.Use(csrfMiddleware)
 

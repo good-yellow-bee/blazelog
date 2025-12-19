@@ -59,9 +59,12 @@ func (s *Server) setupRouter() *chi.Mux {
 			})
 		})
 
+		// Hybrid auth middleware that accepts both JWT and session cookies
+		hybridAuth := middleware.JWTOrSessionAuth(jwtService, s.sessions)
+
 		// User routes (protected)
 		r.Route("/users", func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
 			userHandler := users.NewHandler(s.storage)
@@ -93,7 +96,7 @@ func (s *Server) setupRouter() *chi.Mux {
 
 		// Log routes (protected - any authenticated user can view)
 		r.Route("/logs", func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
 			logsHandler := logs.NewHandler(s.logStorage)
@@ -105,7 +108,7 @@ func (s *Server) setupRouter() *chi.Mux {
 
 		// Alert routes (protected)
 		r.Route("/alerts", func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
 			alertsHandler := alerts.NewHandler(s.storage)
@@ -138,7 +141,7 @@ func (s *Server) setupRouter() *chi.Mux {
 
 		// Project routes (protected)
 		r.Route("/projects", func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
 			projectsHandler := projects.NewHandler(s.storage)
@@ -168,7 +171,7 @@ func (s *Server) setupRouter() *chi.Mux {
 
 		// Connection routes (protected)
 		r.Route("/connections", func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtService))
+			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
 			connectionsHandler := connections.NewHandler(s.storage)
@@ -201,8 +204,9 @@ func (s *Server) setupRouter() *chi.Mux {
 	r.Get("/health/ready", s.healthHandler.Ready)
 
 	// Web UI routes (mounted at root, but API routes take precedence)
+	// Share the session store with the web server so sessions work across both
 	if s.config.WebUIEnabled && s.config.CSRFSecret != "" {
-		webServer := web.NewServer(s.storage, s.logStorage, s.config.CSRFSecret)
+		webServer := web.NewServerWithSessions(s.storage, s.logStorage, s.config.CSRFSecret, s.config.TrustedOrigins, s.sessions)
 		r.Mount("/", webServer.Routes())
 	}
 

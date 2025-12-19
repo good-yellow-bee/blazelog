@@ -3,6 +3,7 @@ package web
 import (
 	"embed"
 	"io/fs"
+	"log"
 	"net/http"
 	"time"
 
@@ -20,8 +21,15 @@ type Server struct {
 	csrfKey  []byte
 }
 
-func NewServer(storage storage.Storage, logStorage storage.LogStorage, csrfKey string) *Server {
+func NewServer(storage storage.Storage, logStorage storage.LogStorage, csrfKey string, _ []string) *Server {
 	sessions := session.NewStore(24 * time.Hour)
+	return NewServerWithSessions(storage, logStorage, csrfKey, nil, sessions)
+}
+
+// NewServerWithSessions creates a new server with a provided session store.
+// This allows sharing the session store with the API server.
+// Note: trustedOrigins parameter is deprecated due to vulnerability GO-2025-3884.
+func NewServerWithSessions(storage storage.Storage, logStorage storage.LogStorage, csrfKey string, _ []string, sessions *session.Store) *Server {
 	return &Server{
 		handler:  handlers.NewHandler(storage, logStorage, sessions, csrfKey),
 		sessions: sessions,
@@ -30,7 +38,11 @@ func NewServer(storage storage.Storage, logStorage storage.LogStorage, csrfKey s
 }
 
 func (s *Server) StaticFS() http.Handler {
-	sub, _ := fs.Sub(staticFS, "static")
+	sub, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		log.Printf("Failed to create static FS: %v", err)
+		return http.NotFoundHandler()
+	}
 	return http.FileServer(http.FS(sub))
 }
 

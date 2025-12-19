@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
+	"github.com/gorilla/csrf"
 )
 
 // ShowAlerts renders the alerts management page
@@ -15,7 +16,7 @@ func (h *Handler) ShowAlerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages.SettingsAlerts(sess).Render(r.Context(), w)
+	pages.SettingsAlerts(sess, csrf.Token(r)).Render(r.Context(), w)
 }
 
 // ShowProjects renders the projects management page (admin only)
@@ -32,7 +33,7 @@ func (h *Handler) ShowProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages.SettingsProjects(sess).Render(r.Context(), w)
+	pages.SettingsProjects(sess, csrf.Token(r)).Render(r.Context(), w)
 }
 
 // ShowConnections renders the connections management page (admin only)
@@ -48,7 +49,7 @@ func (h *Handler) ShowConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages.SettingsConnections(sess).Render(r.Context(), w)
+	pages.SettingsConnections(sess, csrf.Token(r)).Render(r.Context(), w)
 }
 
 // ShowUsers renders the users management page (admin only)
@@ -64,5 +65,5 @@ func (h *Handler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages.SettingsUsers(sess).Render(r.Context(), w)
+	pages.SettingsUsers(sess, csrf.Token(r)).Render(r.Context(), w)
 }

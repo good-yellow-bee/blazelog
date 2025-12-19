@@ -12,7 +12,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/good-yellow-bee/blazelog/internal/web/session"
 
-func Sidebar(user *session.Session) templ.Component {
+func Sidebar(user *session.Session, csrfToken string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -82,7 +82,20 @@ func Sidebar(user *session.Session) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</p></div></div><form method=\"POST\" action=\"/logout\"><button type=\"submit\" class=\"p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors\" title=\"Logout\"><svg class=\"w-5 h-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1\"></path></svg></button></form></div></div></aside>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</p></div></div><form method=\"POST\" action=\"/logout\"><input type=\"hidden\" name=\"csrf_token\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(csrfToken)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/components/sidebar.templ`, Line: 145, Col: 60}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\"> <button type=\"submit\" class=\"p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors\" title=\"Logout\"><svg class=\"w-5 h-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1\"></path></svg></button></form></div></div></aside>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -106,12 +119,12 @@ func SidebarScript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var5 == nil {
-			templ_7745c5c3_Var5 = templ.NopComponent
+		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var6 == nil {
+			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<script>\n\t\t// Initialize sidebar store\n\t\tdocument.addEventListener('alpine:init', () => {\n\t\t\tAlpine.store('sidebar', {\n\t\t\t\topen: false,\n\t\t\t\ttoggle() {\n\t\t\t\t\tthis.open = !this.open;\n\t\t\t\t}\n\t\t\t});\n\t\t});\n\n\t\t// Sidebar navigation component\n\t\tfunction sidebarNav() {\n\t\t\treturn {\n\t\t\t\tsettingsOpen: window.location.pathname.startsWith('/settings'),\n\t\t\t\tcurrentPath: window.location.pathname,\n\t\t\t\tisActive(path) {\n\t\t\t\t\tif (path === '/dashboard') {\n\t\t\t\t\t\treturn this.currentPath === '/' || this.currentPath === '/dashboard';\n\t\t\t\t\t}\n\t\t\t\t\treturn this.currentPath === path || this.currentPath.startsWith(path + '/');\n\t\t\t\t}\n\t\t\t};\n\t\t}\n\t</script><style>\n\t\t[x-cloak] { display: none !important; }\n\t</style>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<script>\n\t\t// Initialize sidebar store\n\t\tdocument.addEventListener('alpine:init', () => {\n\t\t\tAlpine.store('sidebar', {\n\t\t\t\topen: false,\n\t\t\t\ttoggle() {\n\t\t\t\t\tthis.open = !this.open;\n\t\t\t\t}\n\t\t\t});\n\t\t});\n\n\t\t// Sidebar navigation component\n\t\tfunction sidebarNav() {\n\t\t\treturn {\n\t\t\t\tsettingsOpen: window.location.pathname.startsWith('/settings'),\n\t\t\t\tcurrentPath: window.location.pathname,\n\t\t\t\tisActive(path) {\n\t\t\t\t\tif (path === '/dashboard') {\n\t\t\t\t\t\treturn this.currentPath === '/' || this.currentPath === '/dashboard';\n\t\t\t\t\t}\n\t\t\t\t\treturn this.currentPath === path || this.currentPath.startsWith(path + '/');\n\t\t\t\t}\n\t\t\t};\n\t\t}\n\t</script><style>\n\t\t[x-cloak] { display: none !important; }\n\t</style>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

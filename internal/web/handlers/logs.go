@@ -12,6 +12,7 @@ import (
 
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
+	"github.com/gorilla/csrf"
 )
 
 func (h *Handler) ShowLogs(w http.ResponseWriter, r *http.Request) {
@@ -21,7 +22,7 @@ func (h *Handler) ShowLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages.Logs(sess).Render(r.Context(), w)
+	pages.Logs(sess, csrf.Token(r)).Render(r.Context(), w)
 }
 
 // LogsDataResponse wraps paginated log list for JSON response

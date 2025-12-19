@@ -8,6 +8,7 @@ import (
 
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
+	"github.com/gorilla/csrf"
 )
 
 // parseTimeRange converts a time range string to start/end times and aggregation interval
@@ -46,7 +47,7 @@ func (h *Handler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		ActiveAlerts: 3,
 	}
 
-	pages.Dashboard(sess, stats).Render(r.Context(), w)
+	pages.Dashboard(sess, stats, csrf.Token(r)).Render(r.Context(), w)
 }
 
 // DashboardStatsResponse contains JSON response for dashboard stats

@@ -5,22 +5,34 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
 )
 
-templ Base(title string, user *session.Session) {
+templ Base(title string, user *session.Session, csrfToken string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<meta name="csrf-token" content={ csrfToken }/>
 			<title>{ title } - BlazeLog</title>
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+			<script>
+				// Global helper for CSRF-protected fetch
+				window.csrfFetch = function(url, options = {}) {
+					const token = document.querySelector('meta[name="csrf-token"]')?.content;
+					options.headers = options.headers || {};
+					if (token) {
+						options.headers['X-CSRF-Token'] = token;
+					}
+					return fetch(url, options);
+				};
+			</script>
 			@components.SidebarScript()
 		</head>
 		<body class="bg-gray-50 min-h-screen" x-data>
 			if user != nil {
 				<div class="flex min-h-screen">
-					@components.Sidebar(user)
+					@components.Sidebar(user, csrfToken)
 					<main class="flex-1 md:ml-0 p-4 md:p-8 pt-16 md:pt-8">
 						<div class="max-w-7xl mx-auto">
 							{ children... }

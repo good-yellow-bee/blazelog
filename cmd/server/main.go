@@ -299,6 +299,7 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 		Address:          cfg.Server.HTTPAddress,
 		JWTSecret:        []byte(jwtSecret),
 		CSRFSecret:       csrfSecret,
+		TrustedOrigins:   cfg.Auth.TrustedOrigins,
 		WebUIEnabled:     webUIEnabled,
 		AccessTokenTTL:   accessTTL,
 		RefreshTokenTTL:  refreshTTL,

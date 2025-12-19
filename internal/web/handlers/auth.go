@@ -78,9 +78,15 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   maxAge,
 	})
 
-	// HTMX redirect
-	w.Header().Set("HX-Redirect", "/dashboard")
-	w.WriteHeader(http.StatusOK)
+	// Check if this is an HTMX request
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/dashboard")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Regular form submission - use HTTP redirect
+	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 
 func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {

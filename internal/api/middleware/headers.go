@@ -17,8 +17,14 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		// Referrer policy
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// Content Security Policy
-		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		// Content Security Policy - allow HTMX/Alpine.js from CDN and inline scripts/styles
+		// Note: 'unsafe-eval' is required by Alpine.js for expression evaluation
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data:; "+
+				"connect-src 'self'")
 
 		// Permissions policy (modern replacement for Feature-Policy)
 		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
