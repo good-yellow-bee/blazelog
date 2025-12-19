@@ -1,71 +1,64 @@
+version: "2"
 run:
-  timeout: 5m
   modules-download-mode: readonly
 
 linters:
-  disable:
-    - errcheck  # Disabled: codebase intentionally ignores many Write errors
   enable:
-    # Core linters
-    - govet
-    - ineffassign
-    - staticcheck
-    # Style linters (more lenient)
-    - misspell
-    - unconvert
-    # Security
-    - gosec
-    # HTTP best practices
     - bodyclose
+    - gosec
+    - misspell
     - noctx
-    # Disabled for now - enable after codebase cleanup:
-    # - gofmt      # Many files need formatting
-    # - goimports  # Import ordering
-    # - unused     # Some unused fields/types
-    # - gosimple   # Style suggestions
-    # - gocritic   # Style suggestions
-    # - revive     # Style suggestions
-    # - sqlclosecheck  # SQL connection checks
-
-linters-settings:
-  gosec:
-    severity: medium
-    confidence: medium
-    excludes:
-      - G104 # Audit errors not checked (allow for deferred closes)
-      - G106 # SSH InsecureIgnoreHostKey (used for optional host key validation)
-      - G115 # Integer overflow conversion (safe for bounded values like buffer sizes)
-      - G201 # SQL formatting (uses safe time functions, not user input)
-      - G304 # File path provided as taint input (allow for config files)
-      - G402 # TLS MinVersion (configurable, not a hardcoded vulnerability)
-      - G404 # Weak random generator (acceptable for non-crypto uses like jitter)
-
-  govet:
-    enable-all: true
-    disable:
-      - shadow
-      - fieldalignment
-      - unusedwrite  # Many test files have unused writes
-
-  misspell:
-    locale: US
-
+    - unconvert
+  disable:
+    - errcheck
+  settings:
+    gosec:
+      excludes:
+        - G104
+        - G106
+        - G115
+        - G201
+        - G304
+        - G402
+        - G404
+      severity: medium
+      confidence: medium
+    govet:
+      disable:
+        - shadow
+        - fieldalignment
+        - unusedwrite
+      enable-all: true
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - gosec
+        path: _test\.go
+      - linters:
+          - all
+        path: \.pb\.go$
+      - linters:
+          - all
+        path: _templ\.go$
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Test files - more lenient
-    - path: _test\.go
-      linters:
-        - gosec
-
-    # Generated proto files
-    - path: \.pb\.go$
-      linters:
-        - all
-
-    # Generated templ files
-    - path: _templ\.go$
-      linters:
-        - all
-
   max-issues-per-linter: 50
   max-same-issues: 10
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
