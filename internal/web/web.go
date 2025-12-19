@@ -16,25 +16,24 @@ import (
 var staticFS embed.FS
 
 type Server struct {
-	handler        *handlers.Handler
-	sessions       *session.Store
-	csrfKey        []byte
-	trustedOrigins []string
+	handler  *handlers.Handler
+	sessions *session.Store
+	csrfKey  []byte
 }
 
-func NewServer(storage storage.Storage, logStorage storage.LogStorage, csrfKey string, trustedOrigins []string) *Server {
+func NewServer(storage storage.Storage, logStorage storage.LogStorage, csrfKey string, _ []string) *Server {
 	sessions := session.NewStore(24 * time.Hour)
-	return NewServerWithSessions(storage, logStorage, csrfKey, trustedOrigins, sessions)
+	return NewServerWithSessions(storage, logStorage, csrfKey, nil, sessions)
 }
 
 // NewServerWithSessions creates a new server with a provided session store.
 // This allows sharing the session store with the API server.
-func NewServerWithSessions(storage storage.Storage, logStorage storage.LogStorage, csrfKey string, trustedOrigins []string, sessions *session.Store) *Server {
+// Note: trustedOrigins parameter is deprecated due to vulnerability GO-2025-3884.
+func NewServerWithSessions(storage storage.Storage, logStorage storage.LogStorage, csrfKey string, _ []string, sessions *session.Store) *Server {
 	return &Server{
-		handler:        handlers.NewHandler(storage, logStorage, sessions, csrfKey),
-		sessions:       sessions,
-		csrfKey:        []byte(csrfKey),
-		trustedOrigins: trustedOrigins,
+		handler:  handlers.NewHandler(storage, logStorage, sessions, csrfKey),
+		sessions: sessions,
+		csrfKey:  []byte(csrfKey),
 	}
 }
 

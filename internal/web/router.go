@@ -12,15 +12,13 @@ func (s *Server) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	// CSRF protection options
-	csrfOpts := []csrf.Option{
-		csrf.Secure(false),        // Set to true in production with HTTPS
+	// Note: TrustedOrigins removed due to vulnerability GO-2025-3884
+	csrfMiddleware := csrf.Protect(
+		s.csrfKey,
+		csrf.Secure(false),           // Set to true in production with HTTPS
 		csrf.Path("/"),
 		csrf.FieldName("csrf_token"), // Match the form field name
-	}
-	if len(s.trustedOrigins) > 0 {
-		csrfOpts = append(csrfOpts, csrf.TrustedOrigins(s.trustedOrigins))
-	}
-	csrfMiddleware := csrf.Protect(s.csrfKey, csrfOpts...)
+	)
 	r.Use(csrfMiddleware)
 
 	// Static files (no CSRF)
