@@ -48,7 +48,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -o /blazelog-server ./cmd/server
 
 # Runtime stage - Alpine for better volume support
-FROM alpine:3.21
+FROM alpine:3.23
 
 # Install ca-certificates and create user
 RUN apk add --no-cache ca-certificates tzdata \
