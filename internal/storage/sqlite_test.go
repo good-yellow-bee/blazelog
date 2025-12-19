@@ -57,12 +57,13 @@ func TestSQLiteStorage_OpenClose(t *testing.T) {
 func TestSQLiteStorage_Migrate(t *testing.T) {
 	store, cleanup := setupTestDB(t)
 	defer cleanup()
+	ctx := context.Background()
 
 	// Verify tables exist by querying them
 	tables := []string{"users", "projects", "alerts", "connections", "project_users", "schema_migrations"}
 	for _, table := range tables {
 		var count int
-		err := store.db.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&count)
+		err := store.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table).Scan(&count)
 		if err != nil {
 			t.Errorf("table %s should exist: %v", table, err)
 		}

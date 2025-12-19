@@ -384,7 +384,8 @@ type mockSMTPServer struct {
 }
 
 func newMockSMTPServer(t *testing.T) *mockSMTPServer {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+	listener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to create listener: %v", err)
 	}
@@ -500,7 +501,6 @@ func TestEmailNotifierSendWithMockSMTP(t *testing.T) {
 	// Parse address
 	host, portStr, _ := net.SplitHostPort(server.addr())
 	var port int
-	_, _ = net.LookupPort("tcp", portStr)
 	// Manual parse since port is numeric
 	for _, c := range portStr {
 		port = port*10 + int(c-'0')

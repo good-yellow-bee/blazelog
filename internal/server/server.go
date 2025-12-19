@@ -99,7 +99,8 @@ func New(cfg *Config) (*Server, error) {
 
 // Run starts the server and blocks until context is canceled.
 func (s *Server) Run(ctx context.Context) error {
-	listener, err := net.Listen("tcp", s.config.GRPCAddress)
+	var lc net.ListenConfig
+	listener, err := lc.Listen(ctx, "tcp", s.config.GRPCAddress)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", s.config.GRPCAddress, err)
 	}
