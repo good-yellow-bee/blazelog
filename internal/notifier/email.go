@@ -149,7 +149,7 @@ func (e *EmailNotifier) sendMail(ctx context.Context, msg []byte) error {
 	// Try to connect based on port
 	if e.config.Port == 465 {
 		// Implicit TLS (SMTPS)
-		client, err = e.connectImplicitTLS(addr, tlsConfig)
+		client, err = e.connectImplicitTLS(ctx, addr, tlsConfig)
 	} else {
 		// STARTTLS (port 587 or 25)
 		client, err = e.connectSTARTTLS(ctx, addr, tlsConfig)
@@ -198,8 +198,13 @@ func (e *EmailNotifier) sendMail(ctx context.Context, msg []byte) error {
 }
 
 // connectImplicitTLS connects using implicit TLS (port 465).
-func (e *EmailNotifier) connectImplicitTLS(addr string, tlsConfig *tls.Config) (*smtp.Client, error) {
-	conn, err := tls.Dial("tcp", addr, tlsConfig)
+func (e *EmailNotifier) connectImplicitTLS(ctx context.Context, addr string, tlsConfig *tls.Config) (*smtp.Client, error) {
+	dialer := &tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: 30 * time.Second},
+		Config:    tlsConfig,
+	}
+
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
