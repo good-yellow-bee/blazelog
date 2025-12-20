@@ -56,7 +56,7 @@ func Dashboard(user *session.Session, stats DashboardStats, csrfToken string) te
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"dashboardController()\" x-init=\"init()\" class=\"space-y-6\"><!-- Header with Controls --><div class=\"flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4\"><h1 class=\"text-2xl font-bold text-gray-900\">Dashboard</h1><div class=\"flex items-center space-x-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"dashboardController()\" x-init=\"init()\" class=\"space-y-6\"><!-- Header with Controls --><div class=\"flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4\"><h1 class=\"page-title\">Dashboard</h1><div class=\"flex items-center space-x-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -139,7 +139,7 @@ func TimeRangeSelector() templ.Component {
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-gray-500\">Range:</span> <select x-model=\"$store.dashboard.timeRange\" @change=\"refreshDashboard()\" class=\"rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500\"><option value=\"15m\">15 min</option> <option value=\"1h\">1 hour</option> <option value=\"6h\">6 hours</option> <option value=\"24h\">24 hours</option> <option value=\"7d\">7 days</option> <option value=\"30d\">30 days</option></select></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-slate-500\">Range:</span> <select x-model=\"$store.dashboard.timeRange\" @change=\"refreshDashboard()\" class=\"select-field text-sm\"><option value=\"15m\">15 min</option> <option value=\"1h\">1 hour</option> <option value=\"6h\">6 hours</option> <option value=\"24h\">24 hours</option> <option value=\"7d\">7 days</option> <option value=\"30d\">30 days</option></select></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -168,7 +168,7 @@ func AutoRefreshToggle() templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-gray-500\">Refresh:</span> <select x-model=\"$store.dashboard.refreshInterval\" @change=\"setRefreshInterval()\" class=\"rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500\"><option value=\"0\">Off</option> <option value=\"10\">10s</option> <option value=\"30\">30s</option> <option value=\"60\">1m</option> <option value=\"300\">5m</option></select> <span x-show=\"$store.dashboard.refreshInterval > 0\" class=\"w-2 h-2 bg-green-500 rounded-full animate-pulse\" title=\"Auto-refresh active\"></span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-slate-500\">Refresh:</span> <select x-model=\"$store.dashboard.refreshInterval\" @change=\"setRefreshInterval()\" class=\"select-field text-sm\"><option value=\"0\">Off</option> <option value=\"10\">10s</option> <option value=\"30\">30s</option> <option value=\"60\">1m</option> <option value=\"300\">5m</option></select> <span x-show=\"$store.dashboard.refreshInterval > 0\" class=\"w-2 h-2 bg-emerald-500 rounded-full animate-pulse\" title=\"Auto-refresh active\"></span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -198,7 +198,7 @@ func StatsCards(stats DashboardStats) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 stagger-grid\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -247,7 +247,7 @@ func StatCard(title string, value string, color string, icon string) templ.Compo
 			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"bg-white overflow-hidden shadow rounded-lg\"><div class=\"p-5\"><div class=\"flex items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"panel overflow-hidden\"><div class=\"p-5\"><div class=\"flex items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -277,27 +277,27 @@ func StatCard(title string, value string, color string, icon string) templ.Compo
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><div class=\"ml-5 w-0 flex-1\"><dl><dt class=\"text-sm font-medium text-gray-500 truncate\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><div class=\"ml-5 w-0 flex-1\"><dl><dt class=\"text-xs font-semibold uppercase tracking-wider text-slate-500 truncate\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 114, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 114, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</dt><dd class=\"text-lg font-semibold text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</dt><dd class=\"text-lg font-semibold text-slate-900\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 115, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 115, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -380,7 +380,7 @@ func VolumeChart() templ.Component {
 			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Log Volume</h3><div id=\"volume-chart\" class=\"h-64\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"panel p-6\"><h3 class=\"text-lg font-semibold text-slate-900 mb-4\">Log Volume</h3><div id=\"volume-chart\" class=\"h-64\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -409,7 +409,7 @@ func LogLevelChart() templ.Component {
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Log Levels</h3><div id=\"level-chart\" class=\"h-64\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"panel p-6\"><h3 class=\"text-lg font-semibold text-slate-900 mb-4\">Log Levels</h3><div id=\"level-chart\" class=\"h-64\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -438,7 +438,7 @@ func TopSourcesChart() templ.Component {
 			templ_7745c5c3_Var14 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">Top Sources</h3><div id=\"sources-chart\" class=\"h-64\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"panel p-6\"><h3 class=\"text-lg font-semibold text-slate-900 mb-4\">Top Sources</h3><div id=\"sources-chart\" class=\"h-64\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -467,7 +467,7 @@ func HTTPStatusChart() templ.Component {
 			templ_7745c5c3_Var15 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"bg-white shadow rounded-lg p-6\"><h3 class=\"text-lg font-medium text-gray-900 mb-4\">HTTP Status</h3><div id=\"http-chart\" class=\"h-64\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"panel p-6\"><h3 class=\"text-lg font-semibold text-slate-900 mb-4\">HTTP Status</h3><div id=\"http-chart\" class=\"h-64\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -496,7 +496,7 @@ func DashboardScript() templ.Component {
 			templ_7745c5c3_Var16 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<script>\n\t// Alpine.js store for dashboard state\n\tdocument.addEventListener('alpine:init', () => {\n\t\tAlpine.store('dashboard', {\n\t\t\ttimeRange: '24h',\n\t\t\trefreshInterval: 30,\n\t\t\trefreshTimer: null\n\t\t});\n\t});\n\n\tfunction dashboardController() {\n\t\treturn {\n\t\t\tcharts: {},\n\n\t\t\tinit() {\n\t\t\t\tthis.initCharts();\n\t\t\t\tthis.loadData();\n\t\t\t\tthis.setRefreshInterval();\n\t\t\t},\n\n\t\t\tinitCharts() {\n\t\t\t\t// Volume chart (area)\n\t\t\t\tthis.charts.volume = echarts.init(document.getElementById('volume-chart'));\n\t\t\t\tthis.charts.volume.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis' },\n\t\t\t\t\tlegend: { data: ['Total', 'Errors'], bottom: 0 },\n\t\t\t\t\tgrid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'category', data: [], boundaryGap: false },\n\t\t\t\t\tyAxis: { type: 'value' },\n\t\t\t\t\tseries: [\n\t\t\t\t\t\t{ name: 'Total', type: 'line', areaStyle: { opacity: 0.3 }, data: [], smooth: true, color: '#6366f1' },\n\t\t\t\t\t\t{ name: 'Errors', type: 'line', data: [], smooth: true, color: '#ef4444' }\n\t\t\t\t\t]\n\t\t\t\t});\n\n\t\t\t\t// Log level chart (donut)\n\t\t\t\tthis.charts.level = echarts.init(document.getElementById('level-chart'));\n\t\t\t\tthis.charts.level.setOption({\n\t\t\t\t\ttooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },\n\t\t\t\t\tlegend: { bottom: 0, left: 'center' },\n\t\t\t\t\tseries: [{\n\t\t\t\t\t\ttype: 'pie',\n\t\t\t\t\t\tradius: ['40%', '70%'],\n\t\t\t\t\t\tcenter: ['50%', '45%'],\n\t\t\t\t\t\tavoidLabelOverlap: false,\n\t\t\t\t\t\tlabel: { show: false },\n\t\t\t\t\t\tdata: []\n\t\t\t\t\t}]\n\t\t\t\t});\n\n\t\t\t\t// Top sources chart (horizontal bar)\n\t\t\t\tthis.charts.sources = echarts.init(document.getElementById('sources-chart'));\n\t\t\t\tthis.charts.sources.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },\n\t\t\t\t\tgrid: { left: '3%', right: '10%', bottom: '3%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'value' },\n\t\t\t\t\tyAxis: { type: 'category', data: [] },\n\t\t\t\t\tseries: [{ type: 'bar', data: [], itemStyle: { color: '#6366f1' } }]\n\t\t\t\t});\n\n\t\t\t\t// HTTP status chart (bar)\n\t\t\t\tthis.charts.http = echarts.init(document.getElementById('http-chart'));\n\t\t\t\tthis.charts.http.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis' },\n\t\t\t\t\tgrid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'category', data: ['2xx', '3xx', '4xx', '5xx'] },\n\t\t\t\t\tyAxis: { type: 'value' },\n\t\t\t\t\tseries: [{\n\t\t\t\t\t\ttype: 'bar',\n\t\t\t\t\t\tdata: [],\n\t\t\t\t\t\titemStyle: {\n\t\t\t\t\t\t\tcolor: function(params) {\n\t\t\t\t\t\t\t\tconst colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];\n\t\t\t\t\t\t\t\treturn colors[params.dataIndex];\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}]\n\t\t\t\t});\n\t\t\t},\n\n\t\t\tasync loadData() {\n\t\t\t\tconst range = Alpine.store('dashboard').timeRange;\n\t\t\t\ttry {\n\t\t\t\t\tconst res = await fetch(`/dashboard/stats?range=${range}`);\n\t\t\t\t\tif (!res.ok) throw new Error('Failed to fetch');\n\t\t\t\t\tconst data = await res.json();\n\t\t\t\t\tthis.updateCharts(data);\n\t\t\t\t\tthis.updateStatsCards(data);\n\t\t\t\t} catch (err) {\n\t\t\t\t\tconsole.error('Failed to load dashboard data:', err);\n\t\t\t\t}\n\t\t\t},\n\n\t\t\tupdateStatsCards(data) {\n\t\t\t\t// Update stats via DOM (simpler than HTMX for this case)\n\t\t\t\tconst cards = document.querySelectorAll('#stats-container .text-lg');\n\t\t\t\tif (cards.length >= 4) {\n\t\t\t\t\tcards[0].textContent = this.formatNumber(data.total_logs || 0);\n\t\t\t\t\tcards[1].textContent = this.formatNumber(data.error_count || 0);\n\t\t\t\t\tcards[2].textContent = this.formatNumber(data.warning_count || 0);\n\t\t\t\t\tcards[3].textContent = this.formatNumber(data.active_alerts || 0);\n\t\t\t\t}\n\t\t\t},\n\n\t\t\tformatNumber(n) {\n\t\t\t\tif (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';\n\t\t\t\tif (n >= 1000) return (n / 1000).toFixed(1) + 'K';\n\t\t\t\treturn n.toString();\n\t\t\t},\n\n\t\t\tupdateCharts(data) {\n\t\t\t\t// Volume chart\n\t\t\t\tif (data.volume && data.volume.length > 0) {\n\t\t\t\t\tthis.charts.volume.setOption({\n\t\t\t\t\t\txAxis: { data: data.volume.map(v => v.timestamp) },\n\t\t\t\t\t\tseries: [\n\t\t\t\t\t\t\t{ data: data.volume.map(v => v.total_count) },\n\t\t\t\t\t\t\t{ data: data.volume.map(v => v.error_count) }\n\t\t\t\t\t\t]\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\t// Level chart\n\t\t\t\tconst infoCount = (data.total_logs || 0) - (data.error_count || 0) - (data.warning_count || 0) - (data.fatal_count || 0);\n\t\t\t\tconst levelData = [\n\t\t\t\t\t{ value: Math.max(0, infoCount), name: 'Info', itemStyle: { color: '#3b82f6' } },\n\t\t\t\t\t{ value: data.warning_count || 0, name: 'Warning', itemStyle: { color: '#f59e0b' } },\n\t\t\t\t\t{ value: data.error_count || 0, name: 'Error', itemStyle: { color: '#ef4444' } },\n\t\t\t\t\t{ value: data.fatal_count || 0, name: 'Fatal', itemStyle: { color: '#7c3aed' } }\n\t\t\t\t].filter(d => d.value > 0);\n\n\t\t\t\tthis.charts.level.setOption({\n\t\t\t\t\tseries: [{ data: levelData }]\n\t\t\t\t});\n\n\t\t\t\t// Sources chart\n\t\t\t\tif (data.top_sources && data.top_sources.length > 0) {\n\t\t\t\t\tthis.charts.sources.setOption({\n\t\t\t\t\t\tyAxis: { data: data.top_sources.map(s => s.source).reverse() },\n\t\t\t\t\t\tseries: [{ data: data.top_sources.map(s => s.count).reverse() }]\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\t// HTTP chart\n\t\t\t\tif (data.http_stats) {\n\t\t\t\t\tthis.charts.http.setOption({\n\t\t\t\t\t\tseries: [{\n\t\t\t\t\t\t\tdata: [\n\t\t\t\t\t\t\t\tdata.http_stats.total_2xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_3xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_4xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_5xx || 0\n\t\t\t\t\t\t\t]\n\t\t\t\t\t\t}]\n\t\t\t\t\t});\n\t\t\t\t}\n\t\t\t},\n\n\t\t\trefreshDashboard() {\n\t\t\t\tthis.loadData();\n\t\t\t},\n\n\t\t\tsetRefreshInterval() {\n\t\t\t\tconst store = Alpine.store('dashboard');\n\t\t\t\tif (store.refreshTimer) {\n\t\t\t\t\tclearInterval(store.refreshTimer);\n\t\t\t\t\tstore.refreshTimer = null;\n\t\t\t\t}\n\t\t\t\tif (store.refreshInterval > 0) {\n\t\t\t\t\tstore.refreshTimer = setInterval(() => this.loadData(), store.refreshInterval * 1000);\n\t\t\t\t}\n\t\t\t}\n\t\t};\n\t}\n\n\t// Handle chart resize on window resize\n\twindow.addEventListener('resize', () => {\n\t\t['volume-chart', 'level-chart', 'sources-chart', 'http-chart'].forEach(id => {\n\t\t\tconst el = document.getElementById(id);\n\t\t\tif (el) {\n\t\t\t\tconst chart = echarts.getInstanceByDom(el);\n\t\t\t\tif (chart) chart.resize();\n\t\t\t}\n\t\t});\n\t});\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<script>\n\t// Alpine.js store for dashboard state\n\tdocument.addEventListener('alpine:init', () => {\n\t\tAlpine.store('dashboard', {\n\t\t\ttimeRange: '24h',\n\t\t\trefreshInterval: 30,\n\t\t\trefreshTimer: null\n\t\t});\n\t});\n\n\tfunction dashboardController() {\n\t\treturn {\n\t\t\tcharts: {},\n\n\t\t\tinit() {\n\t\t\t\tthis.initCharts();\n\t\t\t\tthis.loadData();\n\t\t\t\tthis.setRefreshInterval();\n\t\t\t},\n\n\t\t\tinitCharts() {\n\t\t\t\t// Volume chart (area)\n\t\t\t\tthis.charts.volume = echarts.init(document.getElementById('volume-chart'));\n\t\t\t\tthis.charts.volume.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis' },\n\t\t\t\t\tlegend: { data: ['Total', 'Errors'], bottom: 0 },\n\t\t\t\t\tgrid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'category', data: [], boundaryGap: false },\n\t\t\t\t\tyAxis: { type: 'value' },\n\t\t\t\t\tseries: [\n\t\t\t\t\t\t{ name: 'Total', type: 'line', areaStyle: { opacity: 0.25 }, data: [], smooth: true, color: '#0ea5a4' },\n\t\t\t\t\t\t{ name: 'Errors', type: 'line', data: [], smooth: true, color: '#f43f5e' }\n\t\t\t\t\t]\n\t\t\t\t});\n\n\t\t\t\t// Log level chart (donut)\n\t\t\t\tthis.charts.level = echarts.init(document.getElementById('level-chart'));\n\t\t\t\tthis.charts.level.setOption({\n\t\t\t\t\ttooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },\n\t\t\t\t\tlegend: { bottom: 0, left: 'center' },\n\t\t\t\t\tseries: [{\n\t\t\t\t\t\ttype: 'pie',\n\t\t\t\t\t\tradius: ['40%', '70%'],\n\t\t\t\t\t\tcenter: ['50%', '45%'],\n\t\t\t\t\t\tavoidLabelOverlap: false,\n\t\t\t\t\t\tlabel: { show: false },\n\t\t\t\t\t\tdata: []\n\t\t\t\t\t}]\n\t\t\t\t});\n\n\t\t\t\t// Top sources chart (horizontal bar)\n\t\t\t\tthis.charts.sources = echarts.init(document.getElementById('sources-chart'));\n\t\t\t\tthis.charts.sources.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },\n\t\t\t\t\tgrid: { left: '3%', right: '10%', bottom: '3%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'value' },\n\t\t\t\t\tyAxis: { type: 'category', data: [] },\n\t\t\t\t\tseries: [{ type: 'bar', data: [], itemStyle: { color: '#0ea5a4' } }]\n\t\t\t\t});\n\n\t\t\t\t// HTTP status chart (bar)\n\t\t\t\tthis.charts.http = echarts.init(document.getElementById('http-chart'));\n\t\t\t\tthis.charts.http.setOption({\n\t\t\t\t\ttooltip: { trigger: 'axis' },\n\t\t\t\t\tgrid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },\n\t\t\t\t\txAxis: { type: 'category', data: ['2xx', '3xx', '4xx', '5xx'] },\n\t\t\t\t\tyAxis: { type: 'value' },\n\t\t\t\t\tseries: [{\n\t\t\t\t\t\ttype: 'bar',\n\t\t\t\t\t\tdata: [],\n\t\t\t\t\titemStyle: {\n\t\t\t\t\t\tcolor: function(params) {\n\t\t\t\t\t\t\tconst colors = ['#10b981', '#0ea5a4', '#f59e0b', '#f43f5e'];\n\t\t\t\t\t\t\treturn colors[params.dataIndex];\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}]\n\t\t\t});\n\t\t\t},\n\n\t\t\tasync loadData() {\n\t\t\t\tconst range = Alpine.store('dashboard').timeRange;\n\t\t\t\ttry {\n\t\t\t\t\tconst res = await fetch(`/dashboard/stats?range=${range}`);\n\t\t\t\t\tif (!res.ok) throw new Error('Failed to fetch');\n\t\t\t\t\tconst data = await res.json();\n\t\t\t\t\tthis.updateCharts(data);\n\t\t\t\t\tthis.updateStatsCards(data);\n\t\t\t\t} catch (err) {\n\t\t\t\t\tconsole.error('Failed to load dashboard data:', err);\n\t\t\t\t}\n\t\t\t},\n\n\t\t\tupdateStatsCards(data) {\n\t\t\t\t// Update stats via DOM (simpler than HTMX for this case)\n\t\t\t\tconst cards = document.querySelectorAll('#stats-container .text-lg');\n\t\t\t\tif (cards.length >= 4) {\n\t\t\t\t\tcards[0].textContent = this.formatNumber(data.total_logs || 0);\n\t\t\t\t\tcards[1].textContent = this.formatNumber(data.error_count || 0);\n\t\t\t\t\tcards[2].textContent = this.formatNumber(data.warning_count || 0);\n\t\t\t\t\tcards[3].textContent = this.formatNumber(data.active_alerts || 0);\n\t\t\t\t}\n\t\t\t},\n\n\t\t\tformatNumber(n) {\n\t\t\t\tif (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';\n\t\t\t\tif (n >= 1000) return (n / 1000).toFixed(1) + 'K';\n\t\t\t\treturn n.toString();\n\t\t\t},\n\n\t\t\tupdateCharts(data) {\n\t\t\t\t// Volume chart\n\t\t\t\tif (data.volume && data.volume.length > 0) {\n\t\t\t\t\tthis.charts.volume.setOption({\n\t\t\t\t\t\txAxis: { data: data.volume.map(v => v.timestamp) },\n\t\t\t\t\t\tseries: [\n\t\t\t\t\t\t\t{ data: data.volume.map(v => v.total_count) },\n\t\t\t\t\t\t\t{ data: data.volume.map(v => v.error_count) }\n\t\t\t\t\t\t]\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\t// Level chart\n\t\t\t\tconst infoCount = (data.total_logs || 0) - (data.error_count || 0) - (data.warning_count || 0) - (data.fatal_count || 0);\n\t\t\t\tconst levelData = [\n\t\t\t\t\t{ value: Math.max(0, infoCount), name: 'Info', itemStyle: { color: '#38bdf8' } },\n\t\t\t\t\t{ value: data.warning_count || 0, name: 'Warning', itemStyle: { color: '#f59e0b' } },\n\t\t\t\t\t{ value: data.error_count || 0, name: 'Error', itemStyle: { color: '#f43f5e' } },\n\t\t\t\t\t{ value: data.fatal_count || 0, name: 'Fatal', itemStyle: { color: '#be123c' } }\n\t\t\t\t].filter(d => d.value > 0);\n\n\t\t\t\tthis.charts.level.setOption({\n\t\t\t\t\tseries: [{ data: levelData }]\n\t\t\t\t});\n\n\t\t\t\t// Sources chart\n\t\t\t\tif (data.top_sources && data.top_sources.length > 0) {\n\t\t\t\t\tthis.charts.sources.setOption({\n\t\t\t\t\t\tyAxis: { data: data.top_sources.map(s => s.source).reverse() },\n\t\t\t\t\t\tseries: [{ data: data.top_sources.map(s => s.count).reverse() }]\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\t// HTTP chart\n\t\t\t\tif (data.http_stats) {\n\t\t\t\t\tthis.charts.http.setOption({\n\t\t\t\t\t\tseries: [{\n\t\t\t\t\t\t\tdata: [\n\t\t\t\t\t\t\t\tdata.http_stats.total_2xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_3xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_4xx || 0,\n\t\t\t\t\t\t\t\tdata.http_stats.total_5xx || 0\n\t\t\t\t\t\t\t]\n\t\t\t\t\t\t}]\n\t\t\t\t\t});\n\t\t\t\t}\n\t\t\t},\n\n\t\t\trefreshDashboard() {\n\t\t\t\tthis.loadData();\n\t\t\t},\n\n\t\t\tsetRefreshInterval() {\n\t\t\t\tconst store = Alpine.store('dashboard');\n\t\t\t\tif (store.refreshTimer) {\n\t\t\t\t\tclearInterval(store.refreshTimer);\n\t\t\t\t\tstore.refreshTimer = null;\n\t\t\t\t}\n\t\t\t\tif (store.refreshInterval > 0) {\n\t\t\t\t\tstore.refreshTimer = setInterval(() => this.loadData(), store.refreshInterval * 1000);\n\t\t\t\t}\n\t\t\t}\n\t\t};\n\t}\n\n\t// Handle chart resize on window resize\n\twindow.addEventListener('resize', () => {\n\t\t['volume-chart', 'level-chart', 'sources-chart', 'http-chart'].forEach(id => {\n\t\t\tconst el = document.getElementById(id);\n\t\t\tif (el) {\n\t\t\t\tconst chart = echarts.getInstanceByDom(el);\n\t\t\t\tif (chart) chart.resize();\n\t\t\t}\n\t\t});\n\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -507,13 +507,13 @@ func DashboardScript() templ.Component {
 func colorClass(color string) string {
 	switch color {
 	case "red":
-		return "bg-red-500"
+		return "bg-rose-500"
 	case "yellow":
-		return "bg-yellow-500"
+		return "bg-amber-500"
 	case "green":
-		return "bg-green-500"
+		return "bg-emerald-500"
 	default:
-		return "bg-blue-500"
+		return "bg-teal-500"
 	}
 }
 

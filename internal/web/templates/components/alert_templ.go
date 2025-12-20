@@ -76,13 +76,13 @@ func alertClass(alertType string) string {
 	base := "rounded-md p-4 mb-4"
 	switch alertType {
 	case "error":
-		return base + " bg-red-50 text-red-800"
+		return base + " bg-rose-50 text-rose-800"
 	case "success":
-		return base + " bg-green-50 text-green-800"
+		return base + " bg-emerald-50 text-emerald-800"
 	case "warning":
-		return base + " bg-yellow-50 text-yellow-800"
+		return base + " bg-amber-50 text-amber-800"
 	default:
-		return base + " bg-blue-50 text-blue-800"
+		return base + " bg-sky-50 text-sky-800"
 	}
 }
 

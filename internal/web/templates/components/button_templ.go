@@ -174,9 +174,9 @@ func buttonClass(variant string) string {
 	case "primary":
 		return "btn-primary"
 	case "secondary":
-		return "rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+		return "btn-secondary"
 	case "danger":
-		return "rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+		return "btn-danger"
 	default:
 		return "btn-primary"
 	}

@@ -48,7 +48,7 @@ func Login(csrfToken, errorMsg string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"mt-6 text-center text-3xl font-bold tracking-tight text-gray-900\">Sign in to BlazeLog</h2></div><div class=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\"><div class=\"bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10\"><div id=\"error-container\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"mt-6 text-center text-3xl font-semibold tracking-tight text-slate-900\">Sign in to BlazeLog</h2></div><div class=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\"><div class=\"panel py-8 px-4 sm:px-10\"><div id=\"error-container\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -81,7 +81,7 @@ func Login(csrfToken, errorMsg string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"flex items-center justify-between\"><div class=\"flex items-center\"><input id=\"remember\" name=\"remember_me\" type=\"checkbox\" class=\"h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500\"> <label for=\"remember\" class=\"ml-2 block text-sm text-gray-900\">Remember me</label></div></div><div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"flex items-center justify-between\"><div class=\"flex items-center\"><input id=\"remember\" name=\"remember_me\" type=\"checkbox\" class=\"h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500\"> <label for=\"remember\" class=\"ml-2 block text-sm text-slate-900\">Remember me</label></div></div><div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
