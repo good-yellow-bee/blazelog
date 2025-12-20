@@ -3,7 +3,7 @@ package components
 
 templ Input(name, label, inputType, placeholder string, required bool) {
 	<div>
-		<label for={ name } class="block text-sm font-medium text-gray-700">{ label }</label>
+		<label for={ name } class="label">{ label }</label>
 		<div class="mt-1">
 			<input
 				id={ name }
@@ -21,7 +21,7 @@ templ Input(name, label, inputType, placeholder string, required bool) {
 
 templ InputWithError(name, label, inputType, placeholder, errorMsg string, required bool) {
 	<div>
-		<label for={ name } class="block text-sm font-medium text-gray-700">{ label }</label>
+		<label for={ name } class="label">{ label }</label>
 		<div class="mt-1">
 			<input
 				id={ name }

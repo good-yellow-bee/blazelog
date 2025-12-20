@@ -11,19 +11,19 @@ templ Logs(user *session.Session, csrfToken string) {
 		<div x-data="logsController()" x-init="init()" class="space-y-6">
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-				<h1 class="text-2xl font-bold text-gray-900">Log Viewer</h1>
+				<h1 class="page-title">Log Viewer</h1>
 				<div class="flex items-center gap-2">
 					<button
 						@click="toggleLive()"
-						:class="isLive ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'"
-						class="flex items-center gap-2 px-4 py-2 text-white rounded-md text-sm font-medium transition-colors"
+						:class="isLive ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-500 hover:bg-slate-600'"
+						class="btn-pill"
 					>
 						<span x-show="isLive" class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
 						<span x-text="isLive ? 'Live' : 'Paused'"></span>
 					</button>
 					<button
 						@click="showExport = true"
-						class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+						class="btn-primary w-auto"
 					>
 						Export
 					</button>
@@ -34,7 +34,7 @@ templ Logs(user *session.Session, csrfToken string) {
 			@LogFilters()
 
 			<!-- Log Table -->
-			<div id="logs-container" class="bg-white shadow rounded-lg overflow-hidden">
+			<div id="logs-container" class="panel overflow-hidden">
 				@LogTable()
 			</div>
 
@@ -50,20 +50,20 @@ templ Logs(user *session.Session, csrfToken string) {
 }
 
 templ LogFilters() {
-	<div class="bg-white shadow rounded-lg p-4">
+	<div class="panel-soft p-4">
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<!-- Search -->
 			<div class="lg:col-span-2">
-				<label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+				<label class="label">Search</label>
 				<div class="relative">
 					<input
 						type="text"
 						x-model="filters.q"
 						@input.debounce.300ms="applyFilters()"
 						placeholder="Search log messages..."
-						class="w-full rounded-md border-gray-300 shadow-sm pl-10 focus:ring-indigo-500 focus:border-indigo-500"
+						class="input-field pl-10"
 					/>
-					<svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg class="absolute left-3 top-2.5 h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
 					</svg>
 				</div>
@@ -71,11 +71,11 @@ templ LogFilters() {
 
 			<!-- Time Range -->
 			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-1">Time Range</label>
+				<label class="label">Time Range</label>
 				<select
 					x-model="filters.range"
 					@change="applyFilters()"
-					class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+					class="select-field"
 				>
 					<option value="15m">Last 15 min</option>
 					<option value="1h">Last 1 hour</option>
@@ -88,11 +88,11 @@ templ LogFilters() {
 
 			<!-- Level Filter -->
 			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-1">Level</label>
+				<label class="label">Level</label>
 				<select
 					x-model="filters.level"
 					@change="applyFilters()"
-					class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+					class="select-field"
 				>
 					<option value="">All Levels</option>
 					<option value="debug">Debug</option>
@@ -105,27 +105,27 @@ templ LogFilters() {
 		</div>
 
 		<!-- Advanced Filters (collapsible) -->
-		<div x-show="showAdvanced" x-collapse class="mt-4 pt-4 border-t border-gray-200">
+		<div x-show="showAdvanced" x-collapse class="mt-4 pt-4 border-t border-slate-200/70">
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 				<!-- Source -->
 				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Source</label>
+					<label class="label">Source</label>
 					<input
 						type="text"
 						x-model="filters.source"
 						@input.debounce.300ms="applyFilters()"
 						placeholder="e.g., nginx, magento"
-						class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+						class="input-field"
 					/>
 				</div>
 
 				<!-- Log Type -->
 				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+					<label class="label">Type</label>
 					<select
 						x-model="filters.type"
 						@change="applyFilters()"
-						class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+						class="select-field"
 					>
 						<option value="">All Types</option>
 						<option value="nginx">Nginx</option>
@@ -138,11 +138,11 @@ templ LogFilters() {
 
 				<!-- Search Mode -->
 				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Search Mode</label>
+					<label class="label">Search Mode</label>
 					<select
 						x-model="filters.search_mode"
 						@change="applyFilters()"
-						class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+						class="select-field"
 					>
 						<option value="token">Token (word match)</option>
 						<option value="substring">Substring</option>
@@ -156,13 +156,13 @@ templ LogFilters() {
 		<div class="mt-4 flex justify-between items-center">
 			<button
 				@click="showAdvanced = !showAdvanced"
-				class="text-sm text-indigo-600 hover:text-indigo-800"
+				class="text-sm text-teal-700 hover:text-teal-900"
 			>
 				<span x-text="showAdvanced ? 'Hide Advanced' : 'Show Advanced'"></span>
 			</button>
 			<button
 				@click="resetFilters()"
-				class="text-sm text-gray-500 hover:text-gray-700"
+				class="text-sm text-slate-500 hover:text-slate-700"
 			>
 				Reset Filters
 			</button>
@@ -172,29 +172,29 @@ templ LogFilters() {
 
 templ LogTable() {
 	<div class="overflow-x-auto">
-		<table class="min-w-full divide-y divide-gray-200">
-			<thead class="bg-gray-50">
+		<table class="min-w-full divide-y divide-slate-200/70">
+			<thead class="table-head">
 				<tr>
-					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-44">
+					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-44">
 						Timestamp
 					</th>
-					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">
 						Level
 					</th>
-					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-28">
 						Source
 					</th>
-					<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
 						Message
 					</th>
 				</tr>
 			</thead>
-			<tbody id="logs-tbody" class="bg-white divide-y divide-gray-200">
+			<tbody id="logs-tbody" class="divide-y divide-slate-200/70">
 				<!-- Populated by JavaScript using safe DOM methods -->
 				<tr>
-					<td colspan="4" class="px-4 py-8 text-center text-gray-500">
+					<td colspan="4" class="px-4 py-8 text-center text-slate-500">
 						<div class="flex flex-col items-center">
-							<svg class="animate-spin h-8 w-8 text-indigo-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<svg class="animate-spin h-8 w-8 text-teal-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 							</svg>
@@ -207,26 +207,26 @@ templ LogTable() {
 	</div>
 
 	<!-- Pagination -->
-	<div id="logs-pagination" class="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200">
+	<div id="logs-pagination" class="bg-white/70 px-4 py-3 flex items-center justify-between border-t border-slate-200/70">
 		<div class="flex-1 flex justify-between sm:hidden">
 			<button
 				@click="prevPage()"
 				:disabled="page <= 1"
-				class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+				class="btn-secondary"
 			>
 				Previous
 			</button>
 			<button
 				@click="nextPage()"
 				:disabled="page >= totalPages"
-				class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+				class="btn-secondary"
 			>
 				Next
 			</button>
 		</div>
 		<div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
 			<div>
-				<p class="text-sm text-gray-700">
+				<p class="text-sm text-slate-600">
 					Showing <span x-text="((page - 1) * perPage) + 1"></span> to
 					<span x-text="Math.min(page * perPage, total)"></span> of
 					<span x-text="total"></span> results
@@ -236,29 +236,29 @@ templ LogTable() {
 				<select
 					x-model="perPage"
 					@change="applyFilters()"
-					class="rounded-md border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+					class="select-field text-sm"
 				>
 					<option value="25">25 per page</option>
 					<option value="50">50 per page</option>
 					<option value="100">100 per page</option>
 				</select>
-				<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+				<nav class="relative z-0 inline-flex rounded-md -space-x-px">
 					<button
 						@click="prevPage()"
 						:disabled="page <= 1"
-						class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+						class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-200 bg-white/80 text-sm font-medium text-slate-500 hover:bg-slate-50/80 disabled:opacity-50"
 					>
 						<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
 							<path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
 						</svg>
 					</button>
-					<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+					<span class="relative inline-flex items-center px-4 py-2 border border-slate-200 bg-white/90 text-sm font-medium text-slate-700">
 						<span x-text="page"></span> / <span x-text="totalPages"></span>
 					</span>
 					<button
 						@click="nextPage()"
 						:disabled="page >= totalPages"
-						class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+						class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-200 bg-white/80 text-sm font-medium text-slate-500 hover:bg-slate-50/80 disabled:opacity-50"
 					>
 						<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
 							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
@@ -284,15 +284,15 @@ templ LogDetailModal() {
 	>
 		<div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
 			<!-- Backdrop -->
-			<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="selectedLog = null"></div>
+			<div class="fixed inset-0 bg-slate-900/40 transition-opacity" @click="selectedLog = null"></div>
 
 			<!-- Modal -->
-			<div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-				<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+			<div class="inline-block align-bottom panel text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+				<div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
 					<!-- Header -->
 					<div class="flex justify-between items-start mb-4">
-						<h3 class="text-lg font-medium text-gray-900">Log Details</h3>
-						<button @click="selectedLog = null" class="text-gray-400 hover:text-gray-500">
+						<h3 class="text-lg font-semibold text-slate-900">Log Details</h3>
+						<button @click="selectedLog = null" class="text-slate-400 hover:text-slate-600">
 							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 							</svg>
@@ -302,60 +302,60 @@ templ LogDetailModal() {
 					<!-- Metadata Grid -->
 					<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
 						<div>
-							<span class="text-gray-500">Timestamp</span>
+							<span class="text-slate-500">Timestamp</span>
 							<p class="font-mono" x-text="selectedLog?.timestamp"></p>
 						</div>
 						<div>
-							<span class="text-gray-500">Level</span>
+							<span class="text-slate-500">Level</span>
 							<p>
 								<span
-									class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+									class="badge"
 									:class="levelClass(selectedLog?.level)"
 									x-text="selectedLog?.level?.toUpperCase()"
 								></span>
 							</p>
 						</div>
 						<div>
-							<span class="text-gray-500">Source</span>
+							<span class="text-slate-500">Source</span>
 							<p x-text="selectedLog?.source || '-'"></p>
 						</div>
 						<div>
-							<span class="text-gray-500">Type</span>
+							<span class="text-slate-500">Type</span>
 							<p x-text="selectedLog?.type || '-'"></p>
 						</div>
 						<div>
-							<span class="text-gray-500">Agent ID</span>
+							<span class="text-slate-500">Agent ID</span>
 							<p class="font-mono text-xs" x-text="selectedLog?.agent_id || '-'"></p>
 						</div>
 						<div>
-							<span class="text-gray-500">File Path</span>
+							<span class="text-slate-500">File Path</span>
 							<p class="font-mono text-xs truncate" x-text="selectedLog?.file_path || '-'"></p>
 						</div>
 						<div>
-							<span class="text-gray-500">Line</span>
+							<span class="text-slate-500">Line</span>
 							<p x-text="selectedLog?.line_number || '-'"></p>
 						</div>
 						<div>
-							<span class="text-gray-500">ID</span>
+							<span class="text-slate-500">ID</span>
 							<p class="font-mono text-xs truncate" x-text="selectedLog?.id"></p>
 						</div>
 					</div>
 
 					<!-- HTTP Info (if present) -->
 					<template x-if="selectedLog?.http_status">
-						<div class="mb-4 p-3 bg-gray-50 rounded-lg">
-							<h4 class="text-sm font-medium text-gray-700 mb-2">HTTP Request</h4>
+						<div class="mb-4 p-3 panel-soft">
+							<h4 class="text-sm font-semibold text-slate-700 mb-2">HTTP Request</h4>
 							<div class="grid grid-cols-3 gap-4 text-sm">
 								<div>
-									<span class="text-gray-500">Method</span>
+									<span class="text-slate-500">Method</span>
 									<p class="font-mono" x-text="selectedLog?.http_method"></p>
 								</div>
 								<div>
-									<span class="text-gray-500">Status</span>
+									<span class="text-slate-500">Status</span>
 									<p class="font-mono" x-text="selectedLog?.http_status"></p>
 								</div>
 								<div>
-									<span class="text-gray-500">URI</span>
+									<span class="text-slate-500">URI</span>
 									<p class="font-mono text-xs truncate" x-text="selectedLog?.uri"></p>
 								</div>
 							</div>
@@ -364,22 +364,22 @@ templ LogDetailModal() {
 
 					<!-- Message -->
 					<div class="mb-4">
-						<h4 class="text-sm font-medium text-gray-700 mb-2">Message</h4>
-						<pre id="log-message-display" class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap" x-text="selectedLog?.message"></pre>
+						<h4 class="text-sm font-semibold text-slate-700 mb-2">Message</h4>
+						<pre id="log-message-display" class="bg-slate-950 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap" x-text="selectedLog?.message"></pre>
 					</div>
 
 					<!-- Fields (if any) -->
 					<template x-if="selectedLog?.fields && Object.keys(selectedLog.fields).length > 0">
 						<div class="mb-4">
-							<h4 class="text-sm font-medium text-gray-700 mb-2">Fields</h4>
-							<pre class="bg-gray-50 p-4 rounded-lg overflow-x-auto text-sm font-mono" x-text="JSON.stringify(selectedLog.fields, null, 2)"></pre>
+							<h4 class="text-sm font-semibold text-slate-700 mb-2">Fields</h4>
+							<pre class="bg-slate-50/70 p-4 rounded-lg overflow-x-auto text-sm font-mono" x-text="JSON.stringify(selectedLog.fields, null, 2)"></pre>
 						</div>
 					</template>
 
 					<!-- Labels (if any) -->
 					<template x-if="selectedLog?.labels && Object.keys(selectedLog.labels).length > 0">
 						<div>
-							<h4 class="text-sm font-medium text-gray-700 mb-2">Labels</h4>
+							<h4 class="text-sm font-semibold text-slate-700 mb-2">Labels</h4>
 							<div id="log-labels-container" class="flex flex-wrap gap-2">
 								<!-- Labels populated via safe DOM methods -->
 							</div>
@@ -388,16 +388,16 @@ templ LogDetailModal() {
 				</div>
 
 				<!-- Footer -->
-				<div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+				<div class="bg-white/70 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200/70">
 					<button
 						@click="copyLog()"
-						class="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:ml-3 sm:w-auto sm:text-sm"
+						class="btn-secondary w-full sm:ml-3 sm:w-auto sm:text-sm"
 					>
 						Copy JSON
 					</button>
 					<button
 						@click="selectedLog = null"
-						class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm"
+						class="btn-secondary mt-3 w-full sm:mt-0 sm:w-auto sm:text-sm"
 					>
 						Close
 					</button>
@@ -420,18 +420,18 @@ templ ExportModal() {
 		@keydown.escape.window="showExport = false"
 	>
 		<div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-			<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showExport = false"></div>
+			<div class="fixed inset-0 bg-slate-900/40 transition-opacity" @click="showExport = false"></div>
 
-			<div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-				<div class="bg-white px-4 pt-5 pb-4 sm:p-6">
-					<h3 class="text-lg font-medium text-gray-900 mb-4">Export Logs</h3>
+			<div class="inline-block align-bottom panel text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+				<div class="px-4 pt-5 pb-4 sm:p-6">
+					<h3 class="text-lg font-semibold text-slate-900 mb-4">Export Logs</h3>
 
 					<div class="space-y-4">
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-1">Format</label>
+							<label class="label">Format</label>
 							<select
 								x-model="exportFormat"
-								class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+								class="select-field"
 							>
 								<option value="json">JSON</option>
 								<option value="csv">CSV</option>
@@ -439,10 +439,10 @@ templ ExportModal() {
 						</div>
 
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-1">Max Records</label>
+							<label class="label">Max Records</label>
 							<select
 								x-model="exportLimit"
-								class="w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+								class="select-field"
 							>
 								<option value="100">100</option>
 								<option value="500">500</option>
@@ -451,17 +451,17 @@ templ ExportModal() {
 							</select>
 						</div>
 
-						<p id="export-filter-summary" class="text-sm text-gray-500">
+						<p id="export-filter-summary" class="text-sm text-slate-500">
 							Export will use current filters
 						</p>
 					</div>
 				</div>
 
-				<div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+				<div class="bg-white/70 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200/70">
 					<button
 						@click="exportLogs()"
 						:disabled="exporting"
-						class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm"
+						class="btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm"
 					>
 						<span x-show="exporting" class="mr-2">
 							<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -473,7 +473,7 @@ templ ExportModal() {
 					</button>
 					<button
 						@click="showExport = false"
-						class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm"
+						class="btn-secondary mt-3 w-full sm:mt-0 sm:w-auto sm:text-sm"
 					>
 						Cancel
 					</button>
@@ -584,7 +584,7 @@ templ LogsScript() {
 					const tr = document.createElement('tr');
 					const td = document.createElement('td');
 					td.setAttribute('colspan', '4');
-					td.className = 'px-4 py-8 text-center text-gray-500';
+					td.className = 'px-4 py-8 text-center text-slate-500';
 					td.textContent = 'No logs found matching your filters';
 					tr.appendChild(td);
 					tbody.appendChild(tr);
@@ -593,12 +593,12 @@ templ LogsScript() {
 
 				this.logs.forEach((log, index) => {
 					const tr = document.createElement('tr');
-					tr.className = 'hover:bg-gray-50 cursor-pointer';
+					tr.className = 'hover:bg-slate-50/70 cursor-pointer';
 					tr.addEventListener('click', () => this.selectLog(index));
 
 					// Timestamp cell
 					const tdTime = document.createElement('td');
-					tdTime.className = 'px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-600';
+					tdTime.className = 'px-4 py-3 whitespace-nowrap text-sm font-mono text-slate-600';
 					tdTime.textContent = this.formatTimestamp(log.timestamp);
 					tr.appendChild(tdTime);
 
@@ -606,20 +606,20 @@ templ LogsScript() {
 					const tdLevel = document.createElement('td');
 					tdLevel.className = 'px-4 py-3 whitespace-nowrap';
 					const levelSpan = document.createElement('span');
-					levelSpan.className = 'inline-flex px-2 py-1 text-xs font-semibold rounded-full ' + this.levelClass(log.level);
+					levelSpan.className = 'badge ' + this.levelClass(log.level);
 					levelSpan.textContent = (log.level || 'unknown').toUpperCase();
 					tdLevel.appendChild(levelSpan);
 					tr.appendChild(tdLevel);
 
 					// Source cell
 					const tdSource = document.createElement('td');
-					tdSource.className = 'px-4 py-3 whitespace-nowrap text-sm text-gray-600';
+					tdSource.className = 'px-4 py-3 whitespace-nowrap text-sm text-slate-600';
 					tdSource.textContent = log.source || '-';
 					tr.appendChild(tdSource);
 
 					// Message cell
 					const tdMessage = document.createElement('td');
-					tdMessage.className = 'px-4 py-3 text-sm text-gray-900 truncate max-w-xl';
+					tdMessage.className = 'px-4 py-3 text-sm text-slate-900 truncate max-w-xl';
 					tdMessage.textContent = log.message || '';
 					tr.appendChild(tdMessage);
 
@@ -638,7 +638,7 @@ templ LogsScript() {
 
 				Object.entries(labels).forEach(([key, value]) => {
 					const span = document.createElement('span');
-					span.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800';
+					span.className = 'badge badge-slate';
 					span.textContent = `${key}: ${value}`;
 					container.appendChild(span);
 				});
@@ -656,12 +656,12 @@ templ LogsScript() {
 
 			levelClass(level) {
 				switch ((level || '').toLowerCase()) {
-					case 'debug': return 'bg-gray-100 text-gray-800';
-					case 'info': return 'bg-blue-100 text-blue-800';
-					case 'warning': return 'bg-yellow-100 text-yellow-800';
-					case 'error': return 'bg-red-100 text-red-800';
-					case 'fatal': return 'bg-purple-100 text-purple-800';
-					default: return 'bg-gray-100 text-gray-800';
+					case 'debug': return 'badge-slate';
+					case 'info': return 'badge-sky';
+					case 'warning': return 'badge-amber';
+					case 'error': return 'badge-rose';
+					case 'fatal': return 'badge-rose';
+					default: return 'badge-slate';
 				}
 			},
 
@@ -761,7 +761,7 @@ templ LogsScript() {
 				const tr = document.createElement('tr');
 				const td = document.createElement('td');
 				td.setAttribute('colspan', '4');
-				td.className = 'px-4 py-8 text-center text-red-500';
+				td.className = 'px-4 py-8 text-center text-rose-500';
 				td.textContent = msg;
 				tr.appendChild(td);
 				tbody.appendChild(tr);

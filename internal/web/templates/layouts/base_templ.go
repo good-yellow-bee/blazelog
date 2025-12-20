@@ -60,7 +60,7 @@ func Base(title string, user *session.Session, csrfToken string) templ.Component
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " - BlazeLog</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org@1.9.10\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js\"></script><script>\n\t\t\t\t// Global helper for CSRF-protected fetch\n\t\t\t\twindow.csrfFetch = function(url, options = {}) {\n\t\t\t\t\tconst token = document.querySelector('meta[name=\"csrf-token\"]')?.content;\n\t\t\t\t\toptions.headers = options.headers || {};\n\t\t\t\t\tif (token) {\n\t\t\t\t\t\toptions.headers['X-CSRF-Token'] = token;\n\t\t\t\t\t}\n\t\t\t\t\treturn fetch(url, options);\n\t\t\t\t};\n\t\t\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " - BlazeLog</title><link rel=\"icon\" href=\"/static/favicon.ico\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js\"></script><script>\n\t\t\t\t// Global helper for CSRF-protected fetch\n\t\t\t\twindow.csrfFetch = function(url, options = {}) {\n\t\t\t\t\tconst token = document.querySelector('meta[name=\"csrf-token\"]')?.content;\n\t\t\t\t\toptions.headers = options.headers || {};\n\t\t\t\t\tif (token) {\n\t\t\t\t\t\toptions.headers['X-CSRF-Token'] = token;\n\t\t\t\t\t}\n\t\t\t\t\treturn fetch(url, options);\n\t\t\t\t};\n\t\t\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -68,7 +68,7 @@ func Base(title string, user *session.Session, csrfToken string) templ.Component
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</head><body class=\"bg-gray-50 min-h-screen\" x-data>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</head><body class=\"min-h-screen text-slate-900\" x-data>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -81,7 +81,7 @@ func Base(title string, user *session.Session, csrfToken string) templ.Component
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<main class=\"flex-1 md:ml-0 p-4 md:p-8 pt-16 md:pt-8\"><div class=\"max-w-7xl mx-auto\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<main class=\"flex-1 md:ml-0 p-4 md:p-8 pt-16 md:pt-8 page-enter\"><div class=\"max-w-7xl mx-auto\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -94,7 +94,7 @@ func Base(title string, user *session.Session, csrfToken string) templ.Component
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<main class=\"container mx-auto px-4 py-8\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<main class=\"container mx-auto px-4 py-8 page-enter\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

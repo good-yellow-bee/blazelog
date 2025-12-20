@@ -13,14 +13,14 @@ templ SettingsProjects(user *session.Session, csrfToken string) {
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 				<div>
-					<h1 class="text-2xl font-bold text-gray-900">Projects</h1>
-					<p class="mt-1 text-sm text-gray-500">Manage projects and team members</p>
+					<h1 class="page-title">Projects</h1>
+					<p class="page-subtitle">Manage projects and team members</p>
 				</div>
 				<button
 					@click="openCreate()"
-					class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+					class="btn-primary w-auto"
 				>
-					<svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
 					</svg>
 					Create Project
@@ -28,7 +28,7 @@ templ SettingsProjects(user *session.Session, csrfToken string) {
 			</div>
 
 			<!-- Search -->
-			<div class="bg-white shadow rounded-lg p-4">
+			<div class="panel-soft p-4">
 				<div class="max-w-md">
 					<label class="label">Search</label>
 					<input
@@ -42,38 +42,38 @@ templ SettingsProjects(user *session.Session, csrfToken string) {
 			</div>
 
 			<!-- Projects Table -->
-			<div class="bg-white shadow rounded-lg overflow-hidden">
+			<div class="table-shell overflow-hidden">
 				<!-- Loading state -->
 				<div x-show="loading" class="p-8 text-center">
-					<svg class="animate-spin h-8 w-8 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+					<svg class="animate-spin h-8 w-8 mx-auto text-teal-600" fill="none" viewBox="0 0 24 24">
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 					</svg>
-					<p class="mt-2 text-gray-500">Loading projects...</p>
+					<p class="mt-2 text-slate-500">Loading projects...</p>
 				</div>
 
 				<!-- Empty state -->
 				<div x-show="!loading && filteredProjects.length === 0" class="p-8 text-center">
-					<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
 					</svg>
-					<h3 class="mt-2 text-sm font-medium text-gray-900">No projects found</h3>
-					<p class="mt-1 text-sm text-gray-500">Get started by creating a new project.</p>
+					<h3 class="mt-2 text-sm font-semibold text-slate-900">No projects found</h3>
+					<p class="mt-1 text-sm text-slate-500">Get started by creating a new project.</p>
 				</div>
 
 				<!-- Table -->
 				<div x-show="!loading && filteredProjects.length > 0" class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
+					<table class="min-w-full divide-y divide-slate-200/70">
+						<thead class="table-head">
 							<tr>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-								<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Name</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Description</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Members</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Created</th>
+								<th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Actions</th>
 							</tr>
 						</thead>
-						<tbody id="projects-tbody" class="bg-white divide-y divide-gray-200">
+						<tbody id="projects-tbody" class="divide-y divide-slate-200/70">
 							<!-- Rows rendered by Alpine.js -->
 						</tbody>
 					</table>
@@ -127,7 +127,7 @@ templ ProjectFormModal() {
 				</div>
 
 				<!-- Error message -->
-				<div x-show="formError" class="p-3 bg-red-50 text-red-700 rounded-md text-sm" x-text="formError"></div>
+				<div x-show="formError" class="p-3 bg-rose-50 text-rose-700 rounded-md text-sm" x-text="formError"></div>
 			</div>
 		}
 		@components.ModalFooter() {
@@ -150,27 +150,27 @@ templ ProjectMembersModal() {
 		@components.ModalBody() {
 			<div class="space-y-4">
 				<!-- Members list -->
-				<div x-show="!loadingMembers && members.length > 0" class="divide-y divide-gray-200">
+				<div x-show="!loadingMembers && members.length > 0" class="divide-y divide-slate-200/70">
 					<template x-for="member in members" :key="member.user_id">
 						<div class="py-3 flex items-center justify-between">
 							<div class="flex items-center">
-								<div class="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+								<div class="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
 									<span class="text-white text-sm font-medium" x-text="member.username.charAt(0).toUpperCase()"></span>
 								</div>
 								<div class="ml-3">
-									<p class="text-sm font-medium text-gray-900" x-text="member.username"></p>
-									<p class="text-sm text-gray-500" x-text="member.email"></p>
+									<p class="text-sm font-medium text-slate-900" x-text="member.username"></p>
+									<p class="text-sm text-slate-500" x-text="member.email"></p>
 								</div>
 							</div>
 							<div class="flex items-center gap-2">
 								<span
 									class="badge"
-									:class="member.role === 'admin' ? 'badge-indigo' : member.role === 'operator' ? 'badge-blue' : 'badge-gray'"
+									:class="member.role === 'admin' ? 'badge-teal' : member.role === 'operator' ? 'badge-sky' : 'badge-slate'"
 									x-text="member.role"
 								></span>
 								<button
 									@click="removeMember(member.user_id)"
-									class="text-red-600 hover:text-red-900 text-sm"
+									class="text-rose-600 hover:text-rose-900 text-sm"
 								>
 									Remove
 								</button>
@@ -180,21 +180,21 @@ templ ProjectMembersModal() {
 				</div>
 
 				<!-- Empty members -->
-				<div x-show="!loadingMembers && members.length === 0" class="text-center py-4 text-gray-500 text-sm">
+				<div x-show="!loadingMembers && members.length === 0" class="text-center py-4 text-slate-500 text-sm">
 					No members yet
 				</div>
 
 				<!-- Loading members -->
 				<div x-show="loadingMembers" class="text-center py-4">
-					<svg class="animate-spin h-6 w-6 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+					<svg class="animate-spin h-6 w-6 mx-auto text-teal-600" fill="none" viewBox="0 0 24 24">
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 					</svg>
 				</div>
 
 				<!-- Add member form -->
-				<div class="pt-4 border-t border-gray-200">
-					<h4 class="text-sm font-medium text-gray-900 mb-3">Add Member</h4>
+				<div class="pt-4 border-t border-slate-200/70">
+					<h4 class="text-sm font-semibold text-slate-900 mb-3">Add Member</h4>
 					<div class="flex gap-2">
 						<select x-model="addMemberForm.user_id" class="select-field flex-1">
 							<option value="">Select user...</option>
@@ -322,17 +322,17 @@ templ ProjectsScript() {
 
 					this.filteredProjects.forEach(project => {
 						const tr = document.createElement('tr');
-						tr.className = 'hover:bg-gray-50';
+					tr.className = 'hover:bg-slate-50/70';
 
 						// Name cell
 						const tdName = document.createElement('td');
-						tdName.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900';
+					tdName.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900';
 						tdName.textContent = project.name;
 						tr.appendChild(tdName);
 
 						// Description cell
 						const tdDesc = document.createElement('td');
-						tdDesc.className = 'px-6 py-4 text-sm text-gray-500 max-w-xs truncate';
+					tdDesc.className = 'px-6 py-4 text-sm text-slate-500 max-w-xs truncate';
 						tdDesc.textContent = project.description || '-';
 						tr.appendChild(tdDesc);
 
@@ -340,7 +340,7 @@ templ ProjectsScript() {
 						const tdMembers = document.createElement('td');
 						tdMembers.className = 'px-6 py-4 whitespace-nowrap';
 						const membersBtn = document.createElement('button');
-						membersBtn.className = 'text-indigo-600 hover:text-indigo-900 text-sm';
+					membersBtn.className = 'text-teal-700 hover:text-teal-900 text-sm';
 						membersBtn.textContent = 'Manage';
 						membersBtn.onclick = () => this.openMembers(project);
 						tdMembers.appendChild(membersBtn);
@@ -348,7 +348,7 @@ templ ProjectsScript() {
 
 						// Created cell
 						const tdCreated = document.createElement('td');
-						tdCreated.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+					tdCreated.className = 'px-6 py-4 whitespace-nowrap text-sm text-slate-500';
 						tdCreated.textContent = new Date(project.created_at).toLocaleDateString();
 						tr.appendChild(tdCreated);
 
@@ -357,7 +357,7 @@ templ ProjectsScript() {
 						tdActions.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2';
 
 						const editBtn = document.createElement('button');
-						editBtn.className = 'text-indigo-600 hover:text-indigo-900';
+					editBtn.className = 'text-teal-700 hover:text-teal-900';
 						editBtn.textContent = 'Edit';
 						editBtn.onclick = () => this.openEdit(project);
 						tdActions.appendChild(editBtn);

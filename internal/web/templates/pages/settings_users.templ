@@ -13,14 +13,14 @@ templ SettingsUsers(user *session.Session, csrfToken string) {
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 				<div>
-					<h1 class="text-2xl font-bold text-gray-900">Users</h1>
-					<p class="mt-1 text-sm text-gray-500">Manage user accounts and roles</p>
+					<h1 class="page-title">Users</h1>
+					<p class="page-subtitle">Manage user accounts and roles</p>
 				</div>
 				<button
 					@click="openCreate()"
-					class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+					class="btn-primary w-auto"
 				>
-					<svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
 					</svg>
 					Create User
@@ -28,7 +28,7 @@ templ SettingsUsers(user *session.Session, csrfToken string) {
 			</div>
 
 			<!-- Search -->
-			<div class="bg-white shadow rounded-lg p-4">
+			<div class="panel-soft p-4">
 				<div class="flex flex-col sm:flex-row gap-4">
 					<div class="flex-1">
 						<label class="label">Search</label>
@@ -53,38 +53,38 @@ templ SettingsUsers(user *session.Session, csrfToken string) {
 			</div>
 
 			<!-- Users Table -->
-			<div class="bg-white shadow rounded-lg overflow-hidden">
+			<div class="table-shell overflow-hidden">
 				<!-- Loading state -->
 				<div x-show="loading" class="p-8 text-center">
-					<svg class="animate-spin h-8 w-8 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+					<svg class="animate-spin h-8 w-8 mx-auto text-teal-600" fill="none" viewBox="0 0 24 24">
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 					</svg>
-					<p class="mt-2 text-gray-500">Loading users...</p>
+					<p class="mt-2 text-slate-500">Loading users...</p>
 				</div>
 
 				<!-- Empty state -->
 				<div x-show="!loading && filteredUsers.length === 0" class="p-8 text-center">
-					<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
 					</svg>
-					<h3 class="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-					<p class="mt-1 text-sm text-gray-500">Try adjusting your search filters.</p>
+					<h3 class="mt-2 text-sm font-semibold text-slate-900">No users found</h3>
+					<p class="mt-1 text-sm text-slate-500">Try adjusting your search filters.</p>
 				</div>
 
 				<!-- Table -->
 				<div x-show="!loading && filteredUsers.length > 0" class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
+					<table class="min-w-full divide-y divide-slate-200/70">
+						<thead class="table-head">
 							<tr>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-								<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">User</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Email</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Role</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Created</th>
+								<th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Actions</th>
 							</tr>
 						</thead>
-						<tbody id="users-tbody" class="bg-white divide-y divide-gray-200">
+						<tbody id="users-tbody" class="divide-y divide-slate-200/70">
 							<!-- Rows rendered by Alpine.js -->
 						</tbody>
 					</table>
@@ -126,7 +126,7 @@ templ UserCreateModal() {
 						class="input-field"
 						placeholder="johndoe"
 					/>
-					<p class="mt-1 text-xs text-gray-500">3-32 characters, letters, numbers, _ and -</p>
+					<p class="mt-1 text-xs text-slate-500">3-32 characters, letters, numbers, _ and -</p>
 				</div>
 
 				<!-- Email -->
@@ -149,7 +149,7 @@ templ UserCreateModal() {
 						class="input-field"
 						placeholder="Min 8 characters"
 					/>
-					<p class="mt-1 text-xs text-gray-500">Uppercase, lowercase, number, and special character</p>
+					<p class="mt-1 text-xs text-slate-500">Uppercase, lowercase, number, and special character</p>
 				</div>
 
 				<!-- Role -->
@@ -163,7 +163,7 @@ templ UserCreateModal() {
 				</div>
 
 				<!-- Error message -->
-				<div x-show="formError" class="p-3 bg-red-50 text-red-700 rounded-md text-sm" x-text="formError"></div>
+				<div x-show="formError" class="p-3 bg-rose-50 text-rose-700 rounded-md text-sm" x-text="formError"></div>
 			</div>
 		}
 		@components.ModalFooter() {
@@ -191,7 +191,7 @@ templ UserEditModal() {
 					<input
 						type="text"
 						:value="selectedUser?.username"
-						class="input-field bg-gray-100"
+						class="input-field bg-slate-100"
 						disabled
 					/>
 				</div>
@@ -214,13 +214,13 @@ templ UserEditModal() {
 						<option value="operator">Operator - Can manage alerts</option>
 						<option value="admin">Admin - Full access</option>
 					</select>
-					<p x-show="selectedUser?.id === currentUserId" class="mt-1 text-xs text-yellow-600">
+					<p x-show="selectedUser?.id === currentUserId" class="mt-1 text-xs text-amber-600">
 						Warning: Changing your own role may affect your access
 					</p>
 				</div>
 
 				<!-- Error message -->
-				<div x-show="formError" class="p-3 bg-red-50 text-red-700 rounded-md text-sm" x-text="formError"></div>
+				<div x-show="formError" class="p-3 bg-rose-50 text-rose-700 rounded-md text-sm" x-text="formError"></div>
 			</div>
 		}
 		@components.ModalFooter() {
@@ -242,7 +242,7 @@ templ UserPasswordModal() {
 	@components.ModalWithFooter("showPasswordModal", "'Reset Password'") {
 		@components.ModalBody() {
 			<div class="space-y-4">
-				<p class="text-sm text-gray-600">
+				<p class="text-sm text-slate-600">
 					Reset password for <strong x-text="selectedUser?.username"></strong>
 				</p>
 
@@ -255,7 +255,7 @@ templ UserPasswordModal() {
 						class="input-field"
 						placeholder="Min 8 characters"
 					/>
-					<p class="mt-1 text-xs text-gray-500">Uppercase, lowercase, number, and special character</p>
+					<p class="mt-1 text-xs text-slate-500">Uppercase, lowercase, number, and special character</p>
 				</div>
 
 				<!-- Confirm Password -->
@@ -270,7 +270,7 @@ templ UserPasswordModal() {
 				</div>
 
 				<!-- Error message -->
-				<div x-show="formError" class="p-3 bg-red-50 text-red-700 rounded-md text-sm" x-text="formError"></div>
+				<div x-show="formError" class="p-3 bg-rose-50 text-rose-700 rounded-md text-sm" x-text="formError"></div>
 			</div>
 		}
 		@components.ModalFooter() {
@@ -380,7 +380,7 @@ templ UsersScript(currentUserID string) {
 
 					this.filteredUsers.forEach(user => {
 						const tr = document.createElement('tr');
-						tr.className = 'hover:bg-gray-50';
+					tr.className = 'hover:bg-slate-50/70';
 
 						// User cell (avatar + username)
 						const tdUser = document.createElement('td');
@@ -389,7 +389,7 @@ templ UsersScript(currentUserID string) {
 						userDiv.className = 'flex items-center';
 						// Avatar
 						const avatar = document.createElement('div');
-						avatar.className = 'w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0';
+					avatar.className = 'w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0';
 						const avatarText = document.createElement('span');
 						avatarText.className = 'text-white text-sm font-medium';
 						avatarText.textContent = user.username.charAt(0).toUpperCase();
@@ -399,12 +399,12 @@ templ UsersScript(currentUserID string) {
 						const nameDiv = document.createElement('div');
 						nameDiv.className = 'ml-3';
 						const username = document.createElement('div');
-						username.className = 'text-sm font-medium text-gray-900';
+					username.className = 'text-sm font-medium text-slate-900';
 						username.textContent = user.username;
 						nameDiv.appendChild(username);
 						if (user.id === this.currentUserId) {
 							const youBadge = document.createElement('span');
-							youBadge.className = 'text-xs text-indigo-600';
+						youBadge.className = 'text-xs text-teal-700';
 							youBadge.textContent = '(You)';
 							nameDiv.appendChild(youBadge);
 						}
@@ -414,7 +414,7 @@ templ UsersScript(currentUserID string) {
 
 						// Email cell
 						const tdEmail = document.createElement('td');
-						tdEmail.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+					tdEmail.className = 'px-6 py-4 whitespace-nowrap text-sm text-slate-500';
 						tdEmail.textContent = user.email;
 						tr.appendChild(tdEmail);
 
@@ -429,7 +429,7 @@ templ UsersScript(currentUserID string) {
 
 						// Created cell
 						const tdCreated = document.createElement('td');
-						tdCreated.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+					tdCreated.className = 'px-6 py-4 whitespace-nowrap text-sm text-slate-500';
 						tdCreated.textContent = new Date(user.created_at).toLocaleDateString();
 						tr.appendChild(tdCreated);
 
@@ -438,13 +438,13 @@ templ UsersScript(currentUserID string) {
 						tdActions.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2';
 
 						const editBtn = document.createElement('button');
-						editBtn.className = 'text-indigo-600 hover:text-indigo-900';
+					editBtn.className = 'text-teal-700 hover:text-teal-900';
 						editBtn.textContent = 'Edit';
 						editBtn.onclick = () => this.openEdit(user);
 						tdActions.appendChild(editBtn);
 
 						const pwBtn = document.createElement('button');
-						pwBtn.className = 'text-yellow-600 hover:text-yellow-900';
+					pwBtn.className = 'text-amber-600 hover:text-amber-900';
 						pwBtn.textContent = 'Password';
 						pwBtn.onclick = () => this.openPassword(user);
 						tdActions.appendChild(pwBtn);
@@ -452,7 +452,7 @@ templ UsersScript(currentUserID string) {
 						// Can't delete yourself
 						if (user.id !== this.currentUserId) {
 							const delBtn = document.createElement('button');
-							delBtn.className = 'text-red-600 hover:text-red-900';
+						delBtn.className = 'text-rose-600 hover:text-rose-900';
 							delBtn.textContent = 'Delete';
 							delBtn.onclick = () => this.openDelete(user);
 							tdActions.appendChild(delBtn);
@@ -463,14 +463,14 @@ templ UsersScript(currentUserID string) {
 					});
 				},
 
-				getRoleBadgeClass(role) {
-					switch (role) {
-						case 'admin': return 'badge badge-indigo';
-						case 'operator': return 'badge badge-blue';
-						case 'viewer': return 'badge badge-gray';
-						default: return 'badge badge-gray';
-					}
-				},
+			getRoleBadgeClass(role) {
+				switch (role) {
+					case 'admin': return 'badge badge-teal';
+					case 'operator': return 'badge badge-sky';
+					case 'viewer': return 'badge badge-slate';
+					default: return 'badge badge-slate';
+				}
+			},
 
 				openCreate() {
 					this.createForm = {

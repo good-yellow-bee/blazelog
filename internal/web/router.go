@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/good-yellow-bee/blazelog/internal/web/middleware"
@@ -11,11 +12,20 @@ import (
 func (s *Server) Routes() chi.Router {
 	r := chi.NewRouter()
 
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.TLS == nil && strings.ToLower(r.Header.Get("X-Forwarded-Proto")) != "https" {
+				r = csrf.PlaintextHTTPRequest(r)
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	// CSRF protection options
 	// Note: TrustedOrigins removed due to vulnerability GO-2025-3884
 	csrfMiddleware := csrf.Protect(
 		s.csrfKey,
-		csrf.Secure(false),           // Set to true in production with HTTPS
+		csrf.Secure(s.useSecureCookies),
 		csrf.Path("/"),
 		csrf.FieldName("csrf_token"), // Match the form field name
 	)
@@ -23,6 +33,9 @@ func (s *Server) Routes() chi.Router {
 
 	// Static files (no CSRF)
 	r.Handle("/static/*", http.StripPrefix("/static/", s.StaticFS()))
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/favicon.ico", http.StatusMovedPermanently)
+	})
 
 	// Public routes
 	r.Get("/login", s.handler.ShowLogin)

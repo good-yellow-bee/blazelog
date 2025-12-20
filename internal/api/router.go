@@ -206,7 +206,7 @@ func (s *Server) setupRouter() *chi.Mux {
 	// Web UI routes (mounted at root, but API routes take precedence)
 	// Share the session store with the web server so sessions work across both
 	if s.config.WebUIEnabled && s.config.CSRFSecret != "" {
-		webServer := web.NewServerWithSessions(s.storage, s.logStorage, s.config.CSRFSecret, s.config.TrustedOrigins, s.sessions)
+		webServer := web.NewServerWithSessions(s.storage, s.logStorage, s.config.CSRFSecret, s.config.TrustedOrigins, s.sessions, s.config.UseSecureCookies)
 		r.Mount("/", webServer.Routes())
 	}
 

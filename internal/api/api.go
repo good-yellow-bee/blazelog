@@ -20,6 +20,7 @@ type Config struct {
 	CSRFSecret       string   // For web UI CSRF protection
 	TrustedOrigins   []string // Trusted origins for CSRF (e.g., "localhost:8080")
 	WebUIEnabled     bool     // Enable web UI (default: true)
+	UseSecureCookies bool     // Use Secure flag for cookies (true in production with HTTPS)
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
 	RateLimitPerIP   int
