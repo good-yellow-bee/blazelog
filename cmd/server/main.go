@@ -301,6 +301,7 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 		CSRFSecret:       csrfSecret,
 		TrustedOrigins:   cfg.Auth.TrustedOrigins,
 		WebUIEnabled:     webUIEnabled,
+		UseSecureCookies: cfg.Auth.UseSecureCookies,
 		AccessTokenTTL:   accessTTL,
 		RefreshTokenTTL:  refreshTTL,
 		RateLimitPerIP:   cfg.Auth.RateLimitPerIP,

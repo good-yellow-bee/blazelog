@@ -30,6 +30,7 @@ type AuthConfig struct {
 	JWTSecretEnv     string   `yaml:"jwt_secret_env"`      // Env var name for JWT secret (default: BLAZELOG_JWT_SECRET)
 	CSRFSecretEnv    string   `yaml:"csrf_secret_env"`     // Env var name for CSRF secret (optional, for web UI)
 	TrustedOrigins   []string `yaml:"trusted_origins"`     // Trusted origins for CSRF (default: localhost:8080, 127.0.0.1:8080)
+	UseSecureCookies bool     `yaml:"use_secure_cookies"`  // Use Secure flag for cookies (enable in production with HTTPS)
 	AccessTokenTTL   string   `yaml:"access_token_ttl"`    // Access token TTL (default: 15m)
 	RefreshTokenTTL  string   `yaml:"refresh_token_ttl"`   // Refresh token TTL (default: 168h / 7 days)
 	RateLimitPerIP   int      `yaml:"rate_limit_per_ip"`   // Login rate limit per IP (default: 5/min)
