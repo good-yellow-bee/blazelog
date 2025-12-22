@@ -324,6 +324,57 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/users/{id}/password:
+    put:
+      tags: [Users]
+      summary: Reset user password (admin only)
+      description: |
+        Admin can reset password for non-admin users only.
+        Cannot reset other admin passwords.
+        Invalidates all existing sessions and tokens for the user.
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '204':
+          description: Password reset successfully, all sessions invalidated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Cannot reset admin password or own password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                admin_target:
+                  summary: Target user is admin
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: cannot reset admin password
+                self_target:
+                  summary: Cannot reset own password
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: use change password endpoint for own password
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ==================== Logs ====================
   /api/v1/logs:
     get:
@@ -1067,12 +1118,45 @@ paths:
               schema:
                 type: object
                 properties:
-                  data:
-                    type: object
-                    properties:
-                      status:
-                        type: string
-                        example: ok
+                  status:
+                    type: string
+                    example: ok
+
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Kubernetes liveness check - returns 200 if process is running
+      security: []
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Kubernetes readiness check - returns 200 if ready to serve traffic
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
 
 components:
   securitySchemes:

@@ -67,7 +67,7 @@ func (s *Server) setupRouter() *chi.Mux {
 			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
-			userHandler := users.NewHandler(s.storage)
+			userHandler := users.NewHandler(s.storage, s.sessions)
 
 			// Current user endpoints (any authenticated user)
 			r.Get("/me", userHandler.GetCurrentUser)
@@ -86,9 +86,10 @@ func (s *Server) setupRouter() *chi.Mux {
 				r.Get("/", userHandler.GetByID)
 				r.Put("/", userHandler.Update)
 
-				// Delete is admin-only
+				// Admin-only operations
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RequireRole(models.RoleAdmin))
+					r.Put("/password", userHandler.ResetPassword)
 					r.Delete("/", userHandler.Delete)
 				})
 			})

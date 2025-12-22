@@ -443,11 +443,14 @@ templ UsersScript(currentUserID string) {
 						editBtn.onclick = () => this.openEdit(user);
 						tdActions.appendChild(editBtn);
 
-						const pwBtn = document.createElement('button');
-					pwBtn.className = 'text-amber-600 hover:text-amber-900';
-						pwBtn.textContent = 'Password';
-						pwBtn.onclick = () => this.openPassword(user);
-						tdActions.appendChild(pwBtn);
+						// Only show password reset for non-admin users
+						if (user.role !== 'admin') {
+							const pwBtn = document.createElement('button');
+							pwBtn.className = 'text-amber-600 hover:text-amber-900';
+							pwBtn.textContent = 'Password';
+							pwBtn.onclick = () => this.openPassword(user);
+							tdActions.appendChild(pwBtn);
+						}
 
 						// Can't delete yourself
 						if (user.id !== this.currentUserId) {

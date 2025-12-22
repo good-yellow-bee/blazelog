@@ -15,6 +15,7 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
+	"github.com/good-yellow-bee/blazelog/internal/web/session"
 )
 
 // Response helpers (local to avoid import cycle)
@@ -76,12 +77,13 @@ type UserResponse struct {
 
 // Handler handles user management endpoints.
 type Handler struct {
-	storage storage.Storage
+	storage  storage.Storage
+	sessions *session.Store
 }
 
 // NewHandler creates a new user handler.
-func NewHandler(store storage.Storage) *Handler {
-	return &Handler{storage: store}
+func NewHandler(store storage.Storage, sessions *session.Store) *Handler {
+	return &Handler{storage: store, sessions: sessions}
 }
 
 // CreateRequest is the request body for creating a user.
@@ -435,13 +437,103 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Revoke all refresh tokens (force re-login on other devices)
+	// Revoke all refresh tokens and sessions (force re-login everywhere)
 	if err := h.storage.Tokens().RevokeAllForUser(ctx, userID); err != nil {
-		log.Printf("change password warning: revoke tokens: %v", err)
-		// Don't fail the request, password was already changed
+		log.Printf("change password error: revoke tokens: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "password changed but failed to invalidate sessions")
+		return
+	}
+	if h.sessions != nil {
+		h.sessions.DeleteByUserID(userID)
 	}
 
 	log.Printf("password changed: user %s", user.Username)
+
+	jsonNoContent(w)
+}
+
+// ResetPasswordRequest is the request body for admin password reset.
+type ResetPasswordRequest struct {
+	Password string `json:"password"`
+}
+
+// ResetPassword allows admin to reset a non-admin user's password.
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		jsonError(w, http.StatusBadRequest, errCodeBadRequest, "user id required")
+		return
+	}
+
+	ctx := r.Context()
+	currentUserID := middleware.GetUserID(ctx)
+
+	// SECURITY: Admin cannot reset their own password via this endpoint
+	// (must use ChangePassword with current password verification)
+	if userID == currentUserID {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "use change password endpoint for own password")
+		return
+	}
+
+	var req ResetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, http.StatusBadRequest, errCodeBadRequest, "invalid request body")
+		return
+	}
+
+	// Validate password
+	if err := auth.ValidatePasswordOrError(req.Password); err != nil {
+		jsonError(w, http.StatusBadRequest, errCodeValidationFailed, err.Error())
+		return
+	}
+
+	// Get target user
+	user, err := h.storage.Users().GetByID(ctx, userID)
+	if err != nil {
+		log.Printf("reset password error: get user: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if user == nil {
+		jsonError(w, http.StatusNotFound, errCodeNotFound, "user not found")
+		return
+	}
+
+	// SECURITY: Cannot reset admin passwords
+	if user.Role == models.RoleAdmin {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "cannot reset admin password")
+		return
+	}
+
+	// Hash new password
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("reset password error: hash: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+
+	// Update password
+	user.PasswordHash = string(hash)
+	user.UpdatedAt = time.Now()
+
+	if err := h.storage.Users().Update(ctx, user); err != nil {
+		log.Printf("reset password error: update: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+
+	// Invalidate all sessions/tokens for this user
+	if err := h.storage.Tokens().RevokeAllForUser(ctx, userID); err != nil {
+		log.Printf("reset password error: revoke tokens: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "password changed but failed to invalidate sessions")
+		return
+	}
+	if h.sessions != nil {
+		h.sessions.DeleteByUserID(userID)
+	}
+
+	log.Printf("password reset by admin %s for user: %s (%s)", currentUserID, user.Username, user.ID)
 
 	jsonNoContent(w)
 }

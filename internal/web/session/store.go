@@ -72,6 +72,17 @@ func (s *Store) Delete(id string) {
 	s.mu.Unlock()
 }
 
+// DeleteByUserID removes all sessions for a user.
+func (s *Store) DeleteByUserID(userID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, sess := range s.sessions {
+		if sess.UserID == userID {
+			delete(s.sessions, id)
+		}
+	}
+}
+
 func (s *Store) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
