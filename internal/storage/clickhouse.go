@@ -462,9 +462,7 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 	// DSL filter takes precedence if set
 	if filter.FilterSQL != "" {
 		conditions = append(conditions, "("+filter.FilterSQL+")")
-		for _, arg := range filter.FilterArgs {
-			args = append(args, arg)
-		}
+		args = append(args, filter.FilterArgs...)
 	} else {
 		// Use flat filters (backward compatibility)
 
