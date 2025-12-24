@@ -165,19 +165,25 @@ func ParseStreamDefault(ctx context.Context, p Parser, r io.Reader, entries chan
 
 // Registry holds all registered parsers.
 type Registry struct {
-	parsers map[models.LogType]Parser
+	parsers       map[models.LogType]Parser
+	customParsers map[string]Parser // name -> parser for custom parsers
 }
 
 // NewRegistry creates a new parser registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		parsers: make(map[models.LogType]Parser),
+		parsers:       make(map[models.LogType]Parser),
+		customParsers: make(map[string]Parser),
 	}
 }
 
 // Register adds a parser to the registry.
 func (r *Registry) Register(p Parser) {
-	r.parsers[p.Type()] = p
+	if p.Type() == models.LogTypeCustom {
+		r.customParsers[p.Name()] = p
+	} else {
+		r.parsers[p.Type()] = p
+	}
 }
 
 // Get returns a parser by type.
@@ -188,6 +194,11 @@ func (r *Registry) Get(t models.LogType) (Parser, bool) {
 
 // GetByName returns a parser by name.
 func (r *Registry) GetByName(name string) (Parser, bool) {
+	// Check custom parsers first
+	if p, ok := r.customParsers[name]; ok {
+		return p, true
+	}
+	// Check built-in parsers
 	for _, p := range r.parsers {
 		if p.Name() == name {
 			return p, true
@@ -198,7 +209,14 @@ func (r *Registry) GetByName(name string) (Parser, bool) {
 
 // AutoDetect tries to detect the appropriate parser for the given line.
 func (r *Registry) AutoDetect(line string) (Parser, bool) {
+	// Try built-in parsers first
 	for _, p := range r.parsers {
+		if p.CanParse(line) {
+			return p, true
+		}
+	}
+	// Then try custom parsers
+	for _, p := range r.customParsers {
 		if p.CanParse(line) {
 			return p, true
 		}
@@ -208,8 +226,11 @@ func (r *Registry) AutoDetect(line string) (Parser, bool) {
 
 // All returns all registered parsers.
 func (r *Registry) All() []Parser {
-	result := make([]Parser, 0, len(r.parsers))
+	result := make([]Parser, 0, len(r.parsers)+len(r.customParsers))
 	for _, p := range r.parsers {
+		result = append(result, p)
+	}
+	for _, p := range r.customParsers {
 		result = append(result, p)
 	}
 	return result

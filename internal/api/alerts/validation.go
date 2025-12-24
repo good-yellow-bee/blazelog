@@ -20,10 +20,10 @@ func ValidateName(name string) error {
 
 func ValidateType(t string) (models.AlertType, error) {
 	switch t {
-	case "pattern", "threshold":
+	case "pattern", "threshold", "expr":
 		return models.AlertType(t), nil
 	default:
-		return "", errors.New("type must be 'pattern' or 'threshold'")
+		return "", errors.New("type must be 'pattern', 'threshold', or 'expr'")
 	}
 }
 

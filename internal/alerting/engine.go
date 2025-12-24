@@ -31,6 +31,7 @@ type EngineStats struct {
 	EntriesEvaluated  atomic.Int64
 	PatternMatches    atomic.Int64
 	ThresholdTriggers atomic.Int64
+	ExprTriggers      atomic.Int64
 	AlertsSuppressed  atomic.Int64
 }
 
@@ -96,6 +97,8 @@ func (e *Engine) EvaluateAt(entry *models.LogEntry, now time.Time) []*Alert {
 			alert = e.evaluatePattern(rule, entry, now)
 		case RuleTypeThreshold:
 			alert = e.evaluateThreshold(rule, entry, now)
+		case RuleTypeExpr:
+			alert = e.evaluateExpr(rule, entry, now)
 		}
 
 		if alert != nil {
@@ -205,6 +208,103 @@ func (e *Engine) evaluateThreshold(rule *Rule, entry *models.LogEntry, now time.
 	}
 }
 
+// evaluateExpr evaluates an expr-based rule against an entry.
+func (e *Engine) evaluateExpr(rule *Rule, entry *models.LogEntry, now time.Time) *Alert {
+	// Check label and log type filters
+	if !rule.MatchesLabels(entry) || !rule.MatchesLogType(entry) {
+		return nil
+	}
+
+	// Evaluate expression
+	matcher := rule.GetExprMatcher()
+	if matcher == nil {
+		return nil
+	}
+
+	matched, err := matcher.Match(entry)
+	if err != nil || !matched {
+		return nil
+	}
+
+	// Add to sliding window
+	agg := rule.Condition.Aggregation
+	window := e.windows.GetOrCreate(rule.Name, rule.GetAggregationWindowDuration())
+	window.AddAt(now)
+
+	// Get count and check threshold based on function
+	count := window.CountAt(now)
+	var value float64
+
+	switch agg.Function {
+	case "count":
+		value = float64(count)
+	case "rate":
+		// Rate = count per minute
+		windowMinutes := rule.GetAggregationWindowDuration().Minutes()
+		if windowMinutes > 0 {
+			value = float64(count) / windowMinutes
+		}
+	}
+
+	// Check threshold with operator
+	if !compareThreshold(value, agg.Threshold, agg.Operator) {
+		return nil
+	}
+
+	e.stats.ExprTriggers.Add(1)
+
+	// Check cooldown
+	if e.cooldown.IsOnCooldown(rule.Name, now) {
+		e.stats.AlertsSuppressed.Add(1)
+		return nil
+	}
+
+	// Set cooldown
+	if rule.GetCooldownDuration() > 0 {
+		e.cooldown.SetCooldown(rule.Name, rule.GetCooldownDuration(), now)
+	}
+
+	// Reset window after alert
+	window.Reset()
+
+	// Build alert message
+	message := fmt.Sprintf("Expression matched: %s (%s %.0f %s %.0f in %s)",
+		rule.Condition.Expression, agg.Function, value, agg.Operator, agg.Threshold, agg.Window)
+
+	return &Alert{
+		RuleName:    rule.Name,
+		Description: rule.Description,
+		Severity:    rule.Severity,
+		Message:     message,
+		Timestamp:   now,
+		Count:       count,
+		Threshold:   int(agg.Threshold),
+		Window:      agg.Window,
+		Notify:      rule.Notify,
+		Labels:      rule.Labels,
+	}
+}
+
+// compareThreshold compares a value against a threshold using the given operator.
+func compareThreshold(value, threshold float64, operator string) bool {
+	switch operator {
+	case ">=":
+		return value >= threshold
+	case ">":
+		return value > threshold
+	case "<=":
+		return value <= threshold
+	case "<":
+		return value < threshold
+	case "==":
+		return value == threshold
+	case "!=":
+		return value != threshold
+	default:
+		return false
+	}
+}
+
 // AddRule adds a new rule to the engine.
 func (e *Engine) AddRule(rule *Rule) error {
 	if err := rule.Validate(); err != nil {
@@ -281,6 +381,7 @@ type EngineStatsSnapshot struct {
 	EntriesEvaluated  int64
 	PatternMatches    int64
 	ThresholdTriggers int64
+	ExprTriggers      int64
 	AlertsSuppressed  int64
 }
 
@@ -290,6 +391,7 @@ func (e *Engine) Stats() EngineStatsSnapshot {
 		EntriesEvaluated:  e.stats.EntriesEvaluated.Load(),
 		PatternMatches:    e.stats.PatternMatches.Load(),
 		ThresholdTriggers: e.stats.ThresholdTriggers.Load(),
+		ExprTriggers:      e.stats.ExprTriggers.Load(),
 		AlertsSuppressed:  e.stats.AlertsSuppressed.Load(),
 	}
 }

@@ -3,6 +3,7 @@ package logs
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/query"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"golang.org/x/sync/errgroup"
 )
@@ -30,6 +32,7 @@ type apiResponse struct {
 const (
 	errCodeBadRequest    = "BAD_REQUEST"
 	errCodeInternalError = "INTERNAL_ERROR"
+	maxFilterLength      = 1000
 )
 
 func jsonError(w http.ResponseWriter, status int, code, message string) {
@@ -232,22 +235,68 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build filter
+	// Parse DSL filter expression (takes precedence over flat filters)
+	var filterSQL string
+	var filterArgs []any
+	filterExpr := q.Get("filter")
+	if len(filterExpr) > maxFilterLength {
+		jsonError(w, http.StatusBadRequest, errCodeBadRequest, fmt.Sprintf("filter expression too long (max %d chars)", maxFilterLength))
+		return
+	}
+	if filterExpr != "" {
+		dsl := query.NewQueryDSL(query.DefaultFields)
+		parsed, err := dsl.Parse(filterExpr)
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, errCodeBadRequest, fmt.Sprintf("invalid filter expression: %v", err))
+			return
+		}
+
+		builder := query.NewSQLBuilder(query.DefaultFields)
+		result, err := builder.Build(parsed)
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, errCodeBadRequest, fmt.Sprintf("filter conversion error: %v", err))
+			return
+		}
+		filterSQL = result.SQL
+		filterArgs = result.Args
+	}
+
+	// Build filter - DSL takes precedence over flat filters
+	agentID := q.Get("agent_id")
+	level := strings.ToLower(q.Get("level"))
+	fileType := strings.ToLower(q.Get("type"))
+	source := q.Get("source")
+	filePath := q.Get("file_path")
+	messageContains := q.Get("q")
+
+	if filterExpr != "" {
+		agentID = ""
+		level = ""
+		levels = nil
+		fileType = ""
+		source = ""
+		filePath = ""
+		messageContains = ""
+	}
+
 	filter := &storage.LogFilter{
 		StartTime:       startTime,
 		EndTime:         endTime,
-		AgentID:         q.Get("agent_id"),
-		Level:           strings.ToLower(q.Get("level")),
+		AgentID:         agentID,
+		Level:           level,
 		Levels:          levels,
-		Type:            strings.ToLower(q.Get("type")),
-		Source:          q.Get("source"),
-		FilePath:        q.Get("file_path"),
-		MessageContains: q.Get("q"),
+		Type:            fileType,
+		Source:          source,
+		FilePath:        filePath,
+		MessageContains: messageContains,
 		SearchMode:      searchMode,
 		Limit:           perPage,
 		Offset:          (page - 1) * perPage,
 		OrderBy:         orderBy,
 		OrderDesc:       orderDesc,
+		FilterExpr:      filterExpr,
+		FilterSQL:       filterSQL,
+		FilterArgs:      filterArgs,
 	}
 
 	// Execute query

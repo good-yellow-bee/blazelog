@@ -19,6 +19,8 @@ const (
 	RuleTypePattern RuleType = "pattern"
 	// RuleTypeThreshold triggers when count exceeds threshold in window.
 	RuleTypeThreshold RuleType = "threshold"
+	// RuleTypeExpr triggers based on expr-lang expression with aggregation.
+	RuleTypeExpr RuleType = "expr"
 )
 
 // Severity represents the severity level of an alert.
@@ -47,6 +49,21 @@ func ParseSeverity(s string) Severity {
 	}
 }
 
+// AggregationConfig defines aggregation for expr-based rules.
+type AggregationConfig struct {
+	// Function is the aggregation function: "count" or "rate".
+	Function string `yaml:"function"`
+	// Threshold is the value that triggers the alert.
+	Threshold float64 `yaml:"threshold"`
+	// Operator is the comparison operator (default: ">=").
+	Operator string `yaml:"operator,omitempty"`
+	// Window is the time window for aggregation (e.g., "5m", "1h").
+	Window string `yaml:"window"`
+
+	// windowDuration is the parsed window duration (internal use).
+	windowDuration time.Duration
+}
+
 // Condition defines the alert trigger condition.
 type Condition struct {
 	// Pattern is the regex pattern for pattern-based rules.
@@ -66,8 +83,15 @@ type Condition struct {
 	// LogType filters by log type (e.g., "nginx", "magento").
 	LogType string `yaml:"log_type,omitempty"`
 
+	// Expression is the expr-lang filter expression for expr-based rules.
+	Expression string `yaml:"expression,omitempty"`
+	// Aggregation defines how matching entries are aggregated for expr rules.
+	Aggregation *AggregationConfig `yaml:"aggregation,omitempty"`
+
 	// compiledPattern is the compiled regex (internal use).
 	compiledPattern *regexp.Regexp
+	// compiledExpr is the compiled expr matcher (internal use).
+	compiledExpr *ExprMatcher
 	// windowDuration is the parsed window duration (internal use).
 	windowDuration time.Duration
 }
@@ -115,7 +139,7 @@ func (r *Rule) Validate() error {
 		return fmt.Errorf("rule type is required for rule %q", r.Name)
 	}
 
-	if r.Type != RuleTypePattern && r.Type != RuleTypeThreshold {
+	if r.Type != RuleTypePattern && r.Type != RuleTypeThreshold && r.Type != RuleTypeExpr {
 		return fmt.Errorf("invalid rule type %q for rule %q", r.Type, r.Name)
 	}
 
@@ -163,6 +187,60 @@ func (r *Rule) Validate() error {
 		}
 	}
 
+	// Validate expr rules
+	if r.Type == RuleTypeExpr {
+		if r.Condition.Expression == "" {
+			return fmt.Errorf("expression is required for expr rule %q", r.Name)
+		}
+
+		// Compile expression
+		matcher, err := NewExprMatcher(r.Condition.Expression)
+		if err != nil {
+			return fmt.Errorf("invalid expression for rule %q: %w", r.Name, err)
+		}
+		r.Condition.compiledExpr = matcher
+
+		// Validate aggregation config
+		if r.Condition.Aggregation == nil {
+			return fmt.Errorf("aggregation is required for expr rule %q", r.Name)
+		}
+		agg := r.Condition.Aggregation
+
+		// Validate function
+		switch agg.Function {
+		case "count", "rate":
+			// Valid
+		default:
+			return fmt.Errorf("invalid aggregation function %q for rule %q (must be count or rate)", agg.Function, r.Name)
+		}
+
+		// Validate threshold
+		if agg.Threshold <= 0 {
+			return fmt.Errorf("aggregation threshold must be positive for rule %q", r.Name)
+		}
+
+		// Default operator
+		if agg.Operator == "" {
+			agg.Operator = ">="
+		}
+		switch agg.Operator {
+		case "==", "!=", ">", ">=", "<", "<=":
+			// Valid
+		default:
+			return fmt.Errorf("invalid aggregation operator %q for rule %q", agg.Operator, r.Name)
+		}
+
+		// Validate window
+		if agg.Window == "" {
+			return fmt.Errorf("aggregation window is required for expr rule %q", r.Name)
+		}
+		windowDur, err := time.ParseDuration(agg.Window)
+		if err != nil {
+			return fmt.Errorf("invalid aggregation window %q for rule %q: %w", agg.Window, r.Name, err)
+		}
+		agg.windowDuration = windowDur
+	}
+
 	// Parse cooldown
 	if r.Cooldown != "" {
 		cooldownDur, err := time.ParseDuration(r.Cooldown)
@@ -193,6 +271,19 @@ func (r *Rule) GetWindowDuration() time.Duration {
 // GetCooldownDuration returns the parsed cooldown duration.
 func (r *Rule) GetCooldownDuration() time.Duration {
 	return r.cooldownDuration
+}
+
+// GetExprMatcher returns the compiled expression matcher.
+func (r *Rule) GetExprMatcher() *ExprMatcher {
+	return r.Condition.compiledExpr
+}
+
+// GetAggregationWindowDuration returns the aggregation window duration.
+func (r *Rule) GetAggregationWindowDuration() time.Duration {
+	if r.Condition.Aggregation == nil {
+		return 0
+	}
+	return r.Condition.Aggregation.windowDuration
 }
 
 // MatchesLabels checks if the rule's label filter matches the log entry.

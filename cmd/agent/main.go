@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/good-yellow-bee/blazelog/internal/agent"
+	"github.com/good-yellow-bee/blazelog/internal/parser"
 	"github.com/good-yellow-bee/blazelog/pkg/config"
 	"github.com/spf13/cobra"
 )
@@ -61,6 +62,16 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	// Override server address if provided
 	if serverAddr != "" {
 		cfg.Server.Address = serverAddr
+	}
+
+	// Register custom parsers
+	if len(cfg.Parsers) > 0 {
+		if err := parser.RegisterCustomParsers(parser.DefaultRegistry, cfg.Parsers); err != nil {
+			return fmt.Errorf("register custom parsers: %w", err)
+		}
+		if verbose {
+			log.Printf("registered %d custom parsers", len(cfg.Parsers))
+		}
 	}
 
 	// Build agent config
