@@ -27,6 +27,7 @@ const (
 	LogTypeMagento    LogType = "magento"
 	LogTypePrestaShop LogType = "prestashop"
 	LogTypeWordPress  LogType = "wordpress"
+	LogTypeCustom     LogType = "custom"
 	LogTypeUnknown    LogType = "unknown"
 )
 

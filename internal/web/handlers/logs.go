@@ -10,10 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/query"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
 	"github.com/gorilla/csrf"
 )
+
+const maxFilterLength = 1000
 
 func (h *Handler) ShowLogs(w http.ResponseWriter, r *http.Request) {
 	sess := GetSession(r)
@@ -112,19 +115,60 @@ func (h *Handler) GetLogsData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build filter
+	// Parse DSL filter expression
+	var filterSQL string
+	var filterArgs []any
+	filterExpr := q.Get("filter")
+	if len(filterExpr) > maxFilterLength {
+		http.Error(w, fmt.Sprintf("filter too long (max %d chars)", maxFilterLength), http.StatusBadRequest)
+		return
+	}
+	if filterExpr != "" {
+		dsl := query.NewQueryDSL(query.DefaultFields)
+		parsed, parseErr := dsl.Parse(filterExpr)
+		if parseErr != nil {
+			http.Error(w, fmt.Sprintf("invalid filter: %v", parseErr), http.StatusBadRequest)
+			return
+		}
+
+		builder := query.NewSQLBuilder(query.DefaultFields)
+		result, buildErr := builder.Build(parsed)
+		if buildErr != nil {
+			http.Error(w, fmt.Sprintf("filter error: %v", buildErr), http.StatusBadRequest)
+			return
+		}
+		filterSQL = result.SQL
+		filterArgs = result.Args
+	}
+
+	// Build filter - DSL takes precedence over flat filters
+	level := strings.ToLower(q.Get("level"))
+	fileType := strings.ToLower(q.Get("type"))
+	source := q.Get("source")
+	messageContains := q.Get("q")
+
+	if filterExpr != "" {
+		level = ""
+		fileType = ""
+		source = ""
+		messageContains = ""
+	}
+
 	filter := &storage.LogFilter{
 		StartTime:       startTime,
 		EndTime:         endTime,
-		Level:           strings.ToLower(q.Get("level")),
-		Type:            strings.ToLower(q.Get("type")),
-		Source:          q.Get("source"),
-		MessageContains: q.Get("q"),
+		Level:           level,
+		Type:            fileType,
+		Source:          source,
+		MessageContains: messageContains,
 		SearchMode:      searchMode,
 		Limit:           perPage,
 		Offset:          (page - 1) * perPage,
 		OrderBy:         "timestamp",
 		OrderDesc:       true,
+		FilterExpr:      filterExpr,
+		FilterSQL:       filterSQL,
+		FilterArgs:      filterArgs,
 	}
 
 	// Default response for nil storage

@@ -459,67 +459,77 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 	// Build WHERE clause
 	var conditions []string
 
-	// Agent filter
-	if filter.AgentID != "" {
-		conditions = append(conditions, "agent_id = ?")
-		args = append(args, filter.AgentID)
-	}
-
-	// Level filter
-	if filter.Level != "" {
-		conditions = append(conditions, "level = ?")
-		args = append(args, filter.Level)
-	}
-	if len(filter.Levels) > 0 {
-		placeholders := make([]string, len(filter.Levels))
-		for i, l := range filter.Levels {
-			placeholders[i] = "?"
-			args = append(args, l)
+	// DSL filter takes precedence if set
+	if filter.FilterSQL != "" {
+		conditions = append(conditions, "("+filter.FilterSQL+")")
+		for _, arg := range filter.FilterArgs {
+			args = append(args, arg)
 		}
-		conditions = append(conditions, fmt.Sprintf("level IN (%s)", strings.Join(placeholders, ", ")))
-	}
+	} else {
+		// Use flat filters (backward compatibility)
 
-	// Type filter
-	if filter.Type != "" {
-		conditions = append(conditions, "type = ?")
-		args = append(args, filter.Type)
-	}
-	if len(filter.Types) > 0 {
-		placeholders := make([]string, len(filter.Types))
-		for i, t := range filter.Types {
-			placeholders[i] = "?"
-			args = append(args, t)
+		// Agent filter
+		if filter.AgentID != "" {
+			conditions = append(conditions, "agent_id = ?")
+			args = append(args, filter.AgentID)
 		}
-		conditions = append(conditions, fmt.Sprintf("type IN (%s)", strings.Join(placeholders, ", ")))
-	}
 
-	// Source filter
-	if filter.Source != "" {
-		conditions = append(conditions, "source = ?")
-		args = append(args, filter.Source)
-	}
-
-	// File path filter
-	if filter.FilePath != "" {
-		conditions = append(conditions, "file_path = ?")
-		args = append(args, filter.FilePath)
-	}
-
-	// Full-text search on message with search mode support (Milestone 21)
-	if filter.MessageContains != "" {
-		switch filter.SearchMode {
-		case SearchModeSubstring:
-			conditions = append(conditions, "position(message, ?) > 0")
-			args = append(args, filter.MessageContains)
-		case SearchModePhrase:
-			words := strings.Fields(filter.MessageContains)
-			for _, word := range words {
-				conditions = append(conditions, "hasToken(message, ?)")
-				args = append(args, word)
+		// Level filter
+		if filter.Level != "" {
+			conditions = append(conditions, "level = ?")
+			args = append(args, filter.Level)
+		}
+		if len(filter.Levels) > 0 {
+			placeholders := make([]string, len(filter.Levels))
+			for i, l := range filter.Levels {
+				placeholders[i] = "?"
+				args = append(args, l)
 			}
-		default: // SearchModeToken
-			conditions = append(conditions, "hasToken(message, ?)")
-			args = append(args, filter.MessageContains)
+			conditions = append(conditions, fmt.Sprintf("level IN (%s)", strings.Join(placeholders, ", ")))
+		}
+
+		// Type filter
+		if filter.Type != "" {
+			conditions = append(conditions, "type = ?")
+			args = append(args, filter.Type)
+		}
+		if len(filter.Types) > 0 {
+			placeholders := make([]string, len(filter.Types))
+			for i, t := range filter.Types {
+				placeholders[i] = "?"
+				args = append(args, t)
+			}
+			conditions = append(conditions, fmt.Sprintf("type IN (%s)", strings.Join(placeholders, ", ")))
+		}
+
+		// Source filter
+		if filter.Source != "" {
+			conditions = append(conditions, "source = ?")
+			args = append(args, filter.Source)
+		}
+
+		// File path filter
+		if filter.FilePath != "" {
+			conditions = append(conditions, "file_path = ?")
+			args = append(args, filter.FilePath)
+		}
+
+		// Full-text search on message with search mode support (Milestone 21)
+		if filter.MessageContains != "" {
+			switch filter.SearchMode {
+			case SearchModeSubstring:
+				conditions = append(conditions, "position(message, ?) > 0")
+				args = append(args, filter.MessageContains)
+			case SearchModePhrase:
+				words := strings.Fields(filter.MessageContains)
+				for _, word := range words {
+					conditions = append(conditions, "hasToken(message, ?)")
+					args = append(args, word)
+				}
+			default: // SearchModeToken
+				conditions = append(conditions, "hasToken(message, ?)")
+				args = append(args, filter.MessageContains)
+			}
 		}
 	}
 

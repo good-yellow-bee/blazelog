@@ -9,17 +9,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/parser"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
 
 // Config represents the agent configuration.
 type Config struct {
-	Server      ServerConfig      `yaml:"server"`
-	Agent       AgentConfig       `yaml:"agent"`
-	Reliability ReliabilityConfig `yaml:"reliability"`
-	Sources     []SourceConfig    `yaml:"sources"`
-	Labels      map[string]string `yaml:"labels"`
+	Server      ServerConfig                 `yaml:"server"`
+	Agent       AgentConfig                  `yaml:"agent"`
+	Reliability ReliabilityConfig            `yaml:"reliability"`
+	Parsers     []parser.CustomParserConfig  `yaml:"parsers"`
+	Sources     []SourceConfig               `yaml:"sources"`
+	Labels      map[string]string            `yaml:"labels"`
 }
 
 // ServerConfig contains server connection settings.

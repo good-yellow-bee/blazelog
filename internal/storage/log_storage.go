@@ -133,6 +133,11 @@ type LogFilter struct {
 	// Sorting (default: timestamp DESC).
 	OrderBy   string // "timestamp", "level"
 	OrderDesc bool
+
+	// DSL filter (takes precedence over flat filters if set).
+	FilterExpr string // Original expression for display/debugging.
+	FilterSQL  string // Generated SQL WHERE clause.
+	FilterArgs []any  // SQL parameters.
 }
 
 // LogQueryResult contains query results with pagination info.
