@@ -309,3 +309,37 @@ The codebase demonstrates many security best practices:
 - `internal/server/*.go` - gRPC server
 - `internal/query/*.go` - Query DSL and SQL builder
 - `cmd/server/config.go` - Configuration handling
+
+---
+
+## Fixes Implemented (commit 2539f7f)
+
+All high-severity and medium-severity issues have been addressed:
+
+### High Severity - FIXED ✓
+
+1. **SSH Command Injection** - Added `validateGlobPattern()` function that only allows safe glob characters (alphanumeric, `/`, `.`, `-`, `_`, `*`, `?`, `[`, `]`). Pattern is also escaped when passed to shell.
+
+2. **SQL Injection via ORDER BY** - Added allowlist at the ClickHouse query builder level. Only `timestamp`, `level`, `source`, `type`, `agent_id`, `http_status` are valid ORDER BY columns.
+
+3. **SSH InsecureIgnoreHostKey** - Now requires explicit `InsecureIgnoreHostKey: true` in config. Logs a security warning when insecure mode is used. Fails with clear error message otherwise.
+
+### Medium Severity - FIXED ✓
+
+4. **JSON Field SQL Injection** - Added `isValidJSONPropertyName()` that only allows alphanumeric, underscore, and hyphen characters in JSON property names.
+
+5. **Rate Limiter IP Spoofing** - Added `TrustedProxies` configuration. X-Forwarded-For and X-Real-IP headers are only trusted when the request comes from a configured trusted proxy IP/CIDR.
+
+6. **Web Login Missing Lockout** - Web UI login now uses `LockoutTracker` like the API. Failed attempts are recorded and accounts are locked after threshold is reached.
+
+7. **Cookie/Session TTL Mismatch** - Added `CreateWithTTL()` method to session store. When remember-me is checked, both cookie and session now use 30-day TTL.
+
+8. **Plaintext Config Passwords** - Added `WarnSecurityIssues()` function that logs warnings on server startup for:
+   - Plaintext ClickHouse password (suggests using `password_env`)
+   - Plaintext SSH passwords (suggests key-based auth)
+   - Disabled TLS for gRPC
+   - Disabled secure cookies
+
+### Low Severity - FIXED ✓
+
+9. **Unbounded Agent Registration** - Added agent cleanup mechanism. Agents not seen for 30 minutes are automatically removed. Heartbeat updates last-active timestamp.
