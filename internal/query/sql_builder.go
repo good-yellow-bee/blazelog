@@ -293,7 +293,14 @@ func (v *sqlVisitor) visitMember(n *ast.MemberNode) (string, error) {
 		return "", fmt.Errorf("unsupported property type")
 	}
 
+	// Validate property name to prevent SQL injection
+	// Only allow alphanumeric characters, underscores, and hyphens
+	if !isValidJSONPropertyName(propName) {
+		return "", fmt.Errorf("invalid JSON property name: %q", propName)
+	}
+
 	// Use JSONExtractString for JSON field access
+	// Property name is validated above to be safe
 	return fmt.Sprintf("JSONExtractString(%s, '%s')", field.Column, propName), nil
 }
 
@@ -375,4 +382,19 @@ func (v *sqlVisitor) durationToInterval(d time.Duration) string {
 		return fmt.Sprintf("INTERVAL %d MINUTE", int(minutes))
 	}
 	return fmt.Sprintf("INTERVAL %d SECOND", int(d.Seconds()))
+}
+
+// isValidJSONPropertyName checks if a property name is safe for use in SQL.
+// Only allows alphanumeric characters, underscores, and hyphens.
+func isValidJSONPropertyName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_' || r == '-') {
+			return false
+		}
+	}
+	return true
 }

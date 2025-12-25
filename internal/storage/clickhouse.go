@@ -551,10 +551,22 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 		return sb.String(), allArgs
 	}
 
-	// ORDER BY
-	orderBy := "timestamp"
+	// ORDER BY - use allowlist to prevent SQL injection
+	// Map of allowed sort fields to their actual column names
+	allowedOrderColumns := map[string]string{
+		"timestamp":   "timestamp",
+		"level":       "level",
+		"source":      "source",
+		"type":        "type",
+		"agent_id":    "agent_id",
+		"http_status": "http_status",
+	}
+	orderBy := "timestamp" // default
 	if filter.OrderBy != "" {
-		orderBy = filter.OrderBy
+		if col, ok := allowedOrderColumns[filter.OrderBy]; ok {
+			orderBy = col
+		}
+		// If not in allowlist, use default (timestamp)
 	}
 	orderDir := "DESC"
 	if !filter.OrderDesc && filter.OrderBy != "" {

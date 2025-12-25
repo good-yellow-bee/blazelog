@@ -19,6 +19,7 @@ type Config struct {
 	JWTSecret        []byte
 	CSRFSecret       string   // For web UI CSRF protection
 	TrustedOrigins   []string // Trusted origins for CSRF (e.g., "localhost:8080")
+	TrustedProxies   []string // Trusted proxy IPs/CIDRs for X-Forwarded-For
 	WebUIEnabled     bool     // Enable web UI (default: true)
 	UseSecureCookies bool     // Use Secure flag for cookies (true in production with HTTPS)
 	AccessTokenTTL   time.Duration
