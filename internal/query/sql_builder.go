@@ -391,8 +391,8 @@ func isValidJSONPropertyName(name string) bool {
 		return false
 	}
 	for _, r := range name {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') || r == '_' || r == '-') {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') &&
+			(r < '0' || r > '9') && r != '_' && r != '-' {
 			return false
 		}
 	}
