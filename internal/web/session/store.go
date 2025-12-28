@@ -34,6 +34,11 @@ func NewStore(ttl time.Duration) *Store {
 }
 
 func (s *Store) Create(userID, username, role string) (*Session, error) {
+	return s.CreateWithTTL(userID, username, role, s.ttl)
+}
+
+// CreateWithTTL creates a session with a custom TTL.
+func (s *Store) CreateWithTTL(userID, username, role string, ttl time.Duration) (*Session, error) {
 	id, err := generateSessionID()
 	if err != nil {
 		return nil, err
@@ -45,7 +50,7 @@ func (s *Store) Create(userID, username, role string) (*Session, error) {
 		Username:  username,
 		Role:      role,
 		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(s.ttl),
+		ExpiresAt: time.Now().Add(ttl),
 	}
 
 	s.mu.Lock()

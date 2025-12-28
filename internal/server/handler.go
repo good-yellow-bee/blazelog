@@ -6,33 +6,87 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 
-	"github.com/google/uuid"
 	"github.com/good-yellow-bee/blazelog/internal/metrics"
 	blazelogv1 "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
+
+// agentEntry tracks an agent with its last activity time.
+type agentEntry struct {
+	info       *blazelogv1.AgentInfo
+	lastActive time.Time
+}
 
 // Handler implements the LogServiceServer gRPC interface.
 type Handler struct {
 	blazelogv1.UnimplementedLogServiceServer
 
 	processor *Processor
-	agents    sync.Map // agent_id -> *blazelogv1.AgentInfo
+	agents    sync.Map // agent_id -> *agentEntry
 	verbose   bool
 
 	// Metrics
 	totalBatches  uint64
 	totalEntries  uint64
 	activeStreams int32
+
+	// Cleanup
+	agentTTL time.Duration
+	stopCh   chan struct{}
 }
 
 // NewHandler creates a new gRPC handler.
 func NewHandler(processor *Processor, verbose bool) *Handler {
-	return &Handler{
+	h := &Handler{
 		processor: processor,
 		verbose:   verbose,
+		agentTTL:  30 * time.Minute, // Agents inactive for 30 min are removed
+		stopCh:    make(chan struct{}),
 	}
+	go h.cleanupLoop()
+	return h
+}
+
+// cleanupLoop periodically removes inactive agents.
+func (h *Handler) cleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			h.cleanupInactiveAgents()
+		case <-h.stopCh:
+			return
+		}
+	}
+}
+
+// cleanupInactiveAgents removes agents that haven't been active recently.
+func (h *Handler) cleanupInactiveAgents() {
+	cutoff := time.Now().Add(-h.agentTTL)
+	removed := 0
+
+	h.agents.Range(func(key, value any) bool {
+		entry := value.(*agentEntry)
+		if entry.lastActive.Before(cutoff) {
+			h.agents.Delete(key)
+			removed++
+		}
+		return true
+	})
+
+	if removed > 0 && h.verbose {
+		log.Printf("cleaned up %d inactive agents", removed)
+	}
+}
+
+// Stop stops the handler's background goroutines.
+func (h *Handler) Stop() {
+	close(h.stopCh)
 }
 
 // Register handles agent registration.
@@ -51,8 +105,11 @@ func (h *Handler) Register(ctx context.Context, req *blazelogv1.RegisterRequest)
 		agentID = uuid.New().String()
 	}
 
-	// Store agent info
-	h.agents.Store(agentID, agent)
+	// Store agent info with activity timestamp
+	h.agents.Store(agentID, &agentEntry{
+		info:       agent,
+		lastActive: time.Now(),
+	})
 	metrics.GRPCAgentsRegistered.Inc()
 
 	log.Printf("agent registered: id=%s name=%s hostname=%s sources=%d",
@@ -125,6 +182,14 @@ func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch
 
 // Heartbeat handles agent heartbeat messages.
 func (h *Handler) Heartbeat(ctx context.Context, req *blazelogv1.HeartbeatRequest) (*blazelogv1.HeartbeatResponse, error) {
+	// Update agent's last active time
+	if req.AgentId != "" {
+		if entry, ok := h.agents.Load(req.AgentId); ok {
+			e := entry.(*agentEntry)
+			e.lastActive = time.Now()
+		}
+	}
+
 	if h.verbose {
 		status := req.Status
 		if status != nil {

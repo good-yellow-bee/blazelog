@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
@@ -37,10 +38,21 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if account is locked out
+	if h.lockoutTracker != nil && h.lockoutTracker.IsLocked(username) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		renderLoginError(w, r, "Account temporarily locked due to too many failed attempts")
+		return
+	}
+
 	// Get user from storage
 	ctx := r.Context()
 	user, err := h.storage.Users().GetByUsername(ctx, username)
 	if err != nil || user == nil {
+		// Record failed attempt
+		if h.lockoutTracker != nil {
+			h.lockoutTracker.RecordFailure(username)
+		}
 		w.WriteHeader(http.StatusUnauthorized)
 		renderLoginError(w, r, "Invalid credentials")
 		return
@@ -48,24 +60,35 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		// Record failed attempt
+		if h.lockoutTracker != nil {
+			h.lockoutTracker.RecordFailure(username)
+		}
 		w.WriteHeader(http.StatusUnauthorized)
 		renderLoginError(w, r, "Invalid credentials")
 		return
 	}
 
-	// Create session
-	sess, err := h.sessions.Create(user.ID, user.Username, string(user.Role))
+	// Clear any failed attempts on successful login
+	if h.lockoutTracker != nil {
+		h.lockoutTracker.ClearFailures(username)
+	}
+
+	// Determine session TTL based on remember-me
+	rememberMe := r.FormValue("remember_me") == "on"
+	sessionTTL := 24 * time.Hour
+	maxAge := 86400 // 24 hours
+	if rememberMe {
+		sessionTTL = 30 * 24 * time.Hour // 30 days
+		maxAge = 2592000                 // 30 days
+	}
+
+	// Create session with appropriate TTL
+	sess, err := h.sessions.CreateWithTTL(user.ID, user.Username, string(user.Role), sessionTTL)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		renderLoginError(w, r, "Failed to create session")
 		return
-	}
-
-	// Set session cookie
-	rememberMe := r.FormValue("remember_me") == "on"
-	maxAge := 86400 // 24 hours
-	if rememberMe {
-		maxAge = 2592000 // 30 days
 	}
 
 	http.SetCookie(w, &http.Cookie{

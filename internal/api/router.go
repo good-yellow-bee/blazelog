@@ -1,6 +1,8 @@
 package api
 
 import (
+	"log"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/good-yellow-bee/blazelog/internal/api/alerts"
@@ -17,6 +19,14 @@ import (
 // setupRouter creates and configures the chi router with all routes.
 func (s *Server) setupRouter() *chi.Mux {
 	r := chi.NewRouter()
+
+	// Configure trusted proxies for rate limiting
+	if len(s.config.TrustedProxies) > 0 {
+		if err := middleware.SetTrustedProxies(s.config.TrustedProxies); err != nil {
+			// Log warning but continue - will fall back to direct IP
+			log.Printf("warning: failed to configure trusted proxies: %v", err)
+		}
+	}
 
 	// Create JWT service
 	jwtService := auth.NewJWTService(s.config.JWTSecret, s.config.AccessTokenTTL)

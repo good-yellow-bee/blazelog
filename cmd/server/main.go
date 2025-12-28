@@ -114,6 +114,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 	cfg.Verbose = verbose
 
+	// Log security warnings for insecure configuration
+	cfg.WarnSecurityIssues(log.Printf)
+
 	// Get master key from environment
 	masterKey := os.Getenv("BLAZELOG_MASTER_KEY")
 	if masterKey == "" {
@@ -300,6 +303,7 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 		JWTSecret:        []byte(jwtSecret),
 		CSRFSecret:       csrfSecret,
 		TrustedOrigins:   cfg.Auth.TrustedOrigins,
+		TrustedProxies:   cfg.Auth.TrustedProxies,
 		WebUIEnabled:     webUIEnabled,
 		UseSecureCookies: cfg.Auth.UseSecureCookies,
 		AccessTokenTTL:   accessTTL,

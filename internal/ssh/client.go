@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -38,8 +39,11 @@ type ClientConfig struct {
 	// JumpHost is an optional bastion/jump host for proxying connections.
 	JumpHost *ClientConfig
 	// HostKeyCallback is the callback for host key verification.
-	// If nil, uses InsecureIgnoreHostKey (not recommended for production).
+	// If nil and InsecureIgnoreHostKey is false, connection will fail.
 	HostKeyCallback ssh.HostKeyCallback
+	// InsecureIgnoreHostKey skips host key verification (NOT RECOMMENDED).
+	// Only use for development/testing. A warning will be logged.
+	InsecureIgnoreHostKey bool
 	// AuditLogger is the optional audit logger for SSH operations.
 	AuditLogger AuditLogger
 }
@@ -90,7 +94,12 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	hostKeyCallback := c.config.HostKeyCallback
 	if hostKeyCallback == nil {
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+		if c.config.InsecureIgnoreHostKey {
+			log.Printf("WARNING: SSH host key verification disabled for %s - vulnerable to MITM attacks", c.config.Host)
+			hostKeyCallback = ssh.InsecureIgnoreHostKey()
+		} else {
+			return fmt.Errorf("host key verification required: set HostKeyCallback or enable InsecureIgnoreHostKey (not recommended)")
+		}
 	}
 
 	sshConfig := &ssh.ClientConfig{
@@ -316,6 +325,12 @@ func (c *Client) FileInfo(ctx context.Context, path string) (*RemoteFileInfo, er
 
 // ListFiles lists files matching a glob pattern.
 func (c *Client) ListFiles(ctx context.Context, pattern string) ([]string, error) {
+	// Validate pattern to prevent command injection
+	// Only allow safe glob characters: alphanumeric, /, ., -, _, *, ?, [, ]
+	if err := validateGlobPattern(pattern); err != nil {
+		return nil, fmt.Errorf("invalid glob pattern: %w", err)
+	}
+
 	c.mu.Lock()
 	if !c.connected {
 		c.mu.Unlock()
@@ -332,8 +347,10 @@ func (c *Client) ListFiles(ctx context.Context, pattern string) ([]string, error
 	}
 	defer session.Close()
 
-	// Use ls with glob pattern
-	cmd := fmt.Sprintf("ls -1 %s 2>/dev/null || true", pattern)
+	// Use ls with glob pattern - pattern is validated above to be safe
+	// We use sh -c with single quotes and escape any single quotes in pattern
+	escapedPattern := strings.ReplaceAll(pattern, "'", "'\"'\"'")
+	cmd := fmt.Sprintf("sh -c 'ls -1 %s 2>/dev/null || true'", escapedPattern)
 	output, err := session.Output(cmd)
 	duration := time.Since(start)
 
@@ -558,6 +575,42 @@ func isConnectionError(err error) bool {
 	if strings.Contains(errStr, "connection refused") ||
 		strings.Contains(errStr, "connection reset") ||
 		strings.Contains(errStr, "broken pipe") {
+		return true
+	}
+	return false
+}
+
+// validateGlobPattern checks that a glob pattern contains only safe characters.
+// This prevents command injection when the pattern is used in shell commands.
+// Allowed characters: alphanumeric, /, ., -, _, *, ?, [, ], space
+func validateGlobPattern(pattern string) error {
+	if pattern == "" {
+		return fmt.Errorf("empty pattern")
+	}
+
+	for i, r := range pattern {
+		if !isAllowedGlobChar(r) {
+			return fmt.Errorf("invalid character %q at position %d", r, i)
+		}
+	}
+
+	// Check for dangerous patterns
+	if strings.Contains(pattern, "..") {
+		return fmt.Errorf("path traversal not allowed")
+	}
+
+	return nil
+}
+
+// isAllowedGlobChar returns true if the rune is allowed in glob patterns.
+func isAllowedGlobChar(r rune) bool {
+	// Alphanumeric
+	if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+		return true
+	}
+	// Safe special characters for glob patterns
+	switch r {
+	case '/', '.', '-', '_', '*', '?', '[', ']', ' ':
 		return true
 	}
 	return false

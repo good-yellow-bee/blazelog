@@ -10,13 +10,13 @@ import (
 
 // Config represents the server configuration.
 type Config struct {
-	Server         ServerConfig      `yaml:"server"`
-	Metrics        MetricsConfig     `yaml:"metrics"`         // Metrics configuration
-	Database       DatabaseConfig    `yaml:"database"`        // Database configuration
-	ClickHouse     ClickHouseConfig  `yaml:"clickhouse"`      // ClickHouse log storage configuration
-	SSHConnections []SSHConnection   `yaml:"ssh_connections"` // SSH connections for remote log collection
-	Auth           AuthConfig        `yaml:"auth"`            // Authentication configuration
-	Verbose        bool              `yaml:"-"`               // set via CLI flag
+	Server         ServerConfig     `yaml:"server"`
+	Metrics        MetricsConfig    `yaml:"metrics"`         // Metrics configuration
+	Database       DatabaseConfig   `yaml:"database"`        // Database configuration
+	ClickHouse     ClickHouseConfig `yaml:"clickhouse"`      // ClickHouse log storage configuration
+	SSHConnections []SSHConnection  `yaml:"ssh_connections"` // SSH connections for remote log collection
+	Auth           AuthConfig       `yaml:"auth"`            // Authentication configuration
+	Verbose        bool             `yaml:"-"`               // set via CLI flag
 }
 
 // MetricsConfig contains Prometheus metrics settings.
@@ -30,6 +30,7 @@ type AuthConfig struct {
 	JWTSecretEnv     string   `yaml:"jwt_secret_env"`      // Env var name for JWT secret (default: BLAZELOG_JWT_SECRET)
 	CSRFSecretEnv    string   `yaml:"csrf_secret_env"`     // Env var name for CSRF secret (optional, for web UI)
 	TrustedOrigins   []string `yaml:"trusted_origins"`     // Trusted origins for CSRF (default: localhost:8080, 127.0.0.1:8080)
+	TrustedProxies   []string `yaml:"trusted_proxies"`     // Trusted proxy IPs/CIDRs for X-Forwarded-For (empty = don't trust proxy headers)
 	UseSecureCookies bool     `yaml:"use_secure_cookies"`  // Use Secure flag for cookies (enable in production with HTTPS)
 	AccessTokenTTL   string   `yaml:"access_token_ttl"`    // Access token TTL (default: 15m)
 	RefreshTokenTTL  string   `yaml:"refresh_token_ttl"`   // Refresh token TTL (default: 168h / 7 days)
@@ -243,4 +244,33 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// WarnSecurityIssues logs warnings for insecure configuration options.
+// Should be called during server startup after config is loaded.
+func (c *Config) WarnSecurityIssues(logger func(format string, args ...any)) {
+	// Warn about plaintext ClickHouse password
+	if c.ClickHouse.Password != "" && c.ClickHouse.PasswordEnv == "" {
+		logger("SECURITY WARNING: clickhouse.password is set in plaintext in config file. Use clickhouse.password_env instead.")
+	}
+
+	// Warn about plaintext SSH passwords
+	for i, conn := range c.SSHConnections {
+		if conn.Password != "" {
+			logger("SECURITY WARNING: ssh_connections[%d].password is set in plaintext. Use key-based authentication instead.", i)
+		}
+		if conn.KeyPassphrase != "" {
+			logger("SECURITY WARNING: ssh_connections[%d].key_passphrase is set in plaintext. Consider using an encrypted key file.", i)
+		}
+	}
+
+	// Warn if TLS is disabled
+	if !c.Server.TLS.Enabled {
+		logger("SECURITY WARNING: TLS is disabled for gRPC. Agent-server communication is not encrypted.")
+	}
+
+	// Warn if secure cookies are disabled
+	if !c.Auth.UseSecureCookies {
+		logger("SECURITY WARNING: use_secure_cookies is disabled. Enable for production with HTTPS.")
+	}
 }
