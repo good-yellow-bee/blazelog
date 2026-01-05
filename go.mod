@@ -4,7 +4,8 @@ go 1.24.7
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.42.0
-	github.com/a-h/templ v0.3.960
+	github.com/a-h/templ v0.3.977
+	github.com/expr-lang/expr v1.17.7
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -19,7 +20,7 @@ require (
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.41.0
+	modernc.org/sqlite v1.42.2
 )
 
 require (
@@ -28,7 +29,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/expr-lang/expr v1.17.7 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
