@@ -76,6 +76,10 @@ linters:
     rules:
       - linters:
           - gosec
+          - nilnil
+          - gocritic
+          - errorlint
+          - prealloc
         path: _test\.go
       - linters:
           - all
