@@ -61,6 +61,31 @@ make build
 make install
 ```
 
+### Cross-Compilation Notes
+
+The server and CLI binaries require SQLCipher (CGO-enabled). Cross-compiling CGO binaries requires platform-specific toolchains.
+
+**Recommended: Use Docker for cross-platform builds**
+
+```bash
+# Build Linux AMD64 image
+docker build --platform linux/amd64 \
+  -f deployments/docker/Dockerfile.server \
+  -t blazelog-server:linux-amd64 .
+
+# Build Linux ARM64 image
+docker build --platform linux/arm64 \
+  -f deployments/docker/Dockerfile.server \
+  -t blazelog-server:linux-arm64 .
+```
+
+**Native cross-compilation** (advanced):
+- Requires cross-compiler toolchain (e.g., `gcc-aarch64-linux-gnu` for ARM64)
+- Requires SQLCipher compiled for target platform
+- Set `CC` and `CGO_CFLAGS`/`CGO_LDFLAGS` for target architecture
+
+The `make build-all-platforms` target works for the agent (CGO_ENABLED=0) but **will fail** for server/CLI without cross-compilation setup.
+
 ### Setup Directories
 
 ```bash
@@ -430,6 +455,44 @@ sudo systemctl start blazelog-server
 sudo journalctl -u blazelog-server -f
 ```
 
+### SQLCipher Migration (v0.x → v1.0)
+
+Version 1.0 introduces SQLCipher database encryption. Existing unencrypted databases must be migrated.
+
+**Breaking Change:** Unencrypted SQLite databases cannot be opened after upgrading.
+
+**Migration Steps:**
+
+1. **Backup existing database**
+   ```bash
+   cp data/blazelog.db data/blazelog.db.backup
+   ```
+
+2. **Export data** (before upgrade)
+   ```bash
+   sqlite3 data/blazelog.db .dump > blazelog_export.sql
+   ```
+
+3. **Upgrade binaries** and set new environment variable
+   ```bash
+   export BLAZELOG_DB_KEY=$(openssl rand -base64 32)
+   # Save this key securely - required to open database
+   ```
+
+4. **Create new encrypted database**
+   ```bash
+   rm data/blazelog.db  # Remove old unencrypted DB
+   ./blazelog-server -c configs/server.yaml  # Creates new encrypted DB
+   ```
+
+5. **Re-import data** (optional - for preserving users/alerts)
+   ```bash
+   # Import via CLI after server creates schema
+   blazectl user create --username admin --role admin
+   ```
+
+**Note:** Log data in ClickHouse is unaffected. Only SQLite config data requires migration.
+
 ### Docker Upgrade
 
 ```bash
@@ -440,6 +503,37 @@ docker compose pull
 
 # Restart with new images
 docker compose --profile prod up -d
+```
+
+### Backup & Restore
+
+**SQLite (config database)**
+```bash
+# Backup (requires BLAZELOG_DB_KEY)
+sqlite3 data/blazelog.db ".backup 'blazelog_backup.db'"
+
+# Or using blazectl (planned feature)
+# blazectl backup --output blazelog_backup.sql
+```
+
+**ClickHouse (log data)**
+```bash
+# Using clickhouse-client
+clickhouse-client --query "SELECT * FROM logs FORMAT Native" > logs_backup.native
+
+# Restore
+clickhouse-client --query "INSERT INTO logs FORMAT Native" < logs_backup.native
+```
+
+**Full backup script example:**
+```bash
+#!/bin/bash
+DATE=$(date +%Y%m%d)
+BACKUP_DIR=/var/backups/blazelog
+
+mkdir -p $BACKUP_DIR
+cp data/blazelog.db $BACKUP_DIR/blazelog_$DATE.db
+# Note: DB key required to restore
 ```
 
 ---
