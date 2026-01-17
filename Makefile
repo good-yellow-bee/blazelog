@@ -35,8 +35,10 @@ LDFLAGS=-ldflags "-s -w \
 	-X github.com/good-yellow-bee/blazelog/pkg/config.Commit=$(COMMIT) \
 	-X github.com/good-yellow-bee/blazelog/pkg/config.BuildTime=$(BUILD_TIME)"
 
-# Build flags for static binary
+# Build flags
 STATIC_FLAGS=CGO_ENABLED=0
+SQLCIPHER_FLAGS=CGO_ENABLED=1
+SQLCIPHER_TAGS=-tags sqlcipher
 
 # Default target
 all: build
@@ -48,7 +50,7 @@ build: build-cli build-agent build-server
 build-cli:
 	@echo "Building $(BINARY_CLI)..."
 	@mkdir -p $(BUILD_DIR)
-	$(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI) ./$(CMD_DIR)/blazectl
+	$(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI) ./$(CMD_DIR)/blazectl
 
 ## build-agent: Build the agent binary
 build-agent:
@@ -60,24 +62,24 @@ build-agent:
 build-server: templ-generate web-build
 	@echo "Building $(BINARY_SERVER)..."
 	@mkdir -p $(BUILD_DIR)
-	$(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_SERVER) ./$(CMD_DIR)/server
+	$(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_SERVER) ./$(CMD_DIR)/server
 
 ## build-all-platforms: Build for all platforms
 build-all-platforms:
 	@echo "Building for all platforms..."
 	@mkdir -p $(BUILD_DIR)
 	# Linux AMD64
-	GOOS=linux GOARCH=amd64 $(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-linux-amd64 ./$(CMD_DIR)/blazectl
+	GOOS=linux GOARCH=amd64 $(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-linux-amd64 ./$(CMD_DIR)/blazectl
 	GOOS=linux GOARCH=amd64 $(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_AGENT)-linux-amd64 ./$(CMD_DIR)/agent
 	# Linux ARM64
-	GOOS=linux GOARCH=arm64 $(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-linux-arm64 ./$(CMD_DIR)/blazectl
+	GOOS=linux GOARCH=arm64 $(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-linux-arm64 ./$(CMD_DIR)/blazectl
 	GOOS=linux GOARCH=arm64 $(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_AGENT)-linux-arm64 ./$(CMD_DIR)/agent
 	# macOS AMD64
-	GOOS=darwin GOARCH=amd64 $(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-darwin-amd64 ./$(CMD_DIR)/blazectl
+	GOOS=darwin GOARCH=amd64 $(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-darwin-amd64 ./$(CMD_DIR)/blazectl
 	# macOS ARM64
-	GOOS=darwin GOARCH=arm64 $(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-darwin-arm64 ./$(CMD_DIR)/blazectl
+	GOOS=darwin GOARCH=arm64 $(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-darwin-arm64 ./$(CMD_DIR)/blazectl
 	# Windows AMD64
-	GOOS=windows GOARCH=amd64 $(STATIC_FLAGS) $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-windows-amd64.exe ./$(CMD_DIR)/blazectl
+	GOOS=windows GOARCH=amd64 $(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-windows-amd64.exe ./$(CMD_DIR)/blazectl
 
 ## test: Run all tests
 test:

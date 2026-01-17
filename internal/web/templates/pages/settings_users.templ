@@ -466,14 +466,44 @@ templ UsersScript(currentUserID string) {
 					});
 				},
 
-			getRoleBadgeClass(role) {
-				switch (role) {
-					case 'admin': return 'badge badge-teal';
-					case 'operator': return 'badge badge-sky';
-					case 'viewer': return 'badge badge-slate';
-					default: return 'badge badge-slate';
-				}
-			},
+				getRoleBadgeClass(role) {
+					switch (role) {
+						case 'admin': return 'badge badge-teal';
+						case 'operator': return 'badge badge-sky';
+						case 'viewer': return 'badge badge-slate';
+						default: return 'badge badge-slate';
+					}
+				},
+
+				validatePassword(password) {
+					if (password.length < 12) {
+						return 'Password must be at least 12 characters';
+					}
+					if (!/[A-Z]/.test(password)) {
+						return 'Password must include at least 1 uppercase letter';
+					}
+					if (!/[a-z]/.test(password)) {
+						return 'Password must include at least 1 lowercase letter';
+					}
+					if (!/[0-9]/.test(password)) {
+						return 'Password must include at least 1 digit';
+					}
+					const specials = "!@#$%^&*()-_=+[]|;:',.<>?/~\"\\\\" +
+						String.fromCharCode(96) +
+						String.fromCharCode(123) +
+						String.fromCharCode(125);
+					let hasSpecial = false;
+					for (const ch of password) {
+						if (specials.includes(ch)) {
+							hasSpecial = true;
+							break;
+						}
+					}
+					if (!hasSpecial) {
+						return 'Password must include at least 1 special character';
+					}
+					return '';
+				},
 
 				openCreate() {
 					this.createForm = {
@@ -527,8 +557,9 @@ templ UsersScript(currentUserID string) {
 						this.formError = 'Password is required';
 						return;
 					}
-					if (this.createForm.password.length < 8) {
-						this.formError = 'Password must be at least 8 characters';
+					const passwordError = this.validatePassword(this.createForm.password);
+					if (passwordError) {
+						this.formError = passwordError;
 						return;
 					}
 
@@ -593,8 +624,9 @@ templ UsersScript(currentUserID string) {
 						this.formError = 'Password is required';
 						return;
 					}
-					if (this.passwordForm.password.length < 8) {
-						this.formError = 'Password must be at least 8 characters';
+					const passwordError = this.validatePassword(this.passwordForm.password);
+					if (passwordError) {
+						this.formError = passwordError;
 						return;
 					}
 					if (this.passwordForm.password !== this.passwordForm.confirm) {

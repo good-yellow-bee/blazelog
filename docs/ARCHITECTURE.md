@@ -176,33 +176,31 @@ type Parser interface {
 
 ```sql
 CREATE TABLE logs (
-    id UUID,
-    timestamp DateTime64(3),
+    id UUID DEFAULT generateUUIDv4(),
+    timestamp DateTime64(3, 'UTC'),
     level LowCardinality(String),
-    type LowCardinality(String),
     message String,
-    source LowCardinality(String),
-    agent_id LowCardinality(String),
+    source String,
+    type LowCardinality(String),
     file_path String,
-    line_number UInt64,
+    line_number Int64,
     raw String,
-    fields String,  -- JSON
-    labels Map(String, String),
-    -- HTTP fields (for access logs)
-    http_status UInt16,
-    http_method LowCardinality(String),
-    uri String,
-    response_time Float64,
-    bytes_sent UInt64
+    agent_id String,
+    fields String,
+    labels String,
+    http_status UInt16 DEFAULT 0,
+    http_method LowCardinality(String) DEFAULT '',
+    uri String DEFAULT '',
+    _date Date DEFAULT toDate(timestamp)
 ) ENGINE = MergeTree()
-PARTITION BY toYYYYMM(timestamp)
-ORDER BY (timestamp, agent_id, level)
-TTL timestamp + INTERVAL 30 DAY;
+PARTITION BY toYYYYMM(_date)
+ORDER BY (agent_id, type, level, timestamp, id)
+TTL _date + INTERVAL 30 DAY DELETE;
 ```
 
 ### Batch Insert
 
-- Batches inserts for efficiency (5000 rows or 5 seconds)
+- Batches inserts for efficiency (1000 rows or 5 seconds)
 - Uses ClickHouse's batch insert API
 - Handles backpressure via buffering
 

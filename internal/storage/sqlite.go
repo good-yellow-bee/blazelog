@@ -6,11 +6,13 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
+	// SQLCipher-enabled SQLite driver.
+	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
-	_ "modernc.org/sqlite"
 
 	"github.com/good-yellow-bee/blazelog/internal/models"
 )
@@ -19,6 +21,7 @@ import (
 type SQLiteStorage struct {
 	path      string
 	masterKey []byte
+	dbKey     []byte
 	db        *sql.DB
 
 	users        *sqliteUserRepo
@@ -30,10 +33,11 @@ type SQLiteStorage struct {
 }
 
 // NewSQLiteStorage creates a new SQLite storage.
-func NewSQLiteStorage(path string, masterKey []byte) *SQLiteStorage {
+func NewSQLiteStorage(path string, masterKey []byte, dbKey []byte) *SQLiteStorage {
 	return &SQLiteStorage{
 		path:      path,
 		masterKey: masterKey,
+		dbKey:     dbKey,
 	}
 }
 
@@ -41,10 +45,14 @@ func NewSQLiteStorage(path string, masterKey []byte) *SQLiteStorage {
 func (s *SQLiteStorage) Open() error {
 	ctx := context.Background()
 
-	// Connection string
-	dsn := fmt.Sprintf("file:%s", s.path)
+	if len(s.dbKey) == 0 {
+		return fmt.Errorf("database key is required")
+	}
 
-	db, err := sql.Open("sqlite", dsn)
+	// Connection string
+	dsn := fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_page_size=4096", s.path, url.QueryEscape(string(s.dbKey)))
+
+	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -62,6 +70,8 @@ func (s *SQLiteStorage) Open() error {
 
 	// Enable foreign keys and WAL mode
 	pragmas := []string{
+		"PRAGMA cipher_compatibility = 4",
+		"PRAGMA cipher_memory_security = ON",
 		"PRAGMA foreign_keys = ON",
 		"PRAGMA journal_mode = WAL",
 	}

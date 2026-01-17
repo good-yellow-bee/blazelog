@@ -8,6 +8,7 @@ BlazeLog provides two CLI tools:
 - **`blazelog-server`** — Server daemon
 
 All management commands use the default database at `./data/blazelog.db`. Use `--db <path>` to override.
+`blazectl` requires `BLAZELOG_DB_KEY` to open the encrypted database. Set `BLAZELOG_MASTER_KEY` when managing encrypted SSH credentials.
 
 ---
 

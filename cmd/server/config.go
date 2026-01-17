@@ -34,10 +34,10 @@ type AuthConfig struct {
 	UseSecureCookies bool     `yaml:"use_secure_cookies"`  // Use Secure flag for cookies (enable in production with HTTPS)
 	AccessTokenTTL   string   `yaml:"access_token_ttl"`    // Access token TTL (default: 15m)
 	RefreshTokenTTL  string   `yaml:"refresh_token_ttl"`   // Refresh token TTL (default: 168h / 7 days)
-	RateLimitPerIP   int      `yaml:"rate_limit_per_ip"`   // Login rate limit per IP (default: 5/min)
+	RateLimitPerIP   int      `yaml:"rate_limit_per_ip"`   // Login rate limit per IP (default: 5/15m)
 	RateLimitPerUser int      `yaml:"rate_limit_per_user"` // API rate limit per user (default: 100/min)
 	LockoutThreshold int      `yaml:"lockout_threshold"`   // Failed attempts before lockout (default: 5)
-	LockoutDuration  string   `yaml:"lockout_duration"`    // Lockout duration (default: 15m)
+	LockoutDuration  string   `yaml:"lockout_duration"`    // Lockout duration (default: 30m)
 }
 
 // ClickHouseConfig contains ClickHouse settings.
@@ -63,9 +63,10 @@ type DatabaseConfig struct {
 
 // ServerConfig contains server settings.
 type ServerConfig struct {
-	GRPCAddress string    `yaml:"grpc_address"` // gRPC listen address (default: :9443)
-	HTTPAddress string    `yaml:"http_address"` // HTTP listen address (default: :8080)
-	TLS         TLSConfig `yaml:"tls"`          // TLS configuration for mTLS
+	GRPCAddress string        `yaml:"grpc_address"` // gRPC listen address (default: :9443)
+	HTTPAddress string        `yaml:"http_address"` // HTTP listen address (default: :8080)
+	TLS         TLSConfig     `yaml:"tls"`          // TLS configuration for mTLS
+	HTTPTLS     HTTPTLSConfig `yaml:"http_tls"`     // TLS configuration for HTTP API
 }
 
 // TLSConfig contains TLS settings for the server.
@@ -74,6 +75,13 @@ type TLSConfig struct {
 	CertFile     string `yaml:"cert_file"`      // Server certificate file
 	KeyFile      string `yaml:"key_file"`       // Server private key file
 	ClientCAFile string `yaml:"client_ca_file"` // CA certificate for verifying client certs
+}
+
+// HTTPTLSConfig contains TLS settings for the HTTP API.
+type HTTPTLSConfig struct {
+	Enabled  bool   `yaml:"enabled"`   // Enable HTTPS
+	CertFile string `yaml:"cert_file"` // Server certificate file
+	KeyFile  string `yaml:"key_file"`  // Server private key file
 }
 
 // SSHConnection defines a remote server connection for log collection.
@@ -189,7 +197,7 @@ func (c *Config) setDefaults() {
 		c.Auth.LockoutThreshold = 5
 	}
 	if c.Auth.LockoutDuration == "" {
-		c.Auth.LockoutDuration = "15m"
+		c.Auth.LockoutDuration = "30m"
 	}
 }
 
@@ -207,6 +215,14 @@ func (c *Config) Validate() error {
 		}
 		if c.Server.TLS.ClientCAFile == "" {
 			return fmt.Errorf("server.tls.client_ca_file is required when TLS is enabled")
+		}
+	}
+	if c.Server.HTTPTLS.Enabled {
+		if c.Server.HTTPTLS.CertFile == "" {
+			return fmt.Errorf("server.http_tls.cert_file is required when HTTP TLS is enabled")
+		}
+		if c.Server.HTTPTLS.KeyFile == "" {
+			return fmt.Errorf("server.http_tls.key_file is required when HTTP TLS is enabled")
 		}
 	}
 
@@ -267,6 +283,9 @@ func (c *Config) WarnSecurityIssues(logger func(format string, args ...any)) {
 	// Warn if TLS is disabled
 	if !c.Server.TLS.Enabled {
 		logger("SECURITY WARNING: TLS is disabled for gRPC. Agent-server communication is not encrypted.")
+	}
+	if !c.Server.HTTPTLS.Enabled {
+		logger("SECURITY WARNING: HTTP TLS is disabled for the API. Enable HTTPS or terminate TLS at a trusted proxy.")
 	}
 
 	// Warn if secure cookies are disabled

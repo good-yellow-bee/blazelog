@@ -500,7 +500,13 @@ func init() {
 
 // openProjectDB opens the SQLite database with default path.
 func openProjectDB() (*storage.SQLiteStorage, error) {
-	store := storage.NewSQLiteStorage(projectDBPath, nil)
+	dbKey := os.Getenv("BLAZELOG_DB_KEY")
+	if dbKey == "" {
+		return nil, fmt.Errorf("BLAZELOG_DB_KEY environment variable is required")
+	}
+	masterKey := []byte(os.Getenv("BLAZELOG_MASTER_KEY"))
+
+	store := storage.NewSQLiteStorage(projectDBPath, masterKey, []byte(dbKey))
 	if err := store.Open(); err != nil {
 		return nil, fmt.Errorf("open database at %s: %w", projectDBPath, err)
 	}

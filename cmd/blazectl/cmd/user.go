@@ -349,7 +349,13 @@ func openDatabase(path string) (*storage.SQLiteStorage, error) {
 		return nil, fmt.Errorf("database file not found: %s", path)
 	}
 
-	store := storage.NewSQLiteStorage(path, nil)
+	dbKey := os.Getenv("BLAZELOG_DB_KEY")
+	if dbKey == "" {
+		return nil, fmt.Errorf("BLAZELOG_DB_KEY environment variable is required")
+	}
+	masterKey := []byte(os.Getenv("BLAZELOG_MASTER_KEY"))
+
+	store := storage.NewSQLiteStorage(path, masterKey, []byte(dbKey))
 	if err := store.Open(); err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}

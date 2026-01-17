@@ -122,6 +122,10 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if masterKey == "" {
 		return fmt.Errorf("BLAZELOG_MASTER_KEY environment variable is required")
 	}
+	dbKey := os.Getenv("BLAZELOG_DB_KEY")
+	if dbKey == "" {
+		return fmt.Errorf("BLAZELOG_DB_KEY environment variable is required")
+	}
 
 	// Auto-create data directory
 	dbDir := filepath.Dir(cfg.Database.Path)
@@ -130,7 +134,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize storage
-	store := storage.NewSQLiteStorage(cfg.Database.Path, []byte(masterKey))
+	store := storage.NewSQLiteStorage(cfg.Database.Path, []byte(masterKey), []byte(dbKey))
 	if err := store.Open(); err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -306,6 +310,9 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 		TrustedProxies:   cfg.Auth.TrustedProxies,
 		WebUIEnabled:     webUIEnabled,
 		UseSecureCookies: cfg.Auth.UseSecureCookies,
+		HTTPTLSEnabled:   cfg.Server.HTTPTLS.Enabled,
+		HTTPTLSCertFile:  cfg.Server.HTTPTLS.CertFile,
+		HTTPTLSKeyFile:   cfg.Server.HTTPTLS.KeyFile,
 		AccessTokenTTL:   accessTTL,
 		RefreshTokenTTL:  refreshTTL,
 		RateLimitPerIP:   cfg.Auth.RateLimitPerIP,

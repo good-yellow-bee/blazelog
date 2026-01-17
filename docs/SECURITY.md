@@ -13,8 +13,8 @@
 └─────────────┘           └────────┬────────────┘              └─────────────┘
                                    │
                          ┌────────▼────────────┐
-                         │  SQLite (Encrypted) │
-                         │  Master Key AES-256 │
+                         │  SQLite (SQLCipher) │
+                         │  DB Key AES-256     │
                          └─────────────────────┘
 ```
 
@@ -25,8 +25,8 @@
 ### JWT Authentication
 
 - Algorithm: HMAC-SHA256
-- Token lifetime: 24 hours
-- Refresh: Automatic with valid token
+- Token lifetime: 15 minutes (default)
+- Refresh: Refresh token required (default 7 days)
 - Secret: `BLAZELOG_JWT_SECRET` environment variable
 
 ### Password Requirements
@@ -39,7 +39,7 @@
 
 | Condition | Action |
 |-----------|--------|
-| 5 failed logins in 15min | Account locked 30min |
+| 5 failed logins | Account locked 30min |
 | Locked account login | Shows "locked" message |
 | After lockout expires | Counter resets |
 
@@ -76,8 +76,8 @@
 ### HTTP API
 
 - Protocol: HTTP/1.1 or HTTP/2
-- TLS: TLS 1.3 minimum (in production)
-- HSTS: Enabled with 1-year max-age
+- TLS: TLS 1.3 minimum when HTTPS enabled
+- HSTS: Enabled with 1-year max-age on HTTPS requests
 
 ### Certificate Requirements
 
@@ -105,7 +105,7 @@ blazectl cert agent --name agent-hostname
 | User passwords | bcrypt hash |
 | SSH keys | AES-256-GCM (master key) |
 | Connection credentials | AES-256-GCM (master key) |
-| SQLite database | File permissions |
+| SQLite database | SQLCipher AES-256 (database key) |
 
 ### Master Key
 
@@ -113,17 +113,21 @@ blazectl cert agent --name agent-hostname
 # Generate secure master key
 openssl rand -base64 32
 
-# Set as environment variable (not in config files!)
+# Set as environment variables (not in config files!)
 export BLAZELOG_MASTER_KEY="<generated-key>"
+export BLAZELOG_DB_KEY="<generated-key>"
 ```
 
-**Warning:** Losing the master key means losing access to encrypted credentials.
+`BLAZELOG_MASTER_KEY` encrypts credentials. `BLAZELOG_DB_KEY` encrypts the SQLite database.
+
+**Warning:** Losing either key means losing access to encrypted data.
 
 ### Secrets Management
 
 | Secret | Storage | Access |
 |--------|---------|--------|
 | `BLAZELOG_MASTER_KEY` | Environment only | Never logged |
+| `BLAZELOG_DB_KEY` | Environment only | Never logged |
 | `BLAZELOG_JWT_SECRET` | Environment only | Never logged |
 | `BLAZELOG_CSRF_SECRET` | Environment only | Never logged |
 | SSH keys | Encrypted files | Decrypted in memory |
@@ -138,8 +142,9 @@ All HTTP responses include:
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 X-XSS-Protection: 1; mode=block
-Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'
 Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains (HTTPS only)
 ```
 
 ---
@@ -154,9 +159,8 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 ### Path Traversal Protection
 
-- Log paths validated against whitelist
+- Log paths validated against allowed characters
 - No `..` in path components
-- Absolute paths required
 
 ### XSS Protection
 
@@ -179,14 +183,14 @@ Lockout: 30 minutes after 5 failures
 ### API Endpoints
 
 ```
-Default: 100 requests per minute per IP
-Configurable per endpoint
+Default: 100 requests per minute per user (fallback to IP)
+Configurable via auth rate limit settings
 ```
 
 ### Implementation
 
-- IP-based tracking with periodic cleanup
-- Sliding window algorithm
+- Token bucket rate limiting with periodic cleanup
+- Per-IP for auth endpoints, per-user for authenticated endpoints
 - Memory-efficient (no external dependencies)
 
 ---
@@ -247,6 +251,7 @@ Service files include these protections:
 ### Pre-Deployment
 
 - [ ] Generate unique `BLAZELOG_MASTER_KEY`
+- [ ] Generate unique `BLAZELOG_DB_KEY`
 - [ ] Generate unique `BLAZELOG_JWT_SECRET`
 - [ ] Generate unique `BLAZELOG_CSRF_SECRET`
 - [ ] Generate TLS certificates (CA + server + agents)
@@ -290,7 +295,7 @@ Service files include these protections:
 
 1. **Isolate**: Disconnect server from network
 2. **Preserve**: Snapshot logs before changes
-3. **Rotate**: All secrets (master key, JWT, CSRF)
+3. **Rotate**: All secrets (master key, DB key, JWT, CSRF)
 4. **Regenerate**: All TLS certificates
 5. **Audit**: Review SSH audit logs
 6. **Reset**: All user passwords

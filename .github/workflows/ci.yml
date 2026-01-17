@@ -63,6 +63,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -87,7 +89,7 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
-          args: --timeout=5m
+          args: --timeout=5m --new-from-rev=origin/main
 
   test:
     name: Test
