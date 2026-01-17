@@ -55,10 +55,12 @@ curl http://localhost:8080/health | jq .
 ```bash
 # Required variables
 echo $BLAZELOG_MASTER_KEY
+echo $BLAZELOG_DB_KEY
 echo $BLAZELOG_JWT_SECRET
 
 # Set if missing
 export BLAZELOG_MASTER_KEY=$(openssl rand -hex 32)
+export BLAZELOG_DB_KEY=$(openssl rand -hex 32)
 export BLAZELOG_JWT_SECRET=$(openssl rand -hex 32)
 ```
 
@@ -73,8 +75,8 @@ lsof -i :9443  # gRPC
 
 **Check 3: Configuration errors**
 ```bash
-# Validate config syntax
-blazelog-server --config server.yaml --validate
+# Validate config by running with the config file
+blazelog-server --config server.yaml
 
 # Common errors:
 # - Invalid YAML syntax

@@ -2,7 +2,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates libstdc++
+RUN apk add --no-cache git ca-certificates libstdc++ build-base sqlcipher-dev
 
 # Install templ, buf, and protoc plugins
 RUN go install github.com/a-h/templ/cmd/templ@latest && \
@@ -40,7 +40,8 @@ ARG COMMIT=unknown
 ARG BUILD_TIME=unknown
 ARG TARGETARCH
 # Build server binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -tags sqlcipher \
     -trimpath \
     -ldflags "-s -w \
         -X github.com/good-yellow-bee/blazelog/pkg/config.Version=${VERSION} \
@@ -49,7 +50,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -o /blazelog-server ./cmd/server
 
 # Build CLI binary (for user management)
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -tags sqlcipher \
     -trimpath \
     -ldflags "-s -w \
         -X github.com/good-yellow-bee/blazelog/pkg/config.Version=${VERSION} \
@@ -61,7 +63,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
 FROM alpine:3.23
 
 # Install ca-certificates and create user
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata sqlcipher \
     && addgroup -g 65532 nonroot \
     && adduser -u 65532 -G nonroot -s /sbin/nologin -D nonroot
 

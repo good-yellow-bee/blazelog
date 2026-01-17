@@ -32,7 +32,7 @@ Response:
     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "token_type": "Bearer",
-    "expires_in": 3600
+    "expires_in": 900
   }
 }
 ```
@@ -49,7 +49,7 @@ curl http://localhost:8080/api/v1/logs \
 
 ### Token Refresh
 
-Access tokens expire after 1 hour. Use the refresh token to get a new pair:
+Access tokens expire after 15 minutes by default. Use the refresh token to get a new pair:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/refresh \

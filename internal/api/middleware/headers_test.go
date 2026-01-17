@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"crypto/tls"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -124,5 +125,26 @@ func TestSecurityHeaders(t *testing.T) {
 	// Permissions-Policy should be set
 	if rec.Header().Get("Permissions-Policy") == "" {
 		t.Error("Permissions-Policy header not set")
+	}
+
+	// HSTS should not be set on insecure requests
+	if rec.Header().Get("Strict-Transport-Security") != "" {
+		t.Error("Strict-Transport-Security should not be set for insecure requests")
+	}
+}
+
+func TestSecurityHeaders_HSTS(t *testing.T) {
+	handler := SecurityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.TLS = &tls.ConnectionState{}
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Header().Get("Strict-Transport-Security") == "" {
+		t.Error("Strict-Transport-Security header not set for secure requests")
 	}
 }

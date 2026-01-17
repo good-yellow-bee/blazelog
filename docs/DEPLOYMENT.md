@@ -8,6 +8,7 @@ make build
 
 # Set required secrets
 export BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)
+export BLAZELOG_DB_KEY=$(openssl rand -base64 32)
 export BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)
 export BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)
 
@@ -41,6 +42,17 @@ cd blazelog
 
 # Install dependencies
 make deps
+
+# Install SQLCipher (required for server + blazectl)
+# macOS (Homebrew):
+#   brew install sqlcipher
+# Linux (Debian/Ubuntu):
+#   sudo apt-get install -y sqlcipher libsqlcipher-dev
+#
+# Point CGO at SQLCipher headers and libs if needed:
+#   export CGO_ENABLED=1
+#   export CGO_CFLAGS="-I$(brew --prefix sqlcipher)/include"
+#   export CGO_LDFLAGS="-L$(brew --prefix sqlcipher)/lib -lsqlcipher"
 
 # Build all binaries
 make build
@@ -98,6 +110,7 @@ cp .env.example .env
 
 # 2. Generate secrets
 echo "BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)" >> .env
+echo "BLAZELOG_DB_KEY=$(openssl rand -base64 32)" >> .env
 echo "BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)" >> .env
 echo "BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)" >> .env
 
@@ -108,7 +121,7 @@ docker compose --profile dev up -d
 open http://localhost:8080
 ```
 
-Default credentials: `admin` / `admin` (change immediately!)
+First run prints a random admin password to server logs (change immediately).
 
 ### Production Deployment (ClickHouse)
 
@@ -121,6 +134,7 @@ cp .env.example .env
 # 2. Generate ALL secrets
 cat >> .env << 'EOF'
 BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)
+BLAZELOG_DB_KEY=$(openssl rand -base64 32)
 BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)
 BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)
 CLICKHOUSE_PASSWORD=$(openssl rand -base64 32)
@@ -145,6 +159,7 @@ docker compose ps
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `BLAZELOG_MASTER_KEY` | Yes | - | Encryption key for sensitive data |
+| `BLAZELOG_DB_KEY` | Yes | - | SQLite SQLCipher database key |
 | `BLAZELOG_JWT_SECRET` | Yes | - | JWT signing secret |
 | `BLAZELOG_CSRF_SECRET` | No | - | Web UI CSRF protection |
 | `CLICKHOUSE_PASSWORD` | Prod | - | ClickHouse password |
@@ -265,6 +280,7 @@ sudo cp deployments/systemd/blazelog-agent.service /etc/systemd/system/
 # Configure secrets
 sudo tee /etc/blazelog/server.env << 'EOF'
 BLAZELOG_MASTER_KEY=<your-master-key>
+BLAZELOG_DB_KEY=<your-db-key>
 BLAZELOG_JWT_SECRET=<your-jwt-secret>
 BLAZELOG_CSRF_SECRET=<your-csrf-secret>
 EOF
@@ -438,6 +454,7 @@ sudo journalctl -u blazelog-server -n 50
 
 # Common issues:
 # - Missing BLAZELOG_MASTER_KEY → Set in /etc/blazelog/server.env
+# - Missing BLAZELOG_DB_KEY → Set in /etc/blazelog/server.env
 # - Port already in use → Check with: ss -tlnp | grep 8080
 # - Permission denied → Check directory ownership
 ```

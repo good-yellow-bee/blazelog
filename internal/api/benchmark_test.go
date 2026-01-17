@@ -28,7 +28,8 @@ func benchServer(b *testing.B) (*Server, storage.Storage, func()) {
 	tmpFile.Close()
 
 	masterKey := []byte("test-master-key-32-bytes-long!!")
-	store := storage.NewSQLiteStorage(tmpFile.Name(), masterKey)
+	dbKey := []byte("test-db-key-32-bytes-long!!!!!")
+	store := storage.NewSQLiteStorage(tmpFile.Name(), masterKey, dbKey)
 	if err := store.Open(); err != nil {
 		os.Remove(tmpFile.Name())
 		b.Fatalf("open storage: %v", err)
@@ -47,7 +48,7 @@ func benchServer(b *testing.B) (*Server, storage.Storage, func()) {
 		RateLimitPerIP:   10000, // High limit for benchmarks
 		RateLimitPerUser: 10000,
 		LockoutThreshold: 1000,
-		LockoutDuration:  15 * time.Minute,
+		LockoutDuration:  30 * time.Minute,
 		Verbose:          false,
 	}
 

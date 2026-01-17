@@ -2,6 +2,7 @@ package api
 
 import (
 	"log"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -35,7 +36,7 @@ func (s *Server) setupRouter() *chi.Mux {
 	lockoutTracker := auth.NewLockoutTracker(s.config.LockoutThreshold, s.config.LockoutDuration)
 
 	// Create rate limiters
-	ipLimiter := middleware.NewRateLimiter(s.config.RateLimitPerIP)
+	ipLimiter := middleware.NewRateLimiterWithWindow(s.config.RateLimitPerIP, 15*time.Minute)
 	userLimiter := middleware.NewRateLimiter(s.config.RateLimitPerUser)
 
 	// Global middleware

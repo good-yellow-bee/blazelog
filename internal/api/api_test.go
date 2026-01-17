@@ -28,7 +28,8 @@ func testServer(t *testing.T) (*Server, storage.Storage, func()) {
 	tmpFile.Close()
 
 	masterKey := []byte("test-master-key-32-bytes-long!!")
-	store := storage.NewSQLiteStorage(tmpFile.Name(), masterKey)
+	dbKey := []byte("test-db-key-32-bytes-long!!!!!")
+	store := storage.NewSQLiteStorage(tmpFile.Name(), masterKey, dbKey)
 	if err := store.Open(); err != nil {
 		os.Remove(tmpFile.Name())
 		t.Fatalf("open storage: %v", err)
@@ -47,7 +48,7 @@ func testServer(t *testing.T) (*Server, storage.Storage, func()) {
 		RateLimitPerIP:   100,
 		RateLimitPerUser: 100,
 		LockoutThreshold: 5,
-		LockoutDuration:  15 * time.Minute,
+		LockoutDuration:  30 * time.Minute,
 		Verbose:          false,
 	}
 

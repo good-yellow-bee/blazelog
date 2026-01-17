@@ -7,6 +7,7 @@
 | Variable | Description | Generation |
 |----------|-------------|------------|
 | `BLAZELOG_MASTER_KEY` | Encryption key for sensitive data | `openssl rand -base64 32` |
+| `BLAZELOG_DB_KEY` | SQLCipher database key | `openssl rand -base64 32` |
 | `BLAZELOG_JWT_SECRET` | JWT signing secret | `openssl rand -base64 32` |
 
 ### Optional
@@ -48,6 +49,12 @@ server:
   # HTTP listen address for REST API and Web UI
   http_address: ":8080"  # default
 
+  # HTTPS configuration for HTTP API
+  http_tls:
+    enabled: false
+    cert_file: "/etc/blazelog/certs/http.crt"
+    key_file: "/etc/blazelog/certs/http.key"
+
   # TLS/mTLS configuration
   tls:
     # Enable mTLS (false for development)
@@ -82,6 +89,24 @@ auth:
 
   # CSRF secret environment variable name (Web UI)
   csrf_secret_env: "BLAZELOG_CSRF_SECRET"
+
+  # Access token TTL (default: 15m)
+  access_token_ttl: "15m"
+
+  # Refresh token TTL (default: 168h / 7 days)
+  refresh_token_ttl: "168h"
+
+  # Login rate limit per IP (default: 5/15m)
+  rate_limit_per_ip: 5
+
+  # API rate limit per user (default: 100/min)
+  rate_limit_per_user: 100
+
+  # Failed attempts before lockout (default: 5)
+  lockout_threshold: 5
+
+  # Lockout duration (default: 30m)
+  lockout_duration: "30m"
 
 ```
 

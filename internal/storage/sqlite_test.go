@@ -23,8 +23,9 @@ func setupTestDB(t *testing.T) (*SQLiteStorage, func()) {
 
 	dbPath := filepath.Join(tmpDir, "test.db")
 	masterKey := []byte("test-master-key-32-bytes-long!!!")
+	dbKey := []byte("test-db-key-32-bytes-long!!!!!")
 
-	store := NewSQLiteStorage(dbPath, masterKey)
+	store := NewSQLiteStorage(dbPath, masterKey, dbKey)
 	if err := store.Open(); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("open database: %v", err)

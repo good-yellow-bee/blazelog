@@ -63,6 +63,8 @@ BlazeLog is a universal log analyzer built in Go that provides real-time streami
 make build
 ```
 
+Note: `blazelog-server` and `blazectl` require SQLCipher (CGO + `-tags sqlcipher`).
+
 ### Parse logs
 
 ```bash

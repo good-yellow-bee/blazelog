@@ -84,13 +84,18 @@ type rateLimiterEntry struct {
 	lastAccess int64 // unix nano, updated on each access
 }
 
-// NewRateLimiter creates a new rate limiter.
-// limit is requests per minute.
+// NewRateLimiter creates a new rate limiter with a 1 minute window.
 func NewRateLimiter(limit int) *RateLimiter {
+	return NewRateLimiterWithWindow(limit, time.Minute)
+}
+
+// NewRateLimiterWithWindow creates a new rate limiter.
+// limit is requests per window.
+func NewRateLimiterWithWindow(limit int, window time.Duration) *RateLimiter {
 	rl := &RateLimiter{
-		limit:  rate.Limit(float64(limit) / 60.0), // convert per-minute to per-second
-		burst:  limit,                             // allow burst up to full limit
-		window: time.Minute,
+		limit:  rate.Limit(float64(limit) / window.Seconds()),
+		burst:  limit,
+		window: window,
 	}
 
 	// Start cleanup goroutine
@@ -228,4 +233,22 @@ func getClientIP(r *http.Request) string {
 
 	// Fall back to direct connection IP
 	return directIP
+}
+
+// IsRequestSecure returns true if the request arrived over HTTPS.
+// For proxied requests, it only trusts X-Forwarded-Proto from trusted proxies.
+func IsRequestSecure(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+
+	directIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		directIP = r.RemoteAddr
+	}
+	if !isTrustedProxy(directIP) {
+		return false
+	}
+
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }

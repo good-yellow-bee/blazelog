@@ -3,6 +3,7 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,6 +23,9 @@ type Config struct {
 	TrustedProxies   []string // Trusted proxy IPs/CIDRs for X-Forwarded-For
 	WebUIEnabled     bool     // Enable web UI (default: true)
 	UseSecureCookies bool     // Use Secure flag for cookies (true in production with HTTPS)
+	HTTPTLSEnabled   bool     // Enable HTTPS for API server
+	HTTPTLSCertFile  string   // HTTPS certificate file
+	HTTPTLSKeyFile   string   // HTTPS private key file
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
 	RateLimitPerIP   int
@@ -43,7 +47,7 @@ func (c *Config) SetDefaults() {
 		c.RefreshTokenTTL = 7 * 24 * time.Hour // 7 days
 	}
 	if c.RateLimitPerIP == 0 {
-		c.RateLimitPerIP = 5 // 5 requests per minute
+		c.RateLimitPerIP = 5 // 5 requests per 15 minutes
 	}
 	if c.RateLimitPerUser == 0 {
 		c.RateLimitPerUser = 100 // 100 requests per minute
@@ -52,7 +56,7 @@ func (c *Config) SetDefaults() {
 		c.LockoutThreshold = 5 // 5 failed attempts
 	}
 	if c.LockoutDuration == 0 {
-		c.LockoutDuration = 15 * time.Minute
+		c.LockoutDuration = 30 * time.Minute
 	}
 }
 
@@ -101,6 +105,11 @@ func New(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*Serv
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+	if cfg.HTTPTLSEnabled {
+		s.server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+		}
+	}
 
 	return s, nil
 }
@@ -116,7 +125,13 @@ func (s *Server) Run(ctx context.Context) error {
 
 	go func() {
 		log.Printf("HTTP API listening on %s", s.config.Address)
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if s.config.HTTPTLSEnabled {
+			err = s.server.ListenAndServeTLS(s.config.HTTPTLSCertFile, s.config.HTTPTLSKeyFile)
+		} else {
+			err = s.server.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			errChan <- err
 		}
 	}()

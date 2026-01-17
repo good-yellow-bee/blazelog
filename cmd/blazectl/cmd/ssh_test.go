@@ -20,8 +20,9 @@ func setupTestDB(t *testing.T) (*storage.SQLiteStorage, func()) {
 
 	// Use a 32-byte master key for encryption tests
 	masterKey := []byte("test-master-key-32-bytes-long!!!")
+	dbKey := []byte("test-db-key-32-bytes-long!!!!!")
 
-	store := storage.NewSQLiteStorage(dbPath, masterKey)
+	store := storage.NewSQLiteStorage(dbPath, masterKey, dbKey)
 	if err := store.Open(); err != nil {
 		t.Fatalf("open db: %v", err)
 	}
