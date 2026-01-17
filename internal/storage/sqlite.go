@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	// SQLCipher-enabled SQLite driver.
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 
