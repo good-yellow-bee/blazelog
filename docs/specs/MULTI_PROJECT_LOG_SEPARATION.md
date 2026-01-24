@@ -4,6 +4,7 @@
 **Author:** Claude
 **Created:** 2026-01-24
 **Last Updated:** 2026-01-24
+**Version:** 1.1
 
 ---
 
@@ -829,25 +830,342 @@ ws://host/api/v1/logs/stream?project_id=proj_abc123
 
 ---
 
-## 7. Security Considerations
+## 7. Access Control Model (Role-Based Fallback)
 
-### 7.1 Access Control
+This section defines how users access logs, alerts, connections, and other project-scoped data based on their role and project assignments. The model ensures backward compatibility while enabling strict project isolation for users who configure it.
 
-- Users can only query logs for projects they have membership in
-- Admin users can query all projects
-- API validates project access before executing queries
-- WebSocket streams filtered by project access
+### 7.1 Design Principles
 
-### 7.2 Data Isolation
+1. **Graceful Degradation**: Users without project assignments still have access (not empty screens)
+2. **Backward Compatibility**: Existing deployments work without changes
+3. **Progressive Isolation**: Organizations can adopt project scoping incrementally
+4. **Admin Override**: Admins always have full visibility
 
-- Project ID is included in all log queries by default for non-admin users
-- Empty project_id filter returns only "unassigned" logs (legacy)
-- No cross-project data leakage in aggregations
+### 7.2 Access Control Matrix
 
-### 7.3 Audit Trail
+| Role | Project Assignments | Logs Access | Alerts Access | Connections Access | Dashboard |
+|------|---------------------|-------------|---------------|-------------------|-----------|
+| **Admin** | Any/None | All projects + unassigned | All projects + unassigned | All projects + unassigned | All projects aggregated |
+| **Operator** | Yes (N projects) | N projects + unassigned | N projects + unassigned | N projects + unassigned | N projects aggregated |
+| **Operator** | No (0 projects) | All (legacy mode)* | All (legacy mode)* | All (legacy mode)* | All (legacy mode)* |
+| **Viewer** | Yes (N projects) | N projects only | N projects only (read) | N projects only (read) | N projects aggregated |
+| **Viewer** | No (0 projects) | Unassigned only | Unassigned only (read) | Unassigned only (read) | Unassigned only |
+
+*\*Legacy mode: Show warning banner encouraging project assignment*
+
+### 7.3 Detailed Access Rules
+
+#### 7.3.1 Admin Role
+```
+CAN ACCESS:
+  - All logs (any project_id, including empty/unassigned)
+  - All alerts (any project_id)
+  - All connections (any project_id)
+  - All dashboard stats (aggregated across all projects)
+  - Project management (CRUD)
+  - User management (CRUD)
+
+NOTES:
+  - Project assignment is optional for admins
+  - Admins can filter by specific project but see all by default
+```
+
+#### 7.3.2 Operator Role (With Project Assignments)
+```
+CAN ACCESS:
+  - Logs where project_id IN (assigned_projects) OR project_id = '' (unassigned)
+  - Alerts where project_id IN (assigned_projects) OR project_id = '' (unassigned)
+  - Connections where project_id IN (assigned_projects) OR project_id = '' (unassigned)
+  - Dashboard stats aggregated from assigned projects + unassigned
+
+CAN MODIFY:
+  - Create/update/delete alerts for assigned projects
+  - Create/update/delete connections for assigned projects
+
+CANNOT ACCESS:
+  - Logs/alerts/connections from other projects
+  - Project management
+  - User management
+```
+
+#### 7.3.3 Operator Role (No Project Assignments - Legacy Mode)
+```
+CAN ACCESS:
+  - All logs (legacy behavior, backward compatible)
+  - All alerts (legacy behavior)
+  - All connections (legacy behavior)
+  - All dashboard stats
+
+UI BEHAVIOR:
+  - Show warning banner: "You are not assigned to any projects.
+    Contact your admin to get project access for better data isolation."
+  - Encourage transition to project-based access
+
+NOTES:
+  - This mode exists for backward compatibility
+  - New deployments should assign operators to projects
+```
+
+#### 7.3.4 Viewer Role (With Project Assignments)
+```
+CAN ACCESS:
+  - Logs where project_id IN (assigned_projects) — NO unassigned
+  - Alerts where project_id IN (assigned_projects) (read-only)
+  - Connections where project_id IN (assigned_projects) (read-only)
+  - Dashboard stats for assigned projects only
+
+CANNOT ACCESS:
+  - Unassigned logs (stricter than operator for data hygiene)
+  - Create/modify alerts or connections
+  - Project management
+  - User management
+```
+
+#### 7.3.5 Viewer Role (No Project Assignments)
+```
+CAN ACCESS:
+  - Unassigned logs only (project_id = '')
+  - Unassigned alerts only (read-only)
+  - Unassigned connections only (read-only)
+  - Dashboard stats for unassigned data only
+
+NOTES:
+  - Most restricted access level
+  - Intended as a "waiting room" state until assigned to projects
+```
+
+### 7.4 Implementation Details
+
+#### 7.4.1 Access Check Function
+
+**File:** `internal/auth/project_access.go` (new file)
+
+```go
+package auth
+
+import "context"
+
+// ProjectAccess defines what projects a user can access
+type ProjectAccess struct {
+    AllProjects      bool     // Admin override - can see everything
+    ProjectIDs       []string // Specific project IDs user can access
+    IncludeUnassigned bool    // Can see logs with empty project_id
+    LegacyMode       bool     // Operator with no assignments (show warning)
+}
+
+// GetProjectAccess returns the project access rules for a user
+func GetProjectAccess(ctx context.Context, user *User, storage Storage) (*ProjectAccess, error) {
+    // Admins can access everything
+    if user.Role == RoleAdmin {
+        return &ProjectAccess{
+            AllProjects:       true,
+            IncludeUnassigned: true,
+        }, nil
+    }
+
+    // Get user's project assignments
+    projects, err := storage.Projects().GetProjectsForUser(ctx, user.ID)
+    if err != nil {
+        return nil, err
+    }
+
+    projectIDs := make([]string, len(projects))
+    for i, p := range projects {
+        projectIDs[i] = p.ID
+    }
+
+    // Operator with no assignments = legacy mode (full access + warning)
+    if user.Role == RoleOperator && len(projectIDs) == 0 {
+        return &ProjectAccess{
+            AllProjects:       true,
+            IncludeUnassigned: true,
+            LegacyMode:        true, // Triggers UI warning
+        }, nil
+    }
+
+    // Operator with assignments = assigned projects + unassigned
+    if user.Role == RoleOperator {
+        return &ProjectAccess{
+            ProjectIDs:        projectIDs,
+            IncludeUnassigned: true,
+        }, nil
+    }
+
+    // Viewer with assignments = assigned projects only (no unassigned)
+    if user.Role == RoleViewer && len(projectIDs) > 0 {
+        return &ProjectAccess{
+            ProjectIDs:        projectIDs,
+            IncludeUnassigned: false,
+        }, nil
+    }
+
+    // Viewer with no assignments = unassigned only
+    return &ProjectAccess{
+        ProjectIDs:        []string{},
+        IncludeUnassigned: true, // Only unassigned visible
+    }, nil
+}
+
+// CanAccessProject checks if user can access a specific project
+func (pa *ProjectAccess) CanAccessProject(projectID string) bool {
+    if pa.AllProjects {
+        return true
+    }
+    if projectID == "" {
+        return pa.IncludeUnassigned
+    }
+    for _, id := range pa.ProjectIDs {
+        if id == projectID {
+            return true
+        }
+    }
+    return false
+}
+```
+
+#### 7.4.2 Query Filter Application
+
+**File:** `internal/api/logs/handler.go`
+
+```go
+func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
+    user := auth.GetUserFromContext(r.Context())
+
+    // Get user's project access rules
+    access, err := auth.GetProjectAccess(r.Context(), user, h.storage)
+    if err != nil {
+        jsonError(w, 500, "INTERNAL_ERROR", "failed to get project access")
+        return
+    }
+
+    filter := &storage.LogFilter{}
+
+    // Apply project access restrictions
+    if !access.AllProjects {
+        // User can only see specific projects
+        filter.ProjectIDs = access.ProjectIDs
+        filter.IncludeUnassigned = access.IncludeUnassigned
+    }
+
+    // User-requested project filter (must be subset of allowed)
+    if requestedProject := r.URL.Query().Get("project_id"); requestedProject != "" {
+        if !access.CanAccessProject(requestedProject) {
+            jsonError(w, 403, "FORBIDDEN", "no access to project")
+            return
+        }
+        filter.ProjectID = requestedProject
+        filter.ProjectIDs = nil // Override with specific project
+    }
+
+    // ... rest of query handling
+}
+```
+
+#### 7.4.3 Updated LogFilter Struct
+
+**File:** `internal/storage/log_storage.go`
+
+```go
+type LogFilter struct {
+    // Project access control (NEW)
+    ProjectID         string   // Filter by single project
+    ProjectIDs        []string // Filter by multiple projects (user's accessible projects)
+    IncludeUnassigned bool     // Include logs where project_id = ''
+
+    // ... existing fields
+}
+```
+
+#### 7.4.4 Query Builder Update
+
+**File:** `internal/storage/clickhouse.go`
+
+```go
+func (r *clickhouseLogRepo) buildProjectFilter(filter *LogFilter) (string, []interface{}) {
+    var conditions []string
+    var args []interface{}
+
+    // Specific single project filter
+    if filter.ProjectID != "" {
+        return "project_id = ?", []interface{}{filter.ProjectID}
+    }
+
+    // Multiple projects filter (user's accessible projects)
+    if len(filter.ProjectIDs) > 0 {
+        placeholders := make([]string, len(filter.ProjectIDs))
+        for i, p := range filter.ProjectIDs {
+            placeholders[i] = "?"
+            args = append(args, p)
+        }
+        conditions = append(conditions, fmt.Sprintf("project_id IN (%s)", strings.Join(placeholders, ",")))
+    }
+
+    // Include unassigned logs
+    if filter.IncludeUnassigned {
+        conditions = append(conditions, "project_id = ''")
+    }
+
+    if len(conditions) == 0 {
+        return "", nil // No project filter (admin sees all)
+    }
+
+    return "(" + strings.Join(conditions, " OR ") + ")", args
+}
+```
+
+### 7.5 UI Indicators
+
+#### 7.5.1 Legacy Mode Warning Banner
+
+When an operator is in legacy mode (no project assignments), show a dismissible warning:
+
+```html
+<div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
+  <div class="flex">
+    <div class="flex-shrink-0">
+      <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+    <div class="ml-3">
+      <p class="text-sm text-amber-700">
+        <strong>No project assignment.</strong>
+        You're seeing all data. Contact your administrator to get assigned to specific projects for better data isolation.
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+#### 7.5.2 Project Selector Behavior
+
+The project dropdown in the logs page adapts to user access:
+
+| User State | Dropdown Options |
+|------------|------------------|
+| Admin | "All Projects" + all project list + "Unassigned" |
+| Operator (with projects) | Assigned projects + "Unassigned" |
+| Operator (legacy mode) | "All Projects" + all project list + "Unassigned" |
+| Viewer (with projects) | Assigned projects only |
+| Viewer (no projects) | "Unassigned" only |
+
+### 7.6 Data Isolation Guarantees
+
+1. **Query-Level Enforcement**: All log queries include project_id filter based on user access
+2. **No Client-Side Filtering**: Server enforces access, not UI
+3. **API Validation**: All endpoints validate project access before returning data
+4. **WebSocket Streams**: Real-time log streams filtered by project access
+5. **Aggregations**: Dashboard stats only aggregate accessible projects
+
+### 7.7 Audit Trail
 
 - Log access requests should be audited with user and project context
-- Failed access attempts should be logged
+- Failed access attempts (403 responses) should be logged with:
+  - User ID
+  - Requested project ID
+  - User's actual project access list
+  - Timestamp
+  - Endpoint accessed
 
 ---
 
@@ -886,10 +1204,20 @@ ws://host/api/v1/logs/stream?project_id=proj_abc123
 
 ## 10. Open Questions
 
-1. **Default Project:** Should there be a "default" project for logs without assignment?
-2. **Project Deletion:** What happens to logs when a project is deleted? (Orphan or cascade?)
-3. **Agent Reassignment:** Can an agent switch projects? What happens to historical logs?
-4. **Multi-Project Agents:** Should one agent be able to send logs to multiple projects?
+1. ~~**Default Project:** Should there be a "default" project for logs without assignment?~~
+   **RESOLVED:** No default project. Unassigned logs (empty project_id) are accessible based on role. See Section 7.
+
+2. ~~**User Access Without Projects:** What do users see if not assigned to any project?~~
+   **RESOLVED:** Role-Based Fallback model implemented. See Section 7.2 for access matrix.
+
+3. **Project Deletion:** What happens to logs when a project is deleted? (Orphan or cascade?)
+   - *Recommendation:* Orphan logs (set project_id to empty). They become "unassigned" and visible per access rules.
+
+4. **Agent Reassignment:** Can an agent switch projects? What happens to historical logs?
+   - *Recommendation:* Historical logs keep original project_id. New logs use new project_id.
+
+5. **Multi-Project Agents:** Should one agent be able to send logs to multiple projects?
+   - *Recommendation:* No. One agent = one project. Use multiple agents for multi-project collection.
 
 ---
 
