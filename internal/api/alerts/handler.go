@@ -168,6 +168,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		for _, pid := range access.ProjectIDs {
 			projectAlerts, pErr := h.storage.Alerts().ListByProject(ctx, pid)
 			if pErr != nil {
+				log.Printf("error listing alerts for project %s: %v", pid, pErr)
 				err = pErr
 				break
 			}

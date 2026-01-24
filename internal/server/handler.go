@@ -209,7 +209,12 @@ func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch
 	recvCh := make(chan *blazelogv1.LogBatch, 1)
 	errCh := make(chan error, 1)
 
-	// Receive goroutine
+	// Receive goroutine - blocks on stream.Recv() which unblocks when:
+	// 1. Client sends data (normal flow)
+	// 2. Client closes stream (returns io.EOF)
+	// 3. Server returns from StreamLogs (gRPC framework cancels stream context)
+	// On idle timeout, returning from this function triggers gRPC cleanup
+	// which cancels the stream context and unblocks stream.Recv().
 	go func() {
 		for {
 			batch, err := stream.Recv()

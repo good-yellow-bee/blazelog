@@ -444,7 +444,11 @@ func (b *DiskBuffer) compactNow() error {
 	tempFile.Close()
 	if err := os.Rename(tempPath, origPath); err != nil {
 		// Try to reopen original on failure
-		b.file, _ = os.OpenFile(origPath, os.O_RDWR|os.O_CREATE, 0644)
+		reopenErr := error(nil)
+		b.file, reopenErr = os.OpenFile(origPath, os.O_RDWR|os.O_CREATE, 0644)
+		if reopenErr != nil {
+			return fmt.Errorf("rename temp file: %w, reopen also failed: %w", err, reopenErr)
+		}
 		return fmt.Errorf("rename temp file: %w", err)
 	}
 

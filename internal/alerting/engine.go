@@ -3,6 +3,7 @@ package alerting
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -109,7 +110,10 @@ func (e *Engine) EvaluateAt(entry *models.LogEntry, now time.Time) []*Alert {
 			case e.alerts <- alert:
 			default:
 				// Channel full, drop alert and track
-				e.stats.AlertsDropped.Add(1)
+				dropped := e.stats.AlertsDropped.Add(1)
+				if dropped == 1 || dropped%100 == 0 {
+					log.Printf("warning: alert channel full, dropped %d alerts total", dropped)
+				}
 			}
 		}
 	}

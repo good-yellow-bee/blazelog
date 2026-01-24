@@ -376,8 +376,10 @@ func (v *sqlVisitor) mapOperator(op string) (string, error) {
 		return "OR", nil
 	case ">=", "<=", ">", "<":
 		return op, nil
-	case "-", "+", "*", "/":
+	case "-", "+", "*", "/", "%":
 		return op, nil
+	case "not", "!":
+		return "NOT", nil
 	default:
 		return "", fmt.Errorf("unknown operator: %s", op)
 	}

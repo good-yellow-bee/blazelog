@@ -96,15 +96,12 @@ func (e *EmailNotifier) Send(ctx context.Context, alert *alerting.Alert) error {
 	return e.sendMail(ctx, msg)
 }
 
-// Close zeros password bytes to prevent memory exposure.
+// Close clears the password reference.
+// Note: Go strings are immutable; []byte(str) creates a copy, so zeroing
+// pwBytes doesn't affect the original string memory. The GC will eventually
+// reclaim the original string. This is a Go language limitation.
 func (e *EmailNotifier) Close() error {
-	if len(e.config.Password) > 0 {
-		pwBytes := []byte(e.config.Password)
-		for i := range pwBytes {
-			pwBytes[i] = 0
-		}
-		e.config.Password = ""
-	}
+	e.config.Password = ""
 	return nil
 }
 

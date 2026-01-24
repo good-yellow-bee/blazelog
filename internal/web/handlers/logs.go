@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
@@ -26,12 +25,8 @@ const maxFilterLength = 1000
 const maxStreamDuration = 30 * time.Minute
 
 // Export rate limiter: 10 requests per minute globally
-var exportLimiter = struct {
-	limiter *rate.Limiter
-	mu      sync.Mutex
-}{
-	limiter: rate.NewLimiter(rate.Every(6*time.Second), 10), // 10/min with burst of 10
-}
+// Note: rate.Limiter is already thread-safe, no mutex needed
+var exportLimiter = rate.NewLimiter(rate.Every(6*time.Second), 10) // 10/min with burst of 10
 
 func (h *Handler) ShowLogs(w http.ResponseWriter, r *http.Request) {
 	sess := GetSession(r)
@@ -268,7 +263,7 @@ func (h *Handler) ExportLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Rate limit exports (10 per minute globally)
-	if !exportLimiter.limiter.Allow() {
+	if !exportLimiter.Allow() {
 		http.Error(w, "export rate limit exceeded, try again later", http.StatusTooManyRequests)
 		return
 	}
@@ -494,6 +489,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 
 			result, err := h.logStorage.Logs().Query(ctx, &filter)
 			if err != nil {
+				log.Printf("streaming logs query error: %v", err)
 				continue
 			}
 
@@ -504,7 +500,11 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 				}
 
 				item := recordToLogItem(entry)
-				data, _ := json.Marshal(item)
+				data, err := json.Marshal(item)
+				if err != nil {
+					log.Printf("streaming logs marshal error: %v", err)
+					continue
+				}
 				fmt.Fprintf(w, "event: log\ndata: %s\n\n", data)
 				flusher.Flush()
 
