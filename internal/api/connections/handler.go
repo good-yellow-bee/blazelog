@@ -224,6 +224,20 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Validate project exists if specified
+	if req.ProjectID != "" {
+		project, err := h.storage.Projects().GetByID(ctx, req.ProjectID)
+		if err != nil {
+			log.Printf("create connection error: check project: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if project == nil {
+			jsonError(w, http.StatusBadRequest, errCodeValidationFailed, "project does not exist")
+			return
+		}
+	}
+
 	// Check name uniqueness
 	existing, err := h.storage.Connections().GetByName(ctx, req.Name)
 	if err != nil {
@@ -366,6 +380,17 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		conn.User = strings.TrimSpace(req.User)
 	}
 	if req.ProjectID != "" {
+		// Validate project exists
+		project, err := h.storage.Projects().GetByID(ctx, req.ProjectID)
+		if err != nil {
+			log.Printf("update connection error: check project: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if project == nil {
+			jsonError(w, http.StatusBadRequest, errCodeValidationFailed, "project does not exist")
+			return
+		}
 		conn.ProjectID = req.ProjectID
 	}
 

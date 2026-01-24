@@ -129,7 +129,11 @@ func JWTOrSessionAuth(jwtService *auth.JWTService, sessions *session.Store) func
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
-					log.Printf("Session not found or expired for %s: %s...", r.RemoteAddr, cookie.Value[:8])
+					cookiePreview := cookie.Value
+					if len(cookiePreview) > 8 {
+						cookiePreview = cookiePreview[:8] + "..."
+					}
+					log.Printf("Session not found or expired for %s: %s", r.RemoteAddr, cookiePreview)
 				}
 			}
 

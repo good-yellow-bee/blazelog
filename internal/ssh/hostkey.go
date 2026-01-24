@@ -2,7 +2,7 @@ package ssh
 
 import (
 	"bufio"
-	"crypto/sha256"
+	"crypto/md5" //nolint:gosec // G501: MD5 for legacy SSH fingerprint compatibility
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -327,9 +327,17 @@ func Fingerprint(key ssh.PublicKey) string {
 }
 
 // FingerprintMD5 returns the MD5 fingerprint of a public key (legacy format).
+// Format: colon-separated hex bytes (e.g., "16:27:ac:a5:...")
+// Note: MD5 is weak but required for compatibility with older SSH clients.
+//
+//nolint:gosec // G401,G501: MD5 used for legacy SSH fingerprint compatibility, not security
 func FingerprintMD5(key ssh.PublicKey) string {
-	hash := sha256.Sum256(key.Marshal())
-	return fmt.Sprintf("%x", hash)
+	hash := md5.Sum(key.Marshal())
+	parts := make([]string, len(hash))
+	for i, b := range hash {
+		parts[i] = fmt.Sprintf("%02x", b)
+	}
+	return strings.Join(parts, ":")
 }
 
 // NewHostKeyCallback creates an ssh.HostKeyCallback with the specified policy.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"net/smtp"
 	"strings"
@@ -14,12 +15,13 @@ import (
 
 // EmailConfig holds SMTP configuration.
 type EmailConfig struct {
-	Host       string   // SMTP server host
-	Port       int      // SMTP server port (465 for implicit TLS, 587 for STARTTLS)
-	Username   string   // SMTP username (optional)
-	Password   string   // SMTP password (optional)
-	From       string   // From address
-	Recipients []string // Email recipients
+	Host          string   // SMTP server host
+	Port          int      // SMTP server port (465 for implicit TLS, 587 for STARTTLS)
+	Username      string   // SMTP username (optional)
+	Password      string   // SMTP password (optional)
+	From          string   // From address
+	Recipients    []string // Email recipients
+	AllowInsecure bool     // Allow plaintext connections (WARNING: credentials may be exposed)
 }
 
 // Validate validates the email configuration.
@@ -243,6 +245,12 @@ func (e *EmailNotifier) connectSTARTTLS(ctx context.Context, addr string, tlsCon
 			client.Close()
 			return nil, fmt.Errorf("STARTTLS failed: %w", err)
 		}
+	} else if !e.config.AllowInsecure {
+		// Require TLS unless explicitly allowing insecure connections
+		client.Close()
+		return nil, fmt.Errorf("STARTTLS not supported by server - set AllowInsecure=true to continue without encryption")
+	} else {
+		log.Printf("WARNING: SMTP connection is NOT encrypted - credentials may be exposed")
 	}
 
 	return client, nil
