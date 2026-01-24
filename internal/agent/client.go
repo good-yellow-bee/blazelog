@@ -23,11 +23,12 @@ type TLSConfig struct {
 
 // Client is a gRPC client for the BlazeLog server.
 type Client struct {
-	conn     *grpc.ClientConn
-	client   blazelogv1.LogServiceClient
-	stream   blazelogv1.LogService_StreamLogsClient
-	agentID  string
-	sequence uint64
+	conn      *grpc.ClientConn
+	client    blazelogv1.LogServiceClient
+	stream    blazelogv1.LogService_StreamLogsClient
+	agentID   string
+	projectID string
+	sequence  uint64
 
 	mu     sync.Mutex
 	closed bool
@@ -84,6 +85,7 @@ func (c *Client) Register(ctx context.Context, info *blazelogv1.AgentInfo) (*bla
 	}
 
 	c.agentID = resp.AgentId
+	c.projectID = info.ProjectId
 	return resp, nil
 }
 
@@ -113,9 +115,10 @@ func (c *Client) SendBatch(ctx context.Context, entries []*blazelogv1.LogEntry) 
 
 	seq := atomic.AddUint64(&c.sequence, 1)
 	batch := &blazelogv1.LogBatch{
-		Entries:  entries,
-		AgentId:  c.agentID,
-		Sequence: seq,
+		Entries:   entries,
+		AgentId:   c.agentID,
+		ProjectId: c.projectID,
+		Sequence:  seq,
 	}
 
 	if err := stream.Send(batch); err != nil {

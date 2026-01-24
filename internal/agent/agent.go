@@ -16,10 +16,11 @@ import (
 	"github.com/good-yellow-bee/blazelog/pkg/config"
 )
 
-// AgentConfig contains agent configuration.
-type AgentConfig struct {
+// Config contains agent configuration.
+type Config struct {
 	ID            string
 	Name          string
+	ProjectID     string // Project this agent belongs to
 	ServerAddress string
 	BatchSize     int
 	FlushInterval time.Duration
@@ -38,7 +39,7 @@ type AgentConfig struct {
 
 // Agent is the main BlazeLog agent with reliability features.
 type Agent struct {
-	config      *AgentConfig
+	config      *Config
 	connMgr     *ConnManager
 	heartbeater *Heartbeater
 	buffer      buffer.Buffer
@@ -57,7 +58,7 @@ type Agent struct {
 }
 
 // New creates a new agent with the given configuration.
-func New(cfg *AgentConfig) (*Agent, error) {
+func New(cfg *Config) (*Agent, error) {
 	// Apply defaults
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = 100
@@ -192,14 +193,15 @@ func (a *Agent) buildAgentInfo() *blazelogv1.AgentInfo {
 	}
 
 	return &blazelogv1.AgentInfo{
-		AgentId:  a.config.ID,
-		Name:     a.config.Name,
-		Hostname: hostname,
-		Version:  config.Version,
-		Os:       runtime.GOOS,
-		Arch:     runtime.GOARCH,
-		Labels:   a.config.Labels,
-		Sources:  sources,
+		AgentId:   a.config.ID,
+		Name:      a.config.Name,
+		ProjectId: a.config.ProjectID,
+		Hostname:  hostname,
+		Version:   config.Version,
+		Os:        runtime.GOOS,
+		Arch:      runtime.GOARCH,
+		Labels:    a.config.Labels,
+		Sources:   sources,
 	}
 }
 
@@ -426,6 +428,8 @@ func (a *Agent) handleResponse(resp *blazelogv1.StreamResponse) {
 // handleCommand handles server commands.
 func (a *Agent) handleCommand(cmd *blazelogv1.ServerCommand) {
 	switch cmd.Type {
+	case blazelogv1.CommandType_COMMAND_TYPE_UNSPECIFIED:
+		a.logf("received unspecified command")
 	case blazelogv1.CommandType_COMMAND_TYPE_SHUTDOWN:
 		a.logf("received shutdown command")
 		// TODO: Trigger graceful shutdown
@@ -438,6 +442,8 @@ func (a *Agent) handleCommand(cmd *blazelogv1.ServerCommand) {
 	case blazelogv1.CommandType_COMMAND_TYPE_RELOAD_CONFIG:
 		a.logf("received reload config command")
 		// TODO: Reload configuration
+	default:
+		a.logf("received unknown command: %v", cmd.Type)
 	}
 }
 

@@ -3,6 +3,7 @@ package ssh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -564,10 +565,11 @@ func isConnectionError(err error) bool {
 		return false
 	}
 	// Check for common connection errors
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return true
 	}
-	if _, ok := err.(*net.OpError); ok {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
 		return true
 	}
 	// Check for SSH-specific errors indicating connection loss

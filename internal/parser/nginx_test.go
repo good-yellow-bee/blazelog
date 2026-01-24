@@ -257,7 +257,7 @@ func TestNginxAccessParser_Type(t *testing.T) {
 
 // TestNginxAccessParser_Options tests that parser options are applied.
 func TestNginxAccessParser_Options(t *testing.T) {
-	opts := &ParserOptions{
+	opts := &Options{
 		IncludeRaw: true,
 		Source:     "nginx-server-1",
 		Labels: map[string]string{
@@ -499,7 +499,7 @@ func TestNginxErrorParser_Type(t *testing.T) {
 
 // TestNginxErrorParser_Options tests that parser options are applied.
 func TestNginxErrorParser_Options(t *testing.T) {
-	opts := &ParserOptions{
+	opts := &Options{
 		IncludeRaw: true,
 		Source:     "nginx-error-log",
 		Labels: map[string]string{

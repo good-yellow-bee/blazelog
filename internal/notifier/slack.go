@@ -200,7 +200,7 @@ func (s *SlackNotifier) buildPayload(alert *alerting.Alert) slackMessage {
 
 	// Add labels if present
 	if len(alert.Labels) > 0 {
-		var labelParts []string
+		labelParts := make([]string, 0, len(alert.Labels))
 		for k, v := range alert.Labels {
 			labelParts = append(labelParts, fmt.Sprintf("`%s=%s`", k, v))
 		}

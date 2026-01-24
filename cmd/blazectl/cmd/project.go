@@ -293,7 +293,7 @@ Examples:
 			fmt.Printf("Delete project '%s'? [y/N]: ", project.Name)
 			var confirm string
 			fmt.Scanln(&confirm)
-			if strings.ToLower(confirm) != "y" {
+			if !strings.EqualFold(confirm, "y") {
 				fmt.Println("Canceled.")
 				return nil
 			}

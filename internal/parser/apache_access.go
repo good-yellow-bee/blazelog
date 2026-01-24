@@ -22,7 +22,7 @@ type ApacheAccessParser struct {
 const apacheAccessTimeFormat = "02/Jan/2006:15:04:05 -0700"
 
 // NewApacheAccessParser creates a new Apache access log parser.
-func NewApacheAccessParser(opts *ParserOptions) *ApacheAccessParser {
+func NewApacheAccessParser(opts *Options) *ApacheAccessParser {
 	return &ApacheAccessParser{
 		BaseParser: NewBaseParser(opts),
 		// Combined format: %h %l %u %t "%r" %>s %b "%{Referer}i" "%{User-agent}i"

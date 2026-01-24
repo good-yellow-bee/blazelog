@@ -586,7 +586,7 @@ func TestMagentoParser_Type(t *testing.T) {
 // TestMagentoParser_Options tests parser options application.
 func TestMagentoParser_Options(t *testing.T) {
 	t.Run("include raw line", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			IncludeRaw: true,
 		}
 		parser := NewMagentoParser(opts)
@@ -601,7 +601,7 @@ func TestMagentoParser_Options(t *testing.T) {
 	})
 
 	t.Run("exclude raw line", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			IncludeRaw: false,
 		}
 		parser := NewMagentoParser(opts)
@@ -616,7 +616,7 @@ func TestMagentoParser_Options(t *testing.T) {
 	})
 
 	t.Run("with source", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			Source: "magento-server-1",
 		}
 		parser := NewMagentoParser(opts)
@@ -631,7 +631,7 @@ func TestMagentoParser_Options(t *testing.T) {
 	})
 
 	t.Run("with labels", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			Labels: map[string]string{
 				"environment": "production",
 				"app":         "magento",

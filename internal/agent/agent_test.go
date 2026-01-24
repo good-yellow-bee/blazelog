@@ -348,7 +348,7 @@ func TestClientSendBatch(t *testing.T) {
 }
 
 func TestAgentConfig(t *testing.T) {
-	cfg := &AgentConfig{
+	cfg := &Config{
 		ID:            "test-id",
 		Name:          "test-agent",
 		ServerAddress: "localhost:9443",

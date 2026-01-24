@@ -51,4 +51,7 @@ message LogBatch {
 
   // Sequence number for ordering/deduplication.
   uint64 sequence = 3;
+
+  // Project this batch belongs to (all entries inherit this).
+  string project_id = 4;
 }

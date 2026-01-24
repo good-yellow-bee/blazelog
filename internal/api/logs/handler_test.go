@@ -157,7 +157,7 @@ func TestQuery_Success(t *testing.T) {
 	}
 
 	var resp struct {
-		Data *LogsResponse `json:"data"`
+		Data *ListResponse `json:"data"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)

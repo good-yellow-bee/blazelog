@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
+	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/query"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
@@ -40,6 +43,7 @@ type LogsDataResponse struct {
 // LogItem represents a log entry in web responses
 type LogItem struct {
 	ID         string                 `json:"id"`
+	ProjectID  string                 `json:"project_id,omitempty"`
 	Timestamp  string                 `json:"timestamp"`
 	Level      string                 `json:"level"`
 	Message    string                 `json:"message"`
@@ -146,6 +150,7 @@ func (h *Handler) GetLogsData(w http.ResponseWriter, r *http.Request) {
 	fileType := strings.ToLower(q.Get("type"))
 	source := q.Get("source")
 	messageContains := q.Get("q")
+	projectID := q.Get("project_id")
 
 	if filterExpr != "" {
 		level = ""
@@ -169,6 +174,24 @@ func (h *Handler) GetLogsData(w http.ResponseWriter, r *http.Request) {
 		FilterExpr:      filterExpr,
 		FilterSQL:       filterSQL,
 		FilterArgs:      filterArgs,
+	}
+
+	// Apply project access filtering
+	if h.storage != nil {
+		role := models.ParseRole(sess.Role)
+		access, err := middleware.GetProjectAccess(ctx, sess.UserID, role, h.storage)
+		if err != nil {
+			http.Error(w, "failed to get project access", http.StatusInternalServerError)
+			return
+		}
+		if err := access.ApplyToLogFilter(filter, projectID); err != nil {
+			if errors.Is(err, middleware.ErrProjectAccessDenied) {
+				http.Error(w, "no access to project", http.StatusForbidden)
+				return
+			}
+			http.Error(w, "failed to apply project filter", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Default response for nil storage
@@ -199,6 +222,7 @@ func (h *Handler) GetLogsData(w http.ResponseWriter, r *http.Request) {
 func recordToLogItem(r *storage.LogRecord) *LogItem {
 	item := &LogItem{
 		ID:         r.ID,
+		ProjectID:  r.ProjectID,
 		Timestamp:  r.Timestamp.Format(time.RFC3339),
 		Level:      r.Level,
 		Message:    r.Message,
@@ -266,6 +290,7 @@ func (h *Handler) ExportLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build filter
+	projectID := q.Get("project_id")
 	filter := &storage.LogFilter{
 		StartTime:       startTime,
 		EndTime:         endTime,
@@ -276,6 +301,24 @@ func (h *Handler) ExportLogs(w http.ResponseWriter, r *http.Request) {
 		Limit:           limit,
 		OrderBy:         "timestamp",
 		OrderDesc:       true,
+	}
+
+	// Apply project access filtering
+	if h.storage != nil {
+		role := models.ParseRole(sess.Role)
+		access, err := middleware.GetProjectAccess(ctx, sess.UserID, role, h.storage)
+		if err != nil {
+			http.Error(w, "failed to get project access", http.StatusInternalServerError)
+			return
+		}
+		if err := access.ApplyToLogFilter(filter, projectID); err != nil {
+			if errors.Is(err, middleware.ErrProjectAccessDenied) {
+				http.Error(w, "no access to project", http.StatusForbidden)
+				return
+			}
+			http.Error(w, "failed to apply project filter", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Query logs
@@ -314,12 +357,13 @@ func (h *Handler) writeCSV(w http.ResponseWriter, entries []*storage.LogRecord) 
 	defer writer.Flush()
 
 	// Header
-	writer.Write([]string{"timestamp", "level", "source", "type", "message", "file_path", "http_status", "http_method", "uri"})
+	writer.Write([]string{"timestamp", "project_id", "level", "source", "type", "message", "file_path", "http_status", "http_method", "uri"})
 
 	// Rows
 	for _, e := range entries {
 		writer.Write([]string{
 			e.Timestamp.Format(time.RFC3339),
+			e.ProjectID,
 			e.Level,
 			e.Source,
 			e.Type,
@@ -358,6 +402,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build base filter
+	projectID := q.Get("project_id")
 	baseFilter := &storage.LogFilter{
 		Level:           strings.ToLower(q.Get("level")),
 		Type:            strings.ToLower(q.Get("type")),
@@ -366,6 +411,24 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 		Limit:           100,
 		OrderBy:         "timestamp",
 		OrderDesc:       false, // ASC for streaming
+	}
+
+	// Apply project access filtering
+	if h.storage != nil {
+		role := models.ParseRole(sess.Role)
+		access, err := middleware.GetProjectAccess(ctx, sess.UserID, role, h.storage)
+		if err != nil {
+			http.Error(w, "failed to get project access", http.StatusInternalServerError)
+			return
+		}
+		if err := access.ApplyToLogFilter(baseFilter, projectID); err != nil {
+			if errors.Is(err, middleware.ErrProjectAccessDenied) {
+				http.Error(w, "no access to project", http.StatusForbidden)
+				return
+			}
+			http.Error(w, "failed to apply project filter", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Set SSE headers

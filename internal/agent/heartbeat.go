@@ -154,6 +154,8 @@ func (h *Heartbeater) handleCommand(cmd *blazelogv1.ServerCommand) {
 	h.logf("received server command: %v", cmd.Type)
 
 	switch cmd.Type {
+	case blazelogv1.CommandType_COMMAND_TYPE_UNSPECIFIED:
+		h.logf("unspecified command received (not implemented)")
 	case blazelogv1.CommandType_COMMAND_TYPE_RELOAD_CONFIG:
 		h.logf("reload config command received (not implemented)")
 	case blazelogv1.CommandType_COMMAND_TYPE_PAUSE:
@@ -162,6 +164,8 @@ func (h *Heartbeater) handleCommand(cmd *blazelogv1.ServerCommand) {
 		h.logf("resume command received (not implemented)")
 	case blazelogv1.CommandType_COMMAND_TYPE_SHUTDOWN:
 		h.logf("shutdown command received (not implemented)")
+	default:
+		h.logf("unknown command received: %v", cmd.Type)
 	}
 }
 

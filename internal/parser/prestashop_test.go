@@ -573,7 +573,7 @@ func TestPrestaShopParser_Type(t *testing.T) {
 // TestPrestaShopParser_Options tests parser options application.
 func TestPrestaShopParser_Options(t *testing.T) {
 	t.Run("include raw line", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			IncludeRaw: true,
 		}
 		parser := NewPrestaShopParser(opts)
@@ -588,7 +588,7 @@ func TestPrestaShopParser_Options(t *testing.T) {
 	})
 
 	t.Run("exclude raw line", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			IncludeRaw: false,
 		}
 		parser := NewPrestaShopParser(opts)
@@ -603,7 +603,7 @@ func TestPrestaShopParser_Options(t *testing.T) {
 	})
 
 	t.Run("with source", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			Source: "prestashop-server-1",
 		}
 		parser := NewPrestaShopParser(opts)
@@ -618,7 +618,7 @@ func TestPrestaShopParser_Options(t *testing.T) {
 	})
 
 	t.Run("with labels", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			Labels: map[string]string{
 				"environment": "production",
 				"app":         "prestashop",

@@ -30,7 +30,7 @@ const apache24ErrorTimeFormat = "Mon Jan 02 15:04:05.000000 2006"
 const apache22ErrorTimeFormat = "Mon Jan 02 15:04:05 2006"
 
 // NewApacheErrorParser creates a new Apache error log parser.
-func NewApacheErrorParser(opts *ParserOptions) *ApacheErrorParser {
+func NewApacheErrorParser(opts *Options) *ApacheErrorParser {
 	return &ApacheErrorParser{
 		BaseParser: NewBaseParser(opts),
 		// Apache 2.4+ format with full details

@@ -297,7 +297,7 @@ func TestApacheAccessParser_Type(t *testing.T) {
 
 // TestApacheAccessParser_Options tests that parser options are applied.
 func TestApacheAccessParser_Options(t *testing.T) {
-	opts := &ParserOptions{
+	opts := &Options{
 		IncludeRaw: true,
 		Source:     "apache-server-1",
 		Labels: map[string]string{
@@ -599,7 +599,7 @@ func TestApacheErrorParser_Type(t *testing.T) {
 
 // TestApacheErrorParser_Options tests that parser options are applied.
 func TestApacheErrorParser_Options(t *testing.T) {
-	opts := &ParserOptions{
+	opts := &Options{
 		IncludeRaw: true,
 		Source:     "apache-error-log",
 		Labels: map[string]string{

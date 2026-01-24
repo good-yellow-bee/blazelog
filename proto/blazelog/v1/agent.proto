@@ -31,6 +31,9 @@ message AgentInfo {
 
   // List of log sources configured on this agent.
   repeated LogSource sources = 8;
+
+  // Project this agent belongs to.
+  string project_id = 9;
 }
 
 // LogSource describes a log file being monitored.

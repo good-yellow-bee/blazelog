@@ -387,6 +387,7 @@ func (a *logBufferAdapter) AddBatch(entries []*server.LogRecord) error {
 	for i, e := range entries {
 		records[i] = &storage.LogRecord{
 			ID:         e.ID,
+			ProjectID:  e.ProjectID,
 			Timestamp:  e.Timestamp,
 			Level:      e.Level,
 			Message:    e.Message,

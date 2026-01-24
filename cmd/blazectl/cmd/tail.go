@@ -184,7 +184,7 @@ func runTail(cmd *cobra.Command, args []string) {
 			Recipients: tailNotifyEmail,
 		}
 
-		emailNotifier, err := notifier.NewEmailNotifier(emailConfig)
+		emailNotifier, err := notifier.NewEmailNotifier(&emailConfig)
 		if err != nil {
 			PrintError(fmt.Sprintf("failed to create email notifier: %v", err), true)
 			return

@@ -165,17 +165,17 @@ func (t *TeamsNotifier) buildPayload(alert *alerting.Alert) teamsMessage {
 		{Title: "Time", Value: timestamp},
 	}
 
-	body = append(body, factSet{
-		Type:  "FactSet",
-		Facts: facts,
-	})
-
-	// Message
-	body = append(body, textBlock{
-		Type:   "TextBlock",
-		Text:   fmt.Sprintf("**Message:** %s", alert.Message),
-		Wrap:   true,
-	})
+	body = append(body,
+		factSet{
+			Type:  "FactSet",
+			Facts: facts,
+		},
+		textBlock{
+			Type: "TextBlock",
+			Text: fmt.Sprintf("**Message:** %s", alert.Message),
+			Wrap: true,
+		},
+	)
 
 	// Threshold info if applicable
 	if alert.Threshold > 0 {
@@ -219,7 +219,7 @@ func (t *TeamsNotifier) buildPayload(alert *alerting.Alert) teamsMessage {
 
 	// Labels if present
 	if len(alert.Labels) > 0 {
-		var labelParts []string
+		labelParts := make([]string, 0, len(alert.Labels))
 		for k, v := range alert.Labels {
 			labelParts = append(labelParts, fmt.Sprintf("`%s=%s`", k, v))
 		}

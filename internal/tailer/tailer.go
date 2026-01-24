@@ -23,8 +23,8 @@ type Line struct {
 	Err      error     // Any error that occurred
 }
 
-// TailerOptions contains options for configuring a Tailer.
-type TailerOptions struct {
+// Options contains options for configuring a Tailer.
+type Options struct {
 	// Follow indicates whether to continue watching for new lines.
 	Follow bool
 	// PollInterval is the interval to poll for changes when fsnotify fails.
@@ -35,9 +35,9 @@ type TailerOptions struct {
 	MustExist bool
 }
 
-// DefaultOptions returns TailerOptions with sensible defaults.
-func DefaultOptions() *TailerOptions {
-	return &TailerOptions{
+// DefaultOptions returns Options with sensible defaults.
+func DefaultOptions() *Options {
+	return &Options{
 		Follow:       true,
 		PollInterval: 250 * time.Millisecond,
 		ReOpen:       true,
@@ -48,7 +48,7 @@ func DefaultOptions() *TailerOptions {
 // Tailer watches a file and emits new lines as they're written.
 type Tailer struct {
 	filePath string
-	opts     *TailerOptions
+	opts     *Options
 	watcher  *fsnotify.Watcher
 
 	file   *os.File
@@ -64,7 +64,7 @@ type Tailer struct {
 }
 
 // NewTailer creates a new Tailer for the given file path.
-func NewTailer(filePath string, opts *TailerOptions) (*Tailer, error) {
+func NewTailer(filePath string, opts *Options) (*Tailer, error) {
 	if opts == nil {
 		opts = DefaultOptions()
 	}

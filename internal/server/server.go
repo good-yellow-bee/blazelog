@@ -30,6 +30,7 @@ type LogBuffer interface {
 // LogRecord represents a log entry for storage.
 type LogRecord struct {
 	ID         string
+	ProjectID  string
 	Timestamp  time.Time
 	Level      string
 	Message    string

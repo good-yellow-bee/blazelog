@@ -26,7 +26,7 @@ type MagentoParser struct {
 const magentoTimeFormat = "2006-01-02 15:04:05"
 
 // NewMagentoParser creates a new Magento log parser.
-func NewMagentoParser(opts *ParserOptions) *MagentoParser {
+func NewMagentoParser(opts *Options) *MagentoParser {
 	return &MagentoParser{
 		BaseParser: NewBaseParser(opts),
 		// Main pattern: [timestamp] channel.LEVEL: message {context} [extra]

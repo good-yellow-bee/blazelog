@@ -3,6 +3,7 @@ package logs
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/query"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"golang.org/x/sync/errgroup"
@@ -31,6 +33,7 @@ type apiResponse struct {
 
 const (
 	errCodeBadRequest    = "BAD_REQUEST"
+	errCodeForbidden     = "FORBIDDEN"
 	errCodeInternalError = "INTERNAL_ERROR"
 	maxFilterLength      = 1000
 )
@@ -50,6 +53,7 @@ func jsonOK(w http.ResponseWriter, data interface{}) {
 // Handler handles log query and streaming endpoints.
 type Handler struct {
 	logStorage storage.LogStorage
+	store      storage.Storage // For project access checks
 }
 
 // NewHandler creates a new logs handler.
@@ -57,9 +61,15 @@ func NewHandler(logStore storage.LogStorage) *Handler {
 	return &Handler{logStorage: logStore}
 }
 
+// NewHandlerWithStorage creates a new logs handler with full storage access for project filtering.
+func NewHandlerWithStorage(logStore storage.LogStorage, store storage.Storage) *Handler {
+	return &Handler{logStorage: logStore, store: store}
+}
+
 // LogResponse represents a log entry in API responses.
 type LogResponse struct {
 	ID         string                 `json:"id"`
+	ProjectID  string                 `json:"project_id,omitempty"`
 	Timestamp  string                 `json:"timestamp"`
 	Level      string                 `json:"level"`
 	Message    string                 `json:"message"`
@@ -75,8 +85,8 @@ type LogResponse struct {
 	URI        string                 `json:"uri,omitempty"`
 }
 
-// LogsResponse wraps a paginated list of logs.
-type LogsResponse struct {
+// ListResponse wraps a paginated list of logs.
+type ListResponse struct {
 	Items      []*LogResponse `json:"items"`
 	Total      int64          `json:"total"`
 	Page       int            `json:"page"`
@@ -299,6 +309,31 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 		FilterArgs:      filterArgs,
 	}
 
+	// Apply project access filtering
+	projectID := q.Get("project_id")
+	if h.store != nil {
+		userID := middleware.GetUserID(ctx)
+		role := middleware.GetRole(ctx)
+		access, err := middleware.GetProjectAccess(ctx, userID, role, h.store)
+		if err != nil {
+			log.Printf("project access error: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if err := access.ApplyToLogFilter(filter, projectID); err != nil {
+			if errors.Is(err, middleware.ErrProjectAccessDenied) {
+				jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+				return
+			}
+			log.Printf("project filter error: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+	} else if projectID != "" {
+		// Legacy mode: just apply the filter without access check
+		filter.ProjectID = projectID
+	}
+
 	// Execute query
 	result, err := h.logStorage.Logs().Query(ctx, filter)
 	if err != nil {
@@ -319,7 +354,7 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 		totalPages = int(math.Ceil(float64(result.Total) / float64(perPage)))
 	}
 
-	jsonOK(w, &LogsResponse{
+	jsonOK(w, &ListResponse{
 		Items:      items,
 		Total:      result.Total,
 		Page:       page,
@@ -376,6 +411,30 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 		EndTime:   endTime,
 		AgentID:   q.Get("agent_id"),
 		Type:      q.Get("type"),
+	}
+
+	// Apply project access filtering
+	projectID := q.Get("project_id")
+	if h.store != nil {
+		userID := middleware.GetUserID(ctx)
+		role := middleware.GetRole(ctx)
+		access, err := middleware.GetProjectAccess(ctx, userID, role, h.store)
+		if err != nil {
+			log.Printf("project access error: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if err := access.ApplyToAggregationFilter(aggFilter, projectID); err != nil {
+			if errors.Is(err, middleware.ErrProjectAccessDenied) {
+				jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+				return
+			}
+			log.Printf("project filter error: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+	} else if projectID != "" {
+		aggFilter.ProjectID = projectID
 	}
 
 	// Execute all 4 queries in parallel for ~4x latency improvement
@@ -547,6 +606,30 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 		OrderDesc:       false, // ASC for streaming
 	}
 
+	// Apply project access filtering
+	projectID := q.Get("project_id")
+	if h.store != nil {
+		userID := middleware.GetUserID(ctx)
+		role := middleware.GetRole(ctx)
+		access, err := middleware.GetProjectAccess(ctx, userID, role, h.store)
+		if err != nil {
+			log.Printf("project access error: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if err := access.ApplyToLogFilter(baseFilter, projectID); err != nil {
+			if errors.Is(err, middleware.ErrProjectAccessDenied) {
+				jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+				return
+			}
+			log.Printf("project filter error: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+	} else if projectID != "" {
+		baseFilter.ProjectID = projectID
+	}
+
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -633,6 +716,7 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 func recordToResponse(r *storage.LogRecord) *LogResponse {
 	resp := &LogResponse{
 		ID:         r.ID,
+		ProjectID:  r.ProjectID,
 		Timestamp:  r.Timestamp.Format(time.RFC3339),
 		Level:      r.Level,
 		Message:    r.Message,

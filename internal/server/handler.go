@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"sync"
@@ -112,8 +113,14 @@ func (h *Handler) Register(ctx context.Context, req *blazelogv1.RegisterRequest)
 	})
 	metrics.GRPCAgentsRegistered.Inc()
 
-	log.Printf("agent registered: id=%s name=%s hostname=%s sources=%d",
-		agentID, agent.Name, agent.Hostname, len(agent.Sources))
+	projectID := agent.ProjectId
+	if projectID != "" {
+		log.Printf("agent registered: id=%s name=%s hostname=%s project=%s sources=%d",
+			agentID, agent.Name, agent.Hostname, projectID, len(agent.Sources))
+	} else {
+		log.Printf("agent registered: id=%s name=%s hostname=%s sources=%d (no project)",
+			agentID, agent.Name, agent.Hostname, len(agent.Sources))
+	}
 
 	return &blazelogv1.RegisterResponse{
 		Success: true,
@@ -141,7 +148,7 @@ func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch
 
 	for {
 		batch, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			if h.verbose {
 				log.Printf("stream closed by client")
 			}

@@ -68,6 +68,9 @@ type LogRecord struct {
 	// ID is the unique identifier for the log entry.
 	ID string
 
+	// ProjectID is the project this log belongs to (empty = unassigned).
+	ProjectID string
+
 	// Timestamp is when the log event occurred.
 	Timestamp time.Time
 
@@ -109,6 +112,11 @@ type LogRecord struct {
 
 // LogFilter defines query parameters for log retrieval.
 type LogFilter struct {
+	// Project filter.
+	ProjectID         string   // Single project filter.
+	ProjectIDs        []string // Multiple projects filter (for users with access to multiple).
+	IncludeUnassigned bool     // Include logs where project_id = ''.
+
 	// Time range (required for efficient queries).
 	StartTime time.Time
 	EndTime   time.Time
@@ -154,10 +162,13 @@ type LogQueryResult struct {
 
 // AggregationFilter defines parameters for aggregation queries.
 type AggregationFilter struct {
-	StartTime time.Time
-	EndTime   time.Time
-	AgentID   string
-	Type      string
+	ProjectID         string   // Single project filter.
+	ProjectIDs        []string // Multiple projects filter.
+	IncludeUnassigned bool     // Include logs where project_id = ''.
+	StartTime         time.Time
+	EndTime           time.Time
+	AgentID           string
+	Type              string
 }
 
 // ErrorRateResult contains error statistics.

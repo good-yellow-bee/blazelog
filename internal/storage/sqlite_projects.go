@@ -39,6 +39,7 @@ func (r *sqliteProjectRepo) GetByID(ctx context.Context, id string) (*models.Pro
 		&project.CreatedAt, &project.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {
@@ -60,6 +61,7 @@ func (r *sqliteProjectRepo) GetByName(ctx context.Context, name string) (*models
 		&project.CreatedAt, &project.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {

@@ -310,8 +310,9 @@ type LogFilter struct {
 ```go
 type LogFilter struct {
     // Project filter (NEW)
-    ProjectID  string   // Single project filter
-    ProjectIDs []string // Multiple projects filter (for users with access to multiple)
+    ProjectID         string   // Single project filter
+    ProjectIDs        []string // Multiple projects filter (for users with access to multiple)
+    IncludeUnassigned bool     // Include logs where project_id = ''
 
     // Time range
     StartTime time.Time
@@ -424,6 +425,39 @@ func (r *clickhouseLogRepo) buildAggregationWhere(filter *AggregationFilter) ([]
     // ...
 }
 ```
+
+#### 4.2.5 Query Scan Order Update
+
+**File:** `internal/storage/clickhouse.go`
+
+The `Query()` method scans columns in a specific order. Adding `project_id` requires updating the Scan call:
+
+```go
+// Update Query() scan - add project_id after id
+err := rows.Scan(
+    &entry.ID,
+    &entry.ProjectID,  // NEW: Add after ID
+    &entry.Timestamp,
+    &entry.Level,
+    // ... rest unchanged
+)
+```
+
+Update SELECT statement:
+```go
+sb.WriteString(`
+    SELECT id, project_id, timestamp, level, message, source, type, raw,
+           agent_id, file_path, line_number, fields, labels,
+           http_status, http_method, uri
+    FROM logs
+`)
+```
+
+#### 4.2.6 LogBuffer Clarification
+
+**File:** `internal/storage/log_buffer.go`
+
+**No changes required.** LogBuffer uses `[]*LogRecord` slice and is agnostic to LogRecord fields. Adding `ProjectID` field to LogRecord struct requires no changes to LogBuffer implementation.
 
 ---
 
@@ -635,9 +669,38 @@ func (s *Server) StreamLogs(stream pb.LogService_StreamLogsServer) error {
 
 #### 4.5.2 Agent Registration Handler
 
-Update agent registration to store project association:
+**Design Decision:** Agents remain ephemeral (in-memory sync.Map with 30-min TTL). No database table needed.
+
+**Rationale:**
+- Agents are identified by agent_id + project_id in log batches
+- Server validates project_id exists on each batch (not just registration)
+- Agent-project association stored in agent config file, not server
+- Simplifies architecture - no agent table migration needed
+
+**Updated Handler:**
 ```go
 func (s *Server) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+    // Extract project_id from AgentInfo (informational only)
+    projectID := req.Agent.ProjectId
+
+    // Note: Real validation happens on each batch because agents are ephemeral
+    if projectID != "" {
+        log.Printf("Agent %s registered for project %s", req.Agent.AgentId, projectID)
+    }
+
+    // Store agent entry (ephemeral, in-memory)
+    h.agents.Store(agentID, &agentEntry{
+        info:       req.Agent,
+        lastActive: time.Now(),
+    })
+
+    return &pb.RegisterResponse{...}, nil
+}
+```
+
+Legacy handler reference (for context):
+```go
+func (s *Server) RegisterLegacy(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
     // Validate project if specified
     if req.ProjectId != "" {
         project, err := s.storage.Projects().GetByID(ctx, req.ProjectId)
@@ -692,6 +755,63 @@ Apply same pattern to:
 - `GET /api/v1/logs/stream` (WebSocket)
 - `GET /api/v1/dashboard/stats`
 
+#### 4.6.3 Complete Endpoint Updates
+
+##### Web Handlers (`internal/web/handlers/logs.go`)
+
+| Handler | Route | Changes |
+|---------|-------|---------|
+| `ShowLogs` | GET /logs | Pass accessible projects to template |
+| `GetLogsData` | GET /logs/data | Add `project_id` param, apply RBAC filter |
+| `ExportLogs` | GET /logs/export | Add `project_id` param, apply RBAC filter |
+| `StreamLogs` | GET /logs/stream | Add `project_id` param, filter SSE events |
+| `GetDashboardStats` | GET /dashboard/stats | Add `project_id` param, aggregate by project |
+
+##### API Handlers (`internal/api/logs/handler.go`)
+
+| Handler | Route | Changes |
+|---------|-------|---------|
+| `Query` | GET /api/v1/logs | Add `project_id` param, RBAC check |
+| `Stats` | GET /api/v1/logs/stats | Add `project_id` param, filter aggregations |
+| `Stream` | GET /api/v1/logs/stream | Add `project_id` param, filter SSE events |
+
+##### Common Pattern for All Handlers:
+```go
+func (h *Handler) <AnyEndpoint>(w http.ResponseWriter, r *http.Request) {
+    user := auth.GetUserFromContext(r.Context())
+
+    // 1. Get user's project access
+    access, err := auth.GetProjectAccess(r.Context(), user, h.storage)
+    if err != nil {
+        // handle error
+    }
+
+    // 2. Parse requested project filter
+    requestedProject := r.URL.Query().Get("project_id")
+
+    // 3. Validate access
+    if requestedProject != "" && !access.CanAccessProject(requestedProject) {
+        jsonError(w, 403, "FORBIDDEN", "no access to project")
+        return
+    }
+
+    // 4. Build filter with project restrictions
+    filter := &storage.LogFilter{
+        ProjectID:         requestedProject,
+        ProjectIDs:        access.ProjectIDs,
+        IncludeUnassigned: access.IncludeUnassigned,
+    }
+
+    // 5. If DSL filter provided, validate project references
+    if filterExpr := r.URL.Query().Get("filter"); filterExpr != "" {
+        // Parse DSL and check for project_id field usage
+        // Validate any project_id values against user's access
+    }
+
+    // ... rest of handler
+}
+```
+
 ---
 
 ### 4.7 Web UI Changes
@@ -745,6 +865,87 @@ func (h *Handler) LogsPage(w http.ResponseWriter, r *http.Request) {
 #### 4.7.3 Dashboard Updates
 
 Update dashboard to show project-specific stats or add project selector.
+
+---
+
+### 4.8 DSL Query Support
+
+**File:** `internal/query/fields.go`
+
+Add `project_id` to queryable fields:
+```go
+var DefaultFields = map[string]Field{
+    // NEW: Project field
+    "project_id": {
+        Name:       "project_id",
+        Type:       FieldTypeString,
+        Column:     "project_id",
+        Operators:  []Operator{OpEqual, OpNotEqual, OpIn},
+    },
+    // ... existing fields
+}
+```
+
+**DSL Examples:**
+- `project_id == "proj_abc123"` → Filter single project
+- `project_id in ["proj_1", "proj_2"]` → Filter multiple projects
+- `project_id == "proj_1" and level == "error"` → Combined filter
+
+**Access Control Integration:**
+- DSL project filter is validated against user's accessible projects
+- If user specifies project they can't access → 403 Forbidden
+- If no project in DSL, server injects user's project access restrictions
+
+---
+
+### 4.9 Log Processor Updates
+
+**File:** `internal/server/processor.go`
+
+Update `convertToRecords()` to include project_id from batch:
+
+```go
+func (p *Processor) convertToRecords(batch *blazelogv1.LogBatch) []*storage.LogRecord {
+    records := make([]*storage.LogRecord, 0, len(batch.Entries))
+
+    for _, entry := range batch.Entries {
+        record := &storage.LogRecord{
+            ID:         uuid.New().String(),
+            ProjectID:  batch.ProjectId,  // NEW: Set from batch
+            Timestamp:  entry.Timestamp.AsTime(),
+            Level:      levelToString(entry.Level),
+            Message:    entry.Message,
+            Source:     entry.Source,
+            Type:       logTypeToString(entry.Type),
+            Raw:        entry.Raw,
+            AgentID:    batch.AgentId,
+            FilePath:   entry.FilePath,
+            LineNumber: entry.LineNumber,
+            // ... rest unchanged
+        }
+        records = append(records, record)
+    }
+    return records
+}
+```
+
+---
+
+### 4.10 Project Validation Behavior
+
+**Validation Strategy in gRPC Handler:**
+```go
+// In StreamLogs handler
+if batch.ProjectId != "" {
+    project, err := s.storage.Projects().GetByID(ctx, batch.ProjectId)
+    if err != nil || project == nil {
+        // STRICT mode - reject batch (recommended for data integrity)
+        return status.Errorf(codes.InvalidArgument, "invalid project_id: %s", batch.ProjectId)
+    }
+}
+```
+
+**Recommendation:** Use strict validation. Invalid project_id likely indicates misconfiguration that should be fixed, not silently ignored.
 
 ---
 
@@ -1225,15 +1426,19 @@ The project dropdown in the logs page adapts to user access:
 
 | File | Changes |
 |------|---------|
-| `internal/storage/clickhouse.go` | Schema, indexes, queries, materialized views |
-| `internal/storage/log_storage.go` | LogRecord, LogFilter, AggregationFilter structs |
-| `proto/blazelog/v1/log.proto` | LogEntry, LogBatch messages |
-| `proto/blazelog/v1/agent.proto` | RegisterRequest, AgentInfo messages |
-| `cmd/agent/config.go` | AgentConfig struct |
-| `internal/server/grpc_handler.go` | Batch handling, agent registration |
-| `internal/api/logs/handler.go` | Query parameter, RBAC |
+| `internal/storage/log_storage.go` | Add `ProjectID`, `IncludeUnassigned` to structs |
+| `internal/storage/clickhouse.go` | Schema, INSERT, SELECT, Scan, query builders |
+| `internal/query/fields.go` | Add `project_id` field to DefaultFields |
+| `internal/query/sql_builder.go` | No changes needed (generic) |
+| `internal/server/processor.go` | Set ProjectID from batch |
+| `internal/server/handler.go` | Validate project on batch receipt |
+| `internal/auth/project_access.go` | NEW FILE - access control logic |
+| `internal/web/handlers/logs.go` | All 5 handlers need project filtering |
+| `internal/api/logs/handler.go` | All 3 handlers need project filtering |
+| `proto/blazelog/v1/log.proto` | Add project_id to LogBatch, LogEntry |
+| `proto/blazelog/v1/agent.proto` | Add project_id to AgentInfo |
+| `cmd/agent/config.go` | Add ProjectID to AgentConfig |
 | `internal/web/templates/pages/logs.templ` | Project selector |
-| `internal/web/handlers/logs.go` | Pass projects to template |
 | `configs/agent.yaml` | Example config |
 
 ---
