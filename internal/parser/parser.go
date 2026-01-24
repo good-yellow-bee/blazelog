@@ -121,11 +121,18 @@ func (p *BaseParser) ApplyOptions(entry *models.LogEntry, raw string) {
 	}
 }
 
+// Scanner buffer sizes for handling large log lines.
+const (
+	scannerInitialBufSize = 64 * 1024  // 64KB initial buffer
+	scannerMaxBufSize     = 1024 * 1024 // 1MB max line size
+)
+
 // ParseStreamDefault provides a default implementation of stream parsing.
 func ParseStreamDefault(ctx context.Context, p Parser, r io.Reader, entries chan<- *models.LogEntry) error {
 	defer close(entries)
 
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, scannerInitialBufSize), scannerMaxBufSize)
 	lineNum := int64(0)
 
 	for scanner.Scan() {

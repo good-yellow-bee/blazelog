@@ -41,13 +41,17 @@ const (
 func jsonError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(apiResponse{Error: &apiError{Code: code, Message: message}})
+	if err := json.NewEncoder(w).Encode(apiResponse{Error: &apiError{Code: code, Message: message}}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonOK(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(apiResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(apiResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 // Handler handles log query and streaming endpoints.

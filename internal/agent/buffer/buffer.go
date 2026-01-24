@@ -371,7 +371,7 @@ func (b *DiskBuffer) dropOldest(needed int64) error {
 	return err
 }
 
-// compactNow removes consumed data from the file.
+// compactNow removes consumed data from the file using streaming copy.
 // Called only when consumed ratio exceeds threshold.
 func (b *DiskBuffer) compactNow() error {
 	// Calculate remaining data
@@ -389,27 +389,77 @@ func (b *DiskBuffer) compactNow() error {
 		return nil
 	}
 
-	// Read remaining bytes from current position
+	// Create temp file for streaming copy to avoid large memory allocation
+	tempPath := b.file.Name() + ".tmp"
+	tempFile, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+
+	// Seek to start of unread data
 	if _, err := b.file.Seek(b.readOffset, io.SeekStart); err != nil {
-		return err
-	}
-	remainingData := make([]byte, remaining)
-	if _, err := io.ReadFull(b.file, remainingData); err != nil {
-		return err
-	}
-
-	// Truncate and rewrite
-	if err := b.file.Truncate(0); err != nil {
-		return err
-	}
-	if _, err := b.file.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	if _, err := b.file.Write(remainingData); err != nil {
+		tempFile.Close()
+		os.Remove(tempPath)
 		return err
 	}
 
-	b.size = remaining
+	// Stream copy in chunks to limit memory usage (64KB chunks)
+	const chunkSize = 64 * 1024
+	buf := make([]byte, chunkSize)
+	copied := int64(0)
+	for copied < remaining {
+		toRead := remaining - copied
+		if toRead > chunkSize {
+			toRead = chunkSize
+		}
+		n, err := b.file.Read(buf[:toRead])
+		if err != nil && err != io.EOF {
+			tempFile.Close()
+			os.Remove(tempPath)
+			return fmt.Errorf("read during compact: %w", err)
+		}
+		if n == 0 {
+			break
+		}
+		if _, err := tempFile.Write(buf[:n]); err != nil {
+			tempFile.Close()
+			os.Remove(tempPath)
+			return fmt.Errorf("write during compact: %w", err)
+		}
+		copied += int64(n)
+	}
+
+	// Sync temp file
+	if err := tempFile.Sync(); err != nil {
+		tempFile.Close()
+		os.Remove(tempPath)
+		return fmt.Errorf("sync temp file: %w", err)
+	}
+
+	// Close original file
+	origPath := b.file.Name()
+	b.file.Close()
+
+	// Close temp and rename
+	tempFile.Close()
+	if err := os.Rename(tempPath, origPath); err != nil {
+		// Try to reopen original on failure
+		b.file, _ = os.OpenFile(origPath, os.O_RDWR|os.O_CREATE, 0644)
+		return fmt.Errorf("rename temp file: %w", err)
+	}
+
+	// Reopen the compacted file
+	b.file, err = os.OpenFile(origPath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("reopen after compact: %w", err)
+	}
+
+	// Seek to end for appending
+	if _, err := b.file.Seek(0, io.SeekEnd); err != nil {
+		return err
+	}
+
+	b.size = copied
 	b.readOffset = 0
 	return nil
 }

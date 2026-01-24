@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 )
 
@@ -17,7 +18,10 @@ func JSON(w http.ResponseWriter, status int, data any) {
 	w.WriteHeader(status)
 
 	resp := Response{Data: data}
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		// Log but don't attempt to write - headers already sent
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 // JSONError writes a JSON error response.
@@ -26,7 +30,9 @@ func JSONError(w http.ResponseWriter, err *Error) {
 	w.WriteHeader(err.Status)
 
 	resp := Response{Error: err}
-	json.NewEncoder(w).Encode(resp)
+	if encErr := json.NewEncoder(w).Encode(resp); encErr != nil {
+		log.Printf("json encode error: %v", encErr)
+	}
 }
 
 // Created writes a 201 Created response.

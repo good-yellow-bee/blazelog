@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const maxSessions = 10000
+
 type Session struct {
 	ID        string
 	UserID    string
@@ -54,6 +56,20 @@ func (s *Store) CreateWithTTL(userID, username, role string, ttl time.Duration) 
 	}
 
 	s.mu.Lock()
+	// Evict oldest session if at capacity
+	if len(s.sessions) >= maxSessions {
+		var oldestID string
+		var oldestTime time.Time
+		for id, sess := range s.sessions {
+			if oldestID == "" || sess.CreatedAt.Before(oldestTime) {
+				oldestID = id
+				oldestTime = sess.CreatedAt
+			}
+		}
+		if oldestID != "" {
+			delete(s.sessions, oldestID)
+		}
+	}
 	s.sessions[id] = session
 	s.mu.Unlock()
 

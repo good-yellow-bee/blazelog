@@ -12,6 +12,17 @@ import (
 // It flushes on either batch size threshold or time interval,
 // whichever comes first. It implements backpressure by dropping
 // oldest entries when the buffer reaches max capacity.
+//
+// Flush ordering guarantee: Entries are flushed in FIFO order within a batch.
+// On flush failure, entries are prepended back to the buffer, preserving order
+// for the next flush attempt. Dropped entries (due to backpressure) are always
+// the oldest entries in the buffer.
+//
+// TOCTOU note: There is a potential time-of-check-time-of-use race between
+// checking buffer size in AddBatch and the actual flush in Flush. This is benign:
+// worst case, a batch may slightly exceed batchSize before flushing, or two
+// concurrent flushes may occur. Both scenarios are safe - flushes are idempotent
+// (atomic swap of buffer) and the slight size overage has no negative impact.
 type LogBuffer struct {
 	repo          LogRepository
 	batchSize     int

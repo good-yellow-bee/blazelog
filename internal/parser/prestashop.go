@@ -4,12 +4,16 @@ package parser
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/models"
 )
+
+// maxJSONSize is the maximum size for JSON context/extra in log lines (1MB).
+const prestashopMaxJSONSize = 1024 * 1024
 
 // PrestaShopParser parses PrestaShop logs (dev.log, prod.log).
 // PrestaShop uses Symfony/Monolog format: [YYYY-MM-DD HH:MM:SS] channel.LEVEL: message {context} [extra]
@@ -119,6 +123,11 @@ func (p *PrestaShopParser) ParseWithContext(ctx context.Context, line string) (*
 // Symfony/Monolog format typically ends with: {} [] or {"key":"value"} [] or [] []
 func parsePrestashopMessageAndContext(s string) (string, map[string]interface{}, []interface{}) {
 	s = strings.TrimSpace(s)
+
+	// Reject lines that are too large to prevent unbounded JSON parsing
+	if len(s) > prestashopMaxJSONSize {
+		return fmt.Sprintf("[line truncated: exceeds %d bytes]", prestashopMaxJSONSize), nil, nil
+	}
 
 	var extra []interface{}
 	var prestashopContext map[string]interface{}

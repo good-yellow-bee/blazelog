@@ -76,7 +76,7 @@ func (t *TeamsNotifier) Send(ctx context.Context, alert *alerting.Alert) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("teams API error: status %d, body: %s", resp.StatusCode, string(body))
 	}
 

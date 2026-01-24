@@ -20,6 +20,8 @@ type AuditLogger interface {
 	LogHostKeyAccepted(host, fingerprint string, isNew bool)
 	// LogHostKeyRejected logs when a host key is rejected.
 	LogHostKeyRejected(host, expected, actual string)
+	// LogHostKeyWarning logs when an unknown host key is accepted with warning (PolicyWarn).
+	LogHostKeyWarning(host, fingerprint string, stored bool)
 	// LogCommand logs a command execution.
 	LogCommand(host, cmd string, success bool, duration time.Duration)
 	// LogFileOp logs a file operation.
@@ -46,6 +48,7 @@ type AuditEvent struct {
 	Bytes       int64  `json:"bytes,omitempty"`
 	Error       string `json:"error,omitempty"`
 	IsNew       *bool  `json:"is_new,omitempty"`
+	Stored      *bool  `json:"stored,omitempty"`
 }
 
 // JSONAuditLogger writes audit events as JSON lines.
@@ -134,6 +137,16 @@ func (l *JSONAuditLogger) LogHostKeyRejected(host, expected, actual string) {
 	})
 }
 
+// LogHostKeyWarning logs when an unknown host key is accepted with PolicyWarn.
+func (l *JSONAuditLogger) LogHostKeyWarning(host, fingerprint string, stored bool) {
+	l.log(&AuditEvent{
+		Event:       "host_key_warning",
+		Host:        host,
+		Fingerprint: fingerprint,
+		Stored:      &stored,
+	})
+}
+
 // LogCommand logs a command execution.
 func (l *JSONAuditLogger) LogCommand(host, cmd string, success bool, duration time.Duration) {
 	l.log(&AuditEvent{
@@ -174,6 +187,7 @@ func (NopAuditLogger) LogConnect(host, user, jumpHost string)                   
 func (NopAuditLogger) LogDisconnect(host string, err error)                              {}
 func (NopAuditLogger) LogHostKeyAccepted(host, fingerprint string, isNew bool)           {}
 func (NopAuditLogger) LogHostKeyRejected(host, expected, actual string)                  {}
+func (NopAuditLogger) LogHostKeyWarning(host, fingerprint string, stored bool)           {}
 func (NopAuditLogger) LogCommand(host, cmd string, success bool, duration time.Duration) {}
 func (NopAuditLogger) LogFileOp(host, op, path string, bytes int64, err error)           {}
 func (NopAuditLogger) Close() error                                                      { return nil }

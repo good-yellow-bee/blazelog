@@ -32,25 +32,32 @@ const (
 	errCodeValidationFailed = "VALIDATION_FAILED"
 	errCodeNotFound         = "NOT_FOUND"
 	errCodeConflict         = "CONFLICT"
+	errCodeForbidden        = "FORBIDDEN"
 	errCodeInternalError    = "INTERNAL_ERROR"
 )
 
 func jsonError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}})
+	if err := json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonOK(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonCreated(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonNoContent(w http.ResponseWriter) {
@@ -180,6 +187,20 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("get project error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if !access.CanAccessProject(id) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
+
 	project, err := h.storage.Projects().GetByID(ctx, id)
 	if err != nil {
 		log.Printf("get project error: %v", err)
@@ -293,6 +314,20 @@ func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("get project users error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if !access.CanAccessProject(id) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
+
 	project, err := h.storage.Projects().GetByID(ctx, id)
 	if err != nil {
 		log.Printf("get project users error: get project: %v", err)

@@ -11,6 +11,7 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/security"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 )
 
 // Config holds server configuration.
@@ -67,7 +68,23 @@ func New(cfg *Config) (*Server, error) {
 	processor := NewProcessor(cfg.Verbose, cfg.LogBuffer)
 	handler := NewHandler(processor, cfg.Verbose)
 
-	var opts []grpc.ServerOption
+	// Message size limits to prevent DoS via memory exhaustion
+	const (
+		maxRecvMsgSize      = 4 * 1024 * 1024 // 4MB
+		maxSendMsgSize      = 4 * 1024 * 1024 // 4MB
+		maxConcurrentStream = 100
+	)
+
+	opts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(maxRecvMsgSize),
+		grpc.MaxSendMsgSize(maxSendMsgSize),
+		grpc.MaxConcurrentStreams(maxConcurrentStream),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: 15 * time.Minute,
+			Time:              5 * time.Minute,
+			Timeout:           1 * time.Minute,
+		}),
+	}
 
 	// Configure TLS if enabled
 	if cfg.TLS != nil {

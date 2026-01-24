@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -95,6 +96,7 @@ func (s *ClickHouseStorage) Open() error {
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
+		db.Close()
 		return fmt.Errorf("ping clickhouse: %w", err)
 	}
 
@@ -260,7 +262,12 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	committed := false
+	defer func() {
+		if !committed {
+			tx.Rollback()
+		}
+	}()
 
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO logs (
@@ -280,10 +287,18 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 			id = uuid.New().String()
 		}
 
-		fieldsJSON, _ := json.Marshal(entry.Fields)
-		labelsJSON, _ := json.Marshal(entry.Labels)
+		fieldsJSON, err := json.Marshal(entry.Fields)
+		if err != nil {
+			log.Printf("warning: failed to marshal fields for log entry: %v", err)
+			fieldsJSON = []byte("{}")
+		}
+		labelsJSON, err := json.Marshal(entry.Labels)
+		if err != nil {
+			log.Printf("warning: failed to marshal labels for log entry: %v", err)
+			labelsJSON = []byte("{}")
+		}
 
-		_, err := stmt.ExecContext(ctx,
+		if _, err := stmt.ExecContext(ctx,
 			id,
 			entry.ProjectID,
 			entry.Timestamp,
@@ -300,8 +315,7 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 			entry.HTTPStatus,
 			entry.HTTPMethod,
 			entry.URI,
-		)
-		if err != nil {
+		); err != nil {
 			return fmt.Errorf("exec: %w", err)
 		}
 	}
@@ -309,6 +323,7 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
+	committed = true
 
 	return nil
 }
@@ -361,10 +376,14 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 
 		// Parse JSON fields
 		if fieldsJSON != "" {
-			json.Unmarshal([]byte(fieldsJSON), &entry.Fields)
+			if err := json.Unmarshal([]byte(fieldsJSON), &entry.Fields); err != nil {
+				log.Printf("warning: failed to unmarshal fields for log entry %s: %v", entry.ID, err)
+			}
 		}
 		if labelsJSON != "" {
-			json.Unmarshal([]byte(labelsJSON), &entry.Labels)
+			if err := json.Unmarshal([]byte(labelsJSON), &entry.Labels); err != nil {
+				log.Printf("warning: failed to unmarshal labels for log entry %s: %v", entry.ID, err)
+			}
 		}
 
 		entries = append(entries, entry)

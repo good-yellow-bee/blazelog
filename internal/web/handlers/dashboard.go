@@ -133,7 +133,9 @@ func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) renderStatsJSON(w http.ResponseWriter, r *http.Request, timeRange, projectID string, access *middleware.ProjectAccess) {
 	stats := h.fetchDashboardStats(r.Context(), timeRange, projectID, access)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func (h *Handler) renderStatsPartial(w http.ResponseWriter, r *http.Request, timeRange, projectID string, access *middleware.ProjectAccess) {

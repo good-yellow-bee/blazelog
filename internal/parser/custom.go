@@ -11,6 +11,9 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/models"
 )
 
+// maxJSONSize is the maximum size for JSON log lines (1MB).
+const maxJSONSize = 1024 * 1024
+
 // CustomParserConfig defines a custom log parser via YAML configuration.
 type CustomParserConfig struct {
 	// Name is the unique identifier for this parser.
@@ -201,6 +204,10 @@ func (p *CustomParser) parseJSON(line string) (*models.LogEntry, error) {
 	line = strings.TrimSpace(line)
 	if line == "" || line[0] != '{' {
 		return nil, ErrInvalidFormat
+	}
+
+	if len(line) > maxJSONSize {
+		return nil, fmt.Errorf("%w: line exceeds max JSON size (%d bytes)", ErrInvalidFormat, maxJSONSize)
 	}
 
 	var data map[string]interface{}

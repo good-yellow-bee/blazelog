@@ -22,6 +22,9 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
 		// Content Security Policy - allow inline scripts/styles, local assets, and Google Fonts
+		// NOTE: unsafe-inline/unsafe-eval required by HTMX (hx-on:* attributes) and Alpine.js (x-data expressions).
+		// Migration to CSP nonces would require refactoring all templates to use <script> tags with nonces
+		// instead of inline event handlers. See: https://htmx.org/docs/#security
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
 				"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "+

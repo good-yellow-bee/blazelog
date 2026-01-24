@@ -26,24 +26,28 @@ const (
 func jsonUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]string{
 			"code":    "UNAUTHORIZED",
 			"message": "invalid or expired token",
 		},
-	})
+	}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 // jsonForbidden writes a forbidden error response.
 func jsonForbidden(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
-	json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]string{
 			"code":    "FORBIDDEN",
 			"message": "access denied",
 		},
-	})
+	}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 // JWTAuth returns middleware that validates JWT tokens.
@@ -172,4 +176,12 @@ func GetClaims(ctx context.Context) *auth.Claims {
 		}
 	}
 	return nil
+}
+
+// WithUserContext adds user info to context (for testing).
+func WithUserContext(ctx context.Context, userID, username string, role models.Role) context.Context {
+	ctx = context.WithValue(ctx, userIDKey, userID)
+	ctx = context.WithValue(ctx, usernameKey, username)
+	ctx = context.WithValue(ctx, roleKey, role)
+	return ctx
 }

@@ -96,8 +96,15 @@ func (e *EmailNotifier) Send(ctx context.Context, alert *alerting.Alert) error {
 	return e.sendMail(ctx, msg)
 }
 
-// Close is a no-op for email notifier.
+// Close zeros password bytes to prevent memory exposure.
 func (e *EmailNotifier) Close() error {
+	if len(e.config.Password) > 0 {
+		pwBytes := []byte(e.config.Password)
+		for i := range pwBytes {
+			pwBytes[i] = 0
+		}
+		e.config.Password = ""
+	}
 	return nil
 }
 

@@ -4,6 +4,7 @@ package health
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -46,7 +47,9 @@ type Response struct {
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(Response{Status: "ok"})
+	if err := json.NewEncoder(w).Encode(Response{Status: "ok"}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 // Live returns liveness probe status.
@@ -55,7 +58,9 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Live(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(Response{Status: "live"})
+	if err := json.NewEncoder(w).Encode(Response{Status: "live"}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 // Ready returns readiness probe status.
@@ -96,5 +101,7 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }

@@ -23,7 +23,8 @@ const (
 	PolicyStrict HostKeyPolicy = iota
 	// PolicyTOFU (Trust On First Use) accepts unknown hosts and stores their keys.
 	PolicyTOFU
-	// PolicyWarn accepts all hosts but logs warnings (dev only).
+	// PolicyWarn accepts unknown hosts with a warning. Stores key on first connection
+	// for subsequent verification (detects MITM attacks on repeat connections). Dev only.
 	PolicyWarn
 )
 
@@ -367,7 +368,13 @@ func NewHostKeyCallback(store HostKeyStore, policy HostKeyPolicy, audit AuditLog
 				return nil
 
 			case PolicyWarn:
-				audit.LogHostKeyAccepted(host, fingerprint, true)
+				// PolicyWarn: Accept unknown keys but log warning. Store key for subsequent
+				// verification to detect MITM attacks on repeat connections.
+				stored := false
+				if err := store.Add(host, key); err == nil {
+					stored = true
+				}
+				audit.LogHostKeyWarning(host, fingerprint, stored)
 				return nil
 			}
 		}
