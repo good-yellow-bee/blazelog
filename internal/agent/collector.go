@@ -46,11 +46,9 @@ func NewCollector(source SourceConfig, labels map[string]string) (*Collector, er
 	}
 
 	// Create tailer
-	opts := &tailer.TailerOptions{
-		Follow:   source.Follow,
-		ReOpen:   true,
-		MustExist: true,
-	}
+	opts := tailer.DefaultOptions()
+	opts.Follow = source.Follow
+	opts.MustExist = true
 	t, err := tailer.NewTailer(source.Path, opts)
 	if err != nil {
 		return nil, fmt.Errorf("create tailer for %s: %w", source.Path, err)
@@ -67,7 +65,14 @@ func NewCollector(source SourceConfig, labels map[string]string) (*Collector, er
 
 // Start begins collecting log entries.
 func (c *Collector) Start(ctx context.Context) error {
-	if err := c.tailer.Start(ctx); err != nil {
+	// For follow mode, start from end to avoid reading huge backlogs
+	var err error
+	if c.source.Follow {
+		err = c.tailer.StartFromEnd(ctx)
+	} else {
+		err = c.tailer.Start(ctx)
+	}
+	if err != nil {
 		return fmt.Errorf("start tailer: %w", err)
 	}
 
@@ -96,7 +101,6 @@ func (c *Collector) collect(ctx context.Context) {
 
 			entry, err := c.parser.Parse(line.Text)
 			if err != nil {
-				// Log parsing error but continue
 				continue
 			}
 

@@ -8,13 +8,17 @@ BlazeLog parses Magento 2 logs which use the Monolog format.
 
 ### Monolog Format
 
+BlazeLog supports both classic and ISO 8601 timestamp formats:
+
 ```
 [YYYY-MM-DD HH:MM:SS] channel.LEVEL: message {context} [extra]
+[YYYY-MM-DDTHH:MM:SS.ffffff±HH:MM] channel.LEVEL: message {context} [extra]
 ```
 
-Example:
+Examples:
 ```
 [2024-01-15 10:30:00] main.ERROR: Exception message {"exception":"[object] (Exception: ...)"} []
+[2024-01-15T10:30:00.123456+00:00] main.INFO: Order placed {"order_id":12345} []
 ```
 
 ### Stack Traces (Multiline)
