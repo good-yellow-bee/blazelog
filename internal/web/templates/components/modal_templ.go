@@ -98,7 +98,7 @@ func Modal(showVar, title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"relative transform overflow-hidden panel text-left transition-all w-full max-w-lg sm:my-8\"><!-- Header --><div class=\"flex items-center justify-between px-6 py-4 border-b border-slate-200/70\"><h3 class=\"text-lg font-semibold text-slate-900\" id=\"modal-title\" x-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"relative z-10 transform overflow-hidden panel text-left transition-all w-full max-w-lg sm:my-8\"><!-- Header --><div class=\"flex items-center justify-between px-6 py-4 border-b border-slate-200/70\"><h3 class=\"text-lg font-semibold text-slate-900\" id=\"modal-title\" x-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -227,7 +227,7 @@ func ModalWithFooter(showVar, title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"relative transform overflow-hidden panel text-left transition-all w-full max-w-lg sm:my-8\"><!-- Header --><div class=\"flex items-center justify-between px-6 py-4 border-b border-slate-200/70\"><h3 class=\"text-lg font-semibold text-slate-900\" id=\"modal-title\" x-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"relative z-10 transform overflow-hidden panel text-left transition-all w-full max-w-lg sm:my-8\"><!-- Header --><div class=\"flex items-center justify-between px-6 py-4 border-b border-slate-200/70\"><h3 class=\"text-lg font-semibold text-slate-900\" id=\"modal-title\" x-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

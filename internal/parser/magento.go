@@ -22,7 +22,7 @@ type MagentoParser struct {
 	startRegex *regexp.Regexp
 }
 
-// Magento timestamp format
+// Magento timestamp format (old style with space separator)
 const magentoTimeFormat = "2006-01-02 15:04:05"
 
 // NewMagentoParser creates a new Magento log parser.
@@ -30,10 +30,10 @@ func NewMagentoParser(opts *ParserOptions) *MagentoParser {
 	return &MagentoParser{
 		BaseParser: NewBaseParser(opts),
 		// Main pattern: [timestamp] channel.LEVEL: message {context} [extra]
-		// The message can contain anything including JSON objects
-		regex: regexp.MustCompile(`^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.*)$`),
+		// Supports both old format [2024-01-24 10:00:00] and ISO 8601 [2024-01-24T10:00:00.000000+00:00]
+		regex: regexp.MustCompile(`^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2})?)\] (\w+)\.(\w+): (.*)$`),
 		// Pattern to detect start of a new entry
-		startRegex: regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]`),
+		startRegex: regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`),
 	}
 }
 
@@ -56,8 +56,21 @@ func (p *MagentoParser) ParseWithContext(ctx context.Context, line string) (*mod
 	entry := models.NewLogEntry()
 	entry.Type = models.LogTypeMagento
 
-	// Parse timestamp
-	timestamp, err := time.Parse(magentoTimeFormat, matches[1])
+	// Parse timestamp (try ISO 8601 first, then old format)
+	tsStr := matches[1]
+	var timestamp time.Time
+	var err error
+	if strings.Contains(tsStr, "T") {
+		// ISO 8601 format with T separator
+		timestamp, err = time.Parse(time.RFC3339Nano, tsStr)
+		if err != nil {
+			// Try without nanoseconds
+			timestamp, err = time.Parse(time.RFC3339, tsStr)
+		}
+	} else {
+		// Old format with space separator
+		timestamp, err = time.Parse(magentoTimeFormat, tsStr)
+	}
 	if err != nil {
 		return nil, ErrInvalidFormat
 	}

@@ -322,7 +322,7 @@ templ LogDetailModal() {
 			<div class="fixed inset-0 bg-slate-900/40 transition-opacity" @click="selectedLog = null"></div>
 
 			<!-- Modal -->
-			<div class="inline-block align-bottom panel text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+			<div class="relative z-10 inline-block align-bottom panel text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
 				<div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
 					<!-- Header -->
 					<div class="flex justify-between items-start mb-4">
@@ -457,7 +457,7 @@ templ ExportModal() {
 		<div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
 			<div class="fixed inset-0 bg-slate-900/40 transition-opacity" @click="showExport = false"></div>
 
-			<div class="inline-block align-bottom panel text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+			<div class="relative z-10 inline-block align-bottom panel text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
 				<div class="px-4 pt-5 pb-4 sm:p-6">
 					<h3 class="text-lg font-semibold text-slate-900 mb-4">Export Logs</h3>
 

@@ -60,7 +60,7 @@ func Base(title string, user *session.Session, csrfToken string) templ.Component
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " - BlazeLog</title><link rel=\"icon\" href=\"/static/favicon.ico\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/vendor/htmx.min.js\"></script><script defer src=\"/static/vendor/alpine.csp.min.js\"></script><script>\n\t\t\t\t// Global helper for CSRF-protected fetch\n\t\t\t\twindow.csrfFetch = function(url, options = {}) {\n\t\t\t\t\tconst token = document.querySelector('meta[name=\"csrf-token\"]')?.content;\n\t\t\t\t\toptions.headers = options.headers || {};\n\t\t\t\t\tif (token) {\n\t\t\t\t\t\toptions.headers['X-CSRF-Token'] = token;\n\t\t\t\t\t}\n\t\t\t\t\treturn fetch(url, options);\n\t\t\t\t};\n\t\t\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " - BlazeLog</title><link rel=\"icon\" href=\"/static/favicon.ico\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/vendor/htmx.min.js\"></script><script defer src=\"/static/vendor/alpine-collapse.min.js\"></script><script defer src=\"/static/vendor/alpine.min.js\"></script><script>\n\t\t\t\t// Global helper for CSRF-protected fetch\n\t\t\t\twindow.csrfFetch = function(url, options = {}) {\n\t\t\t\t\tconst token = document.querySelector('meta[name=\"csrf-token\"]')?.content;\n\t\t\t\t\toptions.headers = options.headers || {};\n\t\t\t\t\tif (token) {\n\t\t\t\t\t\toptions.headers['X-CSRF-Token'] = token;\n\t\t\t\t\t}\n\t\t\t\t\treturn fetch(url, options);\n\t\t\t\t};\n\t\t\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

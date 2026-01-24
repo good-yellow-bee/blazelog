@@ -12,6 +12,21 @@ import (
 func (s *Server) Routes() chi.Router {
 	r := chi.NewRouter()
 
+	// Redirect trailing slashes (preserving query string)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/" && strings.HasSuffix(r.URL.Path, "/") {
+				newURL := strings.TrimSuffix(r.URL.Path, "/")
+				if r.URL.RawQuery != "" {
+					newURL += "?" + r.URL.RawQuery
+				}
+				http.Redirect(w, r, newURL, http.StatusMovedPermanently)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.TLS == nil && strings.ToLower(r.Header.Get("X-Forwarded-Proto")) != "https" {
