@@ -35,8 +35,8 @@ func (h *Handler) RegisterChecker(c Checker) {
 	h.checkers = append(h.checkers, c)
 }
 
-// HealthResponse represents the health check response.
-type HealthResponse struct {
+// Response represents the health check response.
+type Response struct {
 	Status string            `json:"status"`
 	Checks map[string]string `json:"checks,omitempty"`
 }
@@ -46,7 +46,7 @@ type HealthResponse struct {
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(HealthResponse{Status: "ok"})
+	json.NewEncoder(w).Encode(Response{Status: "ok"})
 }
 
 // Live returns liveness probe status.
@@ -55,7 +55,7 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Live(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(HealthResponse{Status: "live"})
+	json.NewEncoder(w).Encode(Response{Status: "live"})
 }
 
 // Ready returns readiness probe status.
@@ -84,7 +84,7 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	resp := HealthResponse{
+	resp := Response{
 		Status: "ready",
 		Checks: results,
 	}

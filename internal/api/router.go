@@ -111,7 +111,7 @@ func (s *Server) setupRouter() *chi.Mux {
 			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
-			logsHandler := logs.NewHandler(s.logStorage)
+			logsHandler := logs.NewHandlerWithStorage(s.logStorage, s.storage)
 
 			r.Get("/", logsHandler.Query)
 			r.Get("/stats", logsHandler.Stats)

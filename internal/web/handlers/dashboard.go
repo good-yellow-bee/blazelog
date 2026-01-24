@@ -3,9 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
+	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
 	"github.com/gorilla/csrf"
@@ -98,25 +101,43 @@ func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 	if timeRange == "" {
 		timeRange = "24h"
 	}
+	projectID := r.URL.Query().Get("project_id")
+
+	// Get project access
+	var access *middleware.ProjectAccess
+	if h.storage != nil {
+		role := models.ParseRole(sess.Role)
+		var err error
+		access, err = middleware.GetProjectAccess(r.Context(), sess.UserID, role, h.storage)
+		if err != nil {
+			http.Error(w, "failed to get project access", http.StatusInternalServerError)
+			return
+		}
+		// Validate requested project access
+		if projectID != "" && !access.CanAccessProject(projectID) {
+			http.Error(w, "no access to project", http.StatusForbidden)
+			return
+		}
+	}
 
 	// Check if HTMX request (wants HTML partial)
 	if r.Header.Get("HX-Request") == "true" {
-		h.renderStatsPartial(w, r, timeRange)
+		h.renderStatsPartial(w, r, timeRange, projectID, access)
 		return
 	}
 
 	// Return JSON for JavaScript fetch
-	h.renderStatsJSON(w, r, timeRange)
+	h.renderStatsJSON(w, r, timeRange, projectID, access)
 }
 
-func (h *Handler) renderStatsJSON(w http.ResponseWriter, r *http.Request, timeRange string) {
-	stats := h.fetchDashboardStats(r.Context(), timeRange)
+func (h *Handler) renderStatsJSON(w http.ResponseWriter, r *http.Request, timeRange, projectID string, access *middleware.ProjectAccess) {
+	stats := h.fetchDashboardStats(r.Context(), timeRange, projectID, access)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
 
-func (h *Handler) renderStatsPartial(w http.ResponseWriter, r *http.Request, timeRange string) {
-	stats := h.fetchDashboardStats(r.Context(), timeRange)
+func (h *Handler) renderStatsPartial(w http.ResponseWriter, r *http.Request, timeRange, projectID string, access *middleware.ProjectAccess) {
+	stats := h.fetchDashboardStats(r.Context(), timeRange, projectID, access)
 	pageStats := pages.DashboardStats{
 		TotalLogs:    int(stats.TotalLogs),
 		ErrorCount:   int(stats.ErrorCount),
@@ -126,11 +147,18 @@ func (h *Handler) renderStatsPartial(w http.ResponseWriter, r *http.Request, tim
 	pages.StatsCards(pageStats).Render(r.Context(), w)
 }
 
-func (h *Handler) fetchDashboardStats(ctx context.Context, timeRange string) *DashboardStatsResponse {
+func (h *Handler) fetchDashboardStats(ctx context.Context, timeRange, projectID string, access *middleware.ProjectAccess) *DashboardStatsResponse {
 	startTime, endTime, interval := parseTimeRange(timeRange)
 	filter := &storage.AggregationFilter{
 		StartTime: startTime,
 		EndTime:   endTime,
+	}
+
+	// Apply project access filtering (error already validated in handler)
+	if access != nil {
+		if err := access.ApplyToAggregationFilter(filter, projectID); err != nil {
+			log.Printf("warning: aggregation filter error: %v", err)
+		}
 	}
 
 	response := &DashboardStatsResponse{TimeRange: timeRange}
@@ -165,11 +193,24 @@ func (h *Handler) fetchDashboardStats(ctx context.Context, timeRange string) *Da
 
 	// Fetch active alerts count
 	if h.storage != nil {
-		if alerts, err := h.storage.Alerts().List(ctx); err == nil {
-			for _, a := range alerts {
-				if a.Enabled {
-					response.ActiveAlerts++
+		alertsRepo := h.storage.Alerts()
+		if projectID != "" {
+			if alerts, err := alertsRepo.ListByProject(ctx, projectID); err == nil {
+				for _, a := range alerts {
+					if a.Enabled {
+						response.ActiveAlerts++
+					}
 				}
+			}
+		} else if alerts, err := alertsRepo.ListEnabled(ctx); err == nil {
+			if access != nil && !access.AllProjects {
+				for _, a := range alerts {
+					if access.CanAccessProject(a.ProjectID) {
+						response.ActiveAlerts++
+					}
+				}
+			} else {
+				response.ActiveAlerts = len(alerts)
 			}
 		}
 	}

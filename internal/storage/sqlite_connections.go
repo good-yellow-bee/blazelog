@@ -188,6 +188,7 @@ func (r *sqliteConnectionRepo) scanConnection(row *sql.Row) (*models.Connection,
 		&projectID, &conn.CreatedAt, &conn.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {

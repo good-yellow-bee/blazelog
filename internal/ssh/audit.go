@@ -77,7 +77,7 @@ func NewJSONAuditLoggerWriter(w io.WriteCloser) *JSONAuditLogger {
 	return &JSONAuditLogger{output: w}
 }
 
-func (l *JSONAuditLogger) log(event AuditEvent) {
+func (l *JSONAuditLogger) log(event *AuditEvent) {
 	event.Timestamp = time.Now().UTC().Format(time.RFC3339)
 
 	l.mu.Lock()
@@ -94,7 +94,7 @@ func (l *JSONAuditLogger) log(event AuditEvent) {
 
 // LogConnect logs a connection attempt.
 func (l *JSONAuditLogger) LogConnect(host, user, jumpHost string) {
-	l.log(AuditEvent{
+	l.log(&AuditEvent{
 		Event:    "connect",
 		Host:     host,
 		User:     user,
@@ -104,7 +104,7 @@ func (l *JSONAuditLogger) LogConnect(host, user, jumpHost string) {
 
 // LogDisconnect logs a disconnection.
 func (l *JSONAuditLogger) LogDisconnect(host string, err error) {
-	event := AuditEvent{
+	event := &AuditEvent{
 		Event: "disconnect",
 		Host:  host,
 	}
@@ -116,7 +116,7 @@ func (l *JSONAuditLogger) LogDisconnect(host string, err error) {
 
 // LogHostKeyAccepted logs when a host key is accepted.
 func (l *JSONAuditLogger) LogHostKeyAccepted(host, fingerprint string, isNew bool) {
-	l.log(AuditEvent{
+	l.log(&AuditEvent{
 		Event:       "host_key_accepted",
 		Host:        host,
 		Fingerprint: fingerprint,
@@ -126,7 +126,7 @@ func (l *JSONAuditLogger) LogHostKeyAccepted(host, fingerprint string, isNew boo
 
 // LogHostKeyRejected logs when a host key is rejected.
 func (l *JSONAuditLogger) LogHostKeyRejected(host, expected, actual string) {
-	l.log(AuditEvent{
+	l.log(&AuditEvent{
 		Event:    "host_key_rejected",
 		Host:     host,
 		Expected: expected,
@@ -136,7 +136,7 @@ func (l *JSONAuditLogger) LogHostKeyRejected(host, expected, actual string) {
 
 // LogCommand logs a command execution.
 func (l *JSONAuditLogger) LogCommand(host, cmd string, success bool, duration time.Duration) {
-	l.log(AuditEvent{
+	l.log(&AuditEvent{
 		Event:      "command",
 		Host:       host,
 		Command:    cmd,
@@ -147,7 +147,7 @@ func (l *JSONAuditLogger) LogCommand(host, cmd string, success bool, duration ti
 
 // LogFileOp logs a file operation.
 func (l *JSONAuditLogger) LogFileOp(host, op, path string, bytes int64, err error) {
-	event := AuditEvent{
+	event := &AuditEvent{
 		Event:     "file_op",
 		Host:      host,
 		Operation: op,

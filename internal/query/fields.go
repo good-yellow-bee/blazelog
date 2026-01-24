@@ -22,6 +22,14 @@ type FieldDef struct {
 
 // DefaultFields contains all queryable log fields.
 var DefaultFields = map[string]FieldDef{
+	// Project field (multi-tenant filtering)
+	"project_id": {
+		Name:      "project_id",
+		Column:    "project_id",
+		Type:      FieldTypeString,
+		Operators: []string{"==", "!=", "in"},
+	},
+
 	// Core fields
 	"level": {
 		Name:      "level",

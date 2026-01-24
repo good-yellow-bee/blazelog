@@ -14,7 +14,7 @@ type MockParser struct {
 	*BaseParser
 }
 
-func NewMockParser(opts *ParserOptions) *MockParser {
+func NewMockParser(opts *Options) *MockParser {
 	return &MockParser{
 		BaseParser: NewBaseParser(opts),
 	}
@@ -120,7 +120,7 @@ func TestMockParser_CanParse(t *testing.T) {
 }
 
 func TestBaseParser_ApplyOptions(t *testing.T) {
-	opts := &ParserOptions{
+	opts := &Options{
 		IncludeRaw: true,
 		Source:     "test-source",
 		Labels: map[string]string{

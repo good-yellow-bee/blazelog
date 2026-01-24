@@ -120,6 +120,7 @@ func (s *ClickHouseStorage) Migrate() error {
 	createTable := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS logs (
 			id UUID DEFAULT generateUUIDv4(),
+			project_id String DEFAULT '',
 			timestamp DateTime64(3, 'UTC'),
 			level LowCardinality(String),
 			message String,
@@ -138,7 +139,7 @@ func (s *ClickHouseStorage) Migrate() error {
 		)
 		ENGINE = MergeTree()
 		PARTITION BY toYYYYMM(_date)
-		ORDER BY (agent_id, type, level, timestamp, id)
+		ORDER BY (project_id, agent_id, type, level, timestamp, id)
 		TTL _date + INTERVAL %d DAY DELETE
 		SETTINGS index_granularity = 8192
 	`, s.config.RetentionDays)
@@ -147,11 +148,23 @@ func (s *ClickHouseStorage) Migrate() error {
 		return fmt.Errorf("create logs table: %w", err)
 	}
 
+	// Migration: Add project_id column to existing tables (before indexes that depend on it)
+	migrations := []string{
+		"ALTER TABLE logs ADD COLUMN IF NOT EXISTS project_id String DEFAULT '' AFTER id",
+	}
+	for _, migration := range migrations {
+		if _, err := s.db.ExecContext(ctx, migration); err != nil {
+			fmt.Printf("warning: migration failed (may already exist): %v\n", err)
+		}
+	}
+
 	// Add indexes (these are idempotent in ClickHouse)
 	indexes := []string{
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_message message TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 4",
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_source source TYPE bloom_filter(0.01) GRANULARITY 4",
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_file_path file_path TYPE bloom_filter(0.01) GRANULARITY 4",
+		// Project index for multi-tenant filtering
+		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_project_id project_id TYPE bloom_filter(0.01) GRANULARITY 4",
 		// Advanced indexes (Milestone 21)
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_message_ngram message TYPE ngrambf_v1(3, 65536, 3, 0) GRANULARITY 4",
 		"ALTER TABLE logs ADD INDEX IF NOT EXISTS idx_timestamp_minmax timestamp TYPE minmax GRANULARITY 3",
@@ -251,10 +264,10 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO logs (
-			id, timestamp, level, message, source, type, raw,
+			id, project_id, timestamp, level, message, source, type, raw,
 			agent_id, file_path, line_number, fields, labels,
 			http_status, http_method, uri
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare: %w", err)
@@ -272,6 +285,7 @@ func (r *clickhouseLogRepo) InsertBatch(ctx context.Context, entries []*LogRecor
 
 		_, err := stmt.ExecContext(ctx,
 			id,
+			entry.ProjectID,
 			entry.Timestamp,
 			entry.Level,
 			entry.Message,
@@ -325,6 +339,7 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 
 		err := rows.Scan(
 			&entry.ID,
+			&entry.ProjectID,
 			&entry.Timestamp,
 			&entry.Level,
 			&entry.Message,
@@ -438,7 +453,7 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 		sb.WriteString("SELECT count() FROM logs")
 	} else {
 		sb.WriteString(`
-			SELECT id, timestamp, level, message, source, type, raw,
+			SELECT id, project_id, timestamp, level, message, source, type, raw,
 			       agent_id, file_path, line_number, fields, labels,
 			       http_status, http_method, uri
 			FROM logs
@@ -458,6 +473,13 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 
 	// Build WHERE clause
 	var conditions []string
+
+	// Project filter (always applied for RBAC)
+	projectCondition, projectArgs := r.buildProjectFilter(filter)
+	if projectCondition != "" {
+		conditions = append(conditions, projectCondition)
+		args = append(args, projectArgs...)
+	}
 
 	// DSL filter takes precedence if set
 	if filter.FilterSQL != "" {
@@ -544,11 +566,11 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 	}
 
 	// Combine args: prewhere args first, then where args
-	allArgs := append(prewhereArgs, args...)
+	prewhereArgs = append(prewhereArgs, args...)
 
 	// Skip ORDER BY and LIMIT for count queries
 	if countOnly {
-		return sb.String(), allArgs
+		return sb.String(), prewhereArgs
 	}
 
 	// ORDER BY - use allowlist to prevent SQL injection
@@ -584,7 +606,7 @@ func (r *clickhouseLogRepo) buildQuery(filter *LogFilter, countOnly bool) (strin
 		sb.WriteString(fmt.Sprintf(" OFFSET %d", filter.Offset))
 	}
 
-	return sb.String(), allArgs
+	return sb.String(), prewhereArgs
 }
 
 // GetErrorRates returns error statistics for the given filter.
@@ -759,10 +781,81 @@ func (r *clickhouseLogRepo) GetHTTPStats(ctx context.Context, filter *Aggregatio
 	return result, rows.Err()
 }
 
+// buildProjectFilter builds the project filter clause for log queries.
+func (r *clickhouseLogRepo) buildProjectFilter(filter *LogFilter) (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	// Specific single project filter
+	if filter.ProjectID != "" {
+		return "project_id = ?", []interface{}{filter.ProjectID}
+	}
+
+	// Multiple projects filter (user's accessible projects)
+	if len(filter.ProjectIDs) > 0 {
+		placeholders := make([]string, len(filter.ProjectIDs))
+		for i, p := range filter.ProjectIDs {
+			placeholders[i] = "?"
+			args = append(args, p)
+		}
+		conditions = append(conditions, fmt.Sprintf("project_id IN (%s)", strings.Join(placeholders, ", ")))
+	}
+
+	// Include unassigned logs (project_id = '')
+	if filter.IncludeUnassigned {
+		conditions = append(conditions, "project_id = ''")
+	}
+
+	if len(conditions) == 0 {
+		return "", nil // No project filter (admin sees all)
+	}
+
+	return "(" + strings.Join(conditions, " OR ") + ")", args
+}
+
+// buildAggregationProjectFilter builds the project filter for aggregation queries.
+func (r *clickhouseLogRepo) buildAggregationProjectFilter(filter *AggregationFilter) (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	// Specific single project filter
+	if filter.ProjectID != "" {
+		return "project_id = ?", []interface{}{filter.ProjectID}
+	}
+
+	// Multiple projects filter
+	if len(filter.ProjectIDs) > 0 {
+		placeholders := make([]string, len(filter.ProjectIDs))
+		for i, p := range filter.ProjectIDs {
+			placeholders[i] = "?"
+			args = append(args, p)
+		}
+		conditions = append(conditions, fmt.Sprintf("project_id IN (%s)", strings.Join(placeholders, ", ")))
+	}
+
+	// Include unassigned logs
+	if filter.IncludeUnassigned {
+		conditions = append(conditions, "project_id = ''")
+	}
+
+	if len(conditions) == 0 {
+		return "", nil
+	}
+
+	return "(" + strings.Join(conditions, " OR ") + ")", args
+}
+
 // buildAggregationWhere builds WHERE clause for aggregation queries.
 func (r *clickhouseLogRepo) buildAggregationWhere(filter *AggregationFilter) ([]interface{}, string) {
 	var conditions []string
 	var args []interface{}
+
+	// Project filter
+	projectCondition, projectArgs := r.buildAggregationProjectFilter(filter)
+	if projectCondition != "" {
+		conditions = append(conditions, projectCondition)
+		args = append(args, projectArgs...)
+	}
 
 	if !filter.StartTime.IsZero() {
 		conditions = append(conditions, "timestamp >= ?")

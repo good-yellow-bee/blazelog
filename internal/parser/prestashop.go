@@ -26,7 +26,7 @@ type PrestaShopParser struct {
 const prestashopTimeFormat = "2006-01-02 15:04:05"
 
 // NewPrestaShopParser creates a new PrestaShop log parser.
-func NewPrestaShopParser(opts *ParserOptions) *PrestaShopParser {
+func NewPrestaShopParser(opts *Options) *PrestaShopParser {
 	return &PrestaShopParser{
 		BaseParser: NewBaseParser(opts),
 		// Main pattern: [timestamp] channel.LEVEL: message {context} [extra]

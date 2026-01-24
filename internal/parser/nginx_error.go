@@ -24,7 +24,7 @@ type NginxErrorParser struct {
 const nginxErrorTimeFormat = "2006/01/02 15:04:05"
 
 // NewNginxErrorParser creates a new Nginx error log parser.
-func NewNginxErrorParser(opts *ParserOptions) *NginxErrorParser {
+func NewNginxErrorParser(opts *Options) *NginxErrorParser {
 	return &NginxErrorParser{
 		BaseParser: NewBaseParser(opts),
 		// Main pattern: timestamp [level] pid#tid: *cid? message

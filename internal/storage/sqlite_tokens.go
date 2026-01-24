@@ -64,6 +64,7 @@ func (r *sqliteTokenRepo) GetByTokenHash(ctx context.Context, tokenHash string) 
 		&revokedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {
@@ -145,4 +146,3 @@ func (r *sqliteTokenRepo) DeleteExpired(ctx context.Context) (int64, error) {
 
 	return result.RowsAffected()
 }
-

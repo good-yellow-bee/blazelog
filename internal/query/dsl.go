@@ -27,18 +27,18 @@ func (pq *ParsedQuery) Raw() string {
 	return pq.raw
 }
 
-// QueryDSL handles expression parsing and validation.
-type QueryDSL struct {
+// DSL handles expression parsing and validation.
+type DSL struct {
 	fields map[string]FieldDef
 }
 
 // NewQueryDSL creates a new DSL parser with the given field definitions.
-func NewQueryDSL(fields map[string]FieldDef) *QueryDSL {
-	return &QueryDSL{fields: fields}
+func NewQueryDSL(fields map[string]FieldDef) *DSL {
+	return &DSL{fields: fields}
 }
 
 // Parse compiles and validates an expression string.
-func (d *QueryDSL) Parse(expression string) (*ParsedQuery, error) {
+func (d *DSL) Parse(expression string) (*ParsedQuery, error) {
 	if expression == "" {
 		return nil, fmt.Errorf("empty expression")
 	}
@@ -69,7 +69,7 @@ func (d *QueryDSL) Parse(expression string) (*ParsedQuery, error) {
 }
 
 // buildEnv creates the environment for expr compilation.
-func (d *QueryDSL) buildEnv() map[string]any {
+func (d *DSL) buildEnv() map[string]any {
 	env := make(map[string]any)
 
 	// Add fields as typed placeholders
@@ -105,7 +105,7 @@ func (d *QueryDSL) buildEnv() map[string]any {
 }
 
 // validateAST walks the AST to validate fields and operators.
-func (d *QueryDSL) validateAST(node *ast.Node) error {
+func (d *DSL) validateAST(node *ast.Node) error {
 	v := &validationVisitor{fields: d.fields}
 	ast.Walk(node, v)
 	return v.err

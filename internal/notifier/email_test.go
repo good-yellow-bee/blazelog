@@ -123,7 +123,7 @@ func TestTemplatesRender(t *testing.T) {
 	}
 
 	// Test HTML rendering
-	html, err := templates.RenderHTML(data)
+	html, err := templates.RenderHTML(&data)
 	if err != nil {
 		t.Fatalf("failed to render HTML: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestTemplatesRender(t *testing.T) {
 	}
 
 	// Test plain rendering
-	plain, err := templates.RenderPlain(data)
+	plain, err := templates.RenderPlain(&data)
 	if err != nil {
 		t.Fatalf("failed to render plain: %v", err)
 	}
@@ -513,7 +513,7 @@ func TestEmailNotifierSendWithMockSMTP(t *testing.T) {
 		Recipients: []string{"admin@example.com"},
 	}
 
-	notifier, err := NewEmailNotifier(config)
+	notifier, err := NewEmailNotifier(&config)
 	if err != nil {
 		t.Fatalf("failed to create notifier: %v", err)
 	}

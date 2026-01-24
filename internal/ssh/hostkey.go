@@ -99,6 +99,7 @@ func (s *FileHostKeyStore) Get(host string) (ssh.PublicKey, error) {
 
 	file, err := os.Open(s.path)
 	if os.IsNotExist(err) {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {
@@ -229,6 +230,7 @@ func (s *FileHostKeyStore) List() (map[string]ssh.PublicKey, error) {
 func (s *FileHostKeyStore) getUnlocked(host string) (ssh.PublicKey, error) {
 	file, err := os.Open(s.path)
 	if os.IsNotExist(err) {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {

@@ -85,9 +85,10 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	agentCfg := &agent.AgentConfig{
+	agentCfg := &agent.Config{
 		ID:            cfg.Agent.ID,
 		Name:          cfg.Agent.Name,
+		ProjectID:     cfg.Agent.ProjectID,
 		ServerAddress: cfg.Server.Address,
 		BatchSize:     cfg.Agent.BatchSize,
 		FlushInterval: cfg.Agent.FlushInterval,

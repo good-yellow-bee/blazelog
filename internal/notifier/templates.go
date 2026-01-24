@@ -66,7 +66,7 @@ func LoadTemplates() (*Templates, error) {
 }
 
 // RenderHTML renders the HTML email body.
-func (t *Templates) RenderHTML(data TemplateData) (string, error) {
+func (t *Templates) RenderHTML(data *TemplateData) (string, error) {
 	var buf bytes.Buffer
 	if err := t.html.Execute(&buf, data); err != nil {
 		return "", err
@@ -75,7 +75,7 @@ func (t *Templates) RenderHTML(data TemplateData) (string, error) {
 }
 
 // RenderPlain renders the plain text email body.
-func (t *Templates) RenderPlain(data TemplateData) (string, error) {
+func (t *Templates) RenderPlain(data *TemplateData) (string, error) {
 	var buf bytes.Buffer
 	if err := t.plain.Execute(&buf, data); err != nil {
 		return "", err

@@ -13,7 +13,7 @@ import (
 // from all of them.
 type MultiTailer struct {
 	patterns []string
-	opts     *TailerOptions
+	opts     *Options
 
 	tailers map[string]*Tailer
 	watcher *fsnotify.Watcher
@@ -28,7 +28,7 @@ type MultiTailer struct {
 
 // NewMultiTailer creates a new MultiTailer for the given patterns.
 // Patterns can be file paths or glob patterns (e.g., "/var/log/*.log").
-func NewMultiTailer(patterns []string, opts *TailerOptions) (*MultiTailer, error) {
+func NewMultiTailer(patterns []string, opts *Options) (*MultiTailer, error) {
 	if opts == nil {
 		opts = DefaultOptions()
 	}

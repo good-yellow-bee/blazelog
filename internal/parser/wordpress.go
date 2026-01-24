@@ -34,7 +34,7 @@ type WordPressParser struct {
 const wordpressTimeFormat = "02-Jan-2006 15:04:05"
 
 // NewWordPressParser creates a new WordPress log parser.
-func NewWordPressParser(opts *ParserOptions) *WordPressParser {
+func NewWordPressParser(opts *Options) *WordPressParser {
 	return &WordPressParser{
 		BaseParser: NewBaseParser(opts),
 		// Main pattern: [timestamp timezone] PHP Level: message or [timestamp timezone] WordPress ...

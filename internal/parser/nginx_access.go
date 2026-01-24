@@ -22,7 +22,7 @@ type NginxAccessParser struct {
 const nginxAccessTimeFormat = "02/Jan/2006:15:04:05 -0700"
 
 // NewNginxAccessParser creates a new Nginx access log parser.
-func NewNginxAccessParser(opts *ParserOptions) *NginxAccessParser {
+func NewNginxAccessParser(opts *Options) *NginxAccessParser {
 	return &NginxAccessParser{
 		BaseParser: NewBaseParser(opts),
 		// Combined format: $remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"

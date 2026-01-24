@@ -589,7 +589,7 @@ func TestWordPressParser_Type(t *testing.T) {
 // TestWordPressParser_Options tests parser options application.
 func TestWordPressParser_Options(t *testing.T) {
 	t.Run("include raw line", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			IncludeRaw: true,
 		}
 		parser := NewWordPressParser(opts)
@@ -604,7 +604,7 @@ func TestWordPressParser_Options(t *testing.T) {
 	})
 
 	t.Run("exclude raw line", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			IncludeRaw: false,
 		}
 		parser := NewWordPressParser(opts)
@@ -619,7 +619,7 @@ func TestWordPressParser_Options(t *testing.T) {
 	})
 
 	t.Run("with source", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			Source: "wordpress-server-1",
 		}
 		parser := NewWordPressParser(opts)
@@ -634,7 +634,7 @@ func TestWordPressParser_Options(t *testing.T) {
 	})
 
 	t.Run("with labels", func(t *testing.T) {
-		opts := &ParserOptions{
+		opts := &Options{
 			Labels: map[string]string{
 				"environment": "production",
 				"app":         "wordpress",

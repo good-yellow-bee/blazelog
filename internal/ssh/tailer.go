@@ -148,7 +148,7 @@ func (t *Tailer) run(ctx context.Context) {
 func (t *Tailer) poll(ctx context.Context) {
 	info, err := t.client.FileInfo(ctx, t.filePath)
 	if err != nil {
-		t.sendLine(Line{
+		t.sendLine(&Line{
 			FilePath: t.filePath,
 			Host:     t.client.config.Host,
 			Time:     time.Now(),
@@ -203,7 +203,7 @@ func (t *Tailer) readFromOffset(ctx context.Context) {
 	// Read chunk from file
 	data, err := t.client.ReadFileRange(ctx, t.filePath, t.offset, bytesToRead)
 	if err != nil {
-		t.sendLine(Line{
+		t.sendLine(&Line{
 			FilePath: t.filePath,
 			Host:     t.client.config.Host,
 			Time:     time.Now(),
@@ -220,7 +220,7 @@ func (t *Tailer) readFromOffset(ctx context.Context) {
 func (t *Tailer) parseLines(data []byte) {
 	scanner := bufio.NewScanner(&bytesReader{data: data})
 	for scanner.Scan() {
-		t.sendLine(Line{
+		t.sendLine(&Line{
 			Text:     scanner.Text(),
 			FilePath: t.filePath,
 			Host:     t.client.config.Host,
@@ -229,9 +229,9 @@ func (t *Tailer) parseLines(data []byte) {
 	}
 }
 
-func (t *Tailer) sendLine(line Line) {
+func (t *Tailer) sendLine(line *Line) {
 	select {
-	case t.lines <- line:
+	case t.lines <- *line:
 	case <-t.done:
 	}
 }

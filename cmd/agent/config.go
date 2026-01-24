@@ -43,6 +43,7 @@ type TLSConfig struct {
 type AgentConfig struct {
 	ID            string        `yaml:"id"`             // optional, auto-generated if empty
 	Name          string        `yaml:"name"`           // human-readable name
+	ProjectID     string        `yaml:"project_id"`     // project this agent belongs to
 	BatchSize     int           `yaml:"batch_size"`     // entries per batch (default: 100)
 	FlushInterval time.Duration `yaml:"flush_interval"` // batch flush interval (default: 1s)
 }

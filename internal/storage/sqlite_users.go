@@ -38,6 +38,7 @@ func (r *sqliteUserRepo) GetByID(ctx context.Context, id string) (*models.User, 
 		&user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {
@@ -57,6 +58,7 @@ func (r *sqliteUserRepo) GetByUsername(ctx context.Context, username string) (*m
 		&user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {
@@ -76,6 +78,7 @@ func (r *sqliteUserRepo) GetByEmail(ctx context.Context, email string) (*models.
 		&user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {

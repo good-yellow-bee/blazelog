@@ -46,7 +46,10 @@ type EmailNotifier struct {
 }
 
 // NewEmailNotifier creates a new email notifier.
-func NewEmailNotifier(config EmailConfig) (*EmailNotifier, error) {
+func NewEmailNotifier(config *EmailConfig) (*EmailNotifier, error) {
+	if config == nil {
+		return nil, fmt.Errorf("email config is required")
+	}
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid email config: %w", err)
 	}
@@ -57,7 +60,7 @@ func NewEmailNotifier(config EmailConfig) (*EmailNotifier, error) {
 	}
 
 	return &EmailNotifier{
-		config:    config,
+		config:    *config,
 		templates: templates,
 	}, nil
 }
@@ -73,12 +76,12 @@ func (e *EmailNotifier) Send(ctx context.Context, alert *alerting.Alert) error {
 	data := AlertToTemplateData(alert)
 
 	// Render templates
-	htmlBody, err := e.templates.RenderHTML(data)
+	htmlBody, err := e.templates.RenderHTML(&data)
 	if err != nil {
 		return fmt.Errorf("failed to render HTML template: %w", err)
 	}
 
-	plainBody, err := e.templates.RenderPlain(data)
+	plainBody, err := e.templates.RenderPlain(&data)
 	if err != nil {
 		return fmt.Errorf("failed to render plain template: %w", err)
 	}
@@ -109,7 +112,7 @@ func (e *EmailNotifier) buildMIMEMessage(subject, plainBody, htmlBody string) []
 	msg.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(e.config.Recipients, ", ")))
 	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
 	msg.WriteString("MIME-Version: 1.0\r\n")
-	msg.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary))
+	msg.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=%q\r\n", boundary))
 	msg.WriteString("\r\n")
 
 	// Plain text part

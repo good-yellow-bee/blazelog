@@ -58,8 +58,8 @@ type StreamParser interface {
 	ParseStream(ctx context.Context, r io.Reader, entries chan<- *models.LogEntry) error
 }
 
-// ParserOptions contains configuration options for parsers.
-type ParserOptions struct {
+// Options contains configuration options for parsers.
+type Options struct {
 	// TimeFormat specifies the expected timestamp format.
 	TimeFormat string
 
@@ -77,8 +77,8 @@ type ParserOptions struct {
 }
 
 // DefaultParserOptions returns default parser options.
-func DefaultParserOptions() *ParserOptions {
-	return &ParserOptions{
+func DefaultParserOptions() *Options {
+	return &Options{
 		IncludeRaw: true,
 		Labels:     make(map[string]string),
 	}
@@ -86,11 +86,11 @@ func DefaultParserOptions() *ParserOptions {
 
 // BaseParser provides common functionality for parsers.
 type BaseParser struct {
-	options *ParserOptions
+	options *Options
 }
 
 // NewBaseParser creates a new BaseParser with the given options.
-func NewBaseParser(opts *ParserOptions) *BaseParser {
+func NewBaseParser(opts *Options) *BaseParser {
 	if opts == nil {
 		opts = DefaultParserOptions()
 	}
@@ -98,7 +98,7 @@ func NewBaseParser(opts *ParserOptions) *BaseParser {
 }
 
 // Options returns the parser options.
-func (p *BaseParser) Options() *ParserOptions {
+func (p *BaseParser) Options() *Options {
 	return p.options
 }
 

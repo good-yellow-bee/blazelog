@@ -171,6 +171,7 @@ func (r *sqliteAlertRepo) scanAlert(row *sql.Row) (*models.AlertRule, error) {
 		&alert.CreatedAt, &alert.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		//nolint:nilnil
 		return nil, nil
 	}
 	if err != nil {

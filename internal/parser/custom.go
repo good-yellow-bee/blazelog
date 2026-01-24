@@ -47,7 +47,7 @@ type CustomParser struct {
 }
 
 // NewCustomParser creates a new custom parser from configuration.
-func NewCustomParser(cfg *CustomParserConfig, opts *ParserOptions) (*CustomParser, error) {
+func NewCustomParser(cfg *CustomParserConfig, opts *Options) (*CustomParser, error) {
 	if cfg.Name == "" {
 		return nil, fmt.Errorf("parser name is required")
 	}
@@ -205,7 +205,7 @@ func (p *CustomParser) parseJSON(line string) (*models.LogEntry, error) {
 
 	var data map[string]interface{}
 	if err := json.Unmarshal([]byte(line), &data); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidFormat, err)
+		return nil, fmt.Errorf("%w: %s", ErrInvalidFormat, err.Error())
 	}
 
 	entry := &models.LogEntry{

@@ -67,6 +67,7 @@ func (p *Processor) convertToRecords(batch *blazelogv1.LogBatch) []*LogRecord {
 
 		record := &LogRecord{
 			ID:         uuid.New().String(),
+			ProjectID:  batch.ProjectId,
 			Timestamp:  ts,
 			Level:      levelToString(entry.Level),
 			Message:    entry.Message,
