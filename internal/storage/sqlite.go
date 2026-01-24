@@ -17,6 +17,10 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/models"
 )
 
+// bcryptCost mirrors auth.BcryptCost to avoid import cycle.
+// Both values must remain synchronized.
+const bcryptCost = 12
+
 // SQLiteStorage implements Storage using SQLite.
 type SQLiteStorage struct {
 	path      string
@@ -124,8 +128,11 @@ func (s *SQLiteStorage) EnsureAdminUser() error {
 	}
 
 	// Generate random password
-	password := generateRandomPassword(16)
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	password, err := generateRandomPassword(16)
+	if err != nil {
+		return fmt.Errorf("generate password: %w", err)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
 	}
@@ -187,8 +194,10 @@ func (s *SQLiteStorage) AlertHistory() AlertHistoryRepository {
 }
 
 // generateRandomPassword generates a random password of the specified length.
-func generateRandomPassword(length int) string {
+func generateRandomPassword(length int) (string, error) {
 	b := make([]byte, length)
-	rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)[:length]
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("read random bytes: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(b)[:length], nil
 }

@@ -20,6 +20,14 @@ const (
 	colorGray   = "\033[90m"
 )
 
+// Size limits for LogEntry fields.
+const (
+	maxMessageLen  = 65536  // 64KB
+	maxRawLen      = 131072 // 128KB
+	maxSourceLen   = 512
+	maxFilePathLen = 1024
+)
+
 // Processor handles log processing and output.
 type Processor struct {
 	verbose   bool
@@ -35,6 +43,12 @@ func NewProcessor(verbose bool, logBuffer LogBuffer) *Processor {
 }
 
 // ProcessBatch processes a batch of log entries.
+//
+// Project validation: The processor does not validate that batch.ProjectId exists
+// in the projects table. This is intentional - logs can be received before project
+// configuration, and validation would require a database lookup per batch. Invalid
+// project IDs will simply result in logs that are orphaned until the project is
+// created, or filtered out by project-scoped queries.
 func (p *Processor) ProcessBatch(batch *blazelogv1.LogBatch) error {
 	// Console output
 	for _, entry := range batch.Entries {
@@ -54,6 +68,14 @@ func (p *Processor) ProcessBatch(batch *blazelogv1.LogBatch) error {
 	return nil
 }
 
+// truncateString truncates a string to maxLen if it exceeds the limit.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
 // convertToRecords converts a proto batch to storage records.
 func (p *Processor) convertToRecords(batch *blazelogv1.LogBatch) []*LogRecord {
 	records := make([]*LogRecord, 0, len(batch.Entries))
@@ -65,17 +87,23 @@ func (p *Processor) convertToRecords(batch *blazelogv1.LogBatch) []*LogRecord {
 			ts = time.Now()
 		}
 
+		// Truncate fields to prevent oversized data
+		message := truncateString(entry.Message, maxMessageLen)
+		raw := truncateString(entry.Raw, maxRawLen)
+		source := truncateString(entry.Source, maxSourceLen)
+		filePath := truncateString(entry.FilePath, maxFilePathLen)
+
 		record := &LogRecord{
 			ID:         uuid.New().String(),
 			ProjectID:  batch.ProjectId,
 			Timestamp:  ts,
 			Level:      levelToString(entry.Level),
-			Message:    entry.Message,
-			Source:     entry.Source,
+			Message:    message,
+			Source:     source,
 			Type:       typeToString(entry.Type),
-			Raw:        entry.Raw,
+			Raw:        raw,
 			AgentID:    batch.AgentId,
-			FilePath:   entry.FilePath,
+			FilePath:   filePath,
 			LineNumber: entry.LineNumber,
 			Labels:     entry.Labels,
 		}

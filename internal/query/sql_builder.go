@@ -2,11 +2,16 @@ package query
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/expr-lang/expr/ast"
 )
+
+// reDoSPattern detects potentially dangerous regex patterns that can cause catastrophic backtracking.
+// Matches nested quantifiers like (a+)+, (a*)+, (a|a)+, etc.
+var reDoSPattern = regexp.MustCompile(`\([^)]*[+*][^)]*\)[+*]|\([^)]*\|[^)]*\)[+*]`)
 
 // SQLBuilder converts parsed expressions to ClickHouse SQL.
 type SQLBuilder struct {
@@ -96,11 +101,14 @@ func (v *sqlVisitor) visitBinary(n *ast.BinaryNode) (string, error) {
 		return "", err
 	}
 
-	op := v.mapOperator(n.Operator)
-
 	// Handle 'in' operator specially
 	if n.Operator == "in" {
 		return fmt.Sprintf("%s IN %s", left, right), nil
+	}
+
+	op, err := v.mapOperator(n.Operator)
+	if err != nil {
+		return "", err
 	}
 
 	// Handle case-insensitive string comparison
@@ -333,6 +341,12 @@ func (v *sqlVisitor) handleStringMethod(n *ast.BinaryNode) (string, error) {
 	case "endsWith":
 		return fmt.Sprintf("endsWith(lower(%s), %s)", left, right), nil
 	case "matches":
+		// Validate regex for ReDoS before using
+		if strNode, ok := n.Right.(*ast.StringNode); ok {
+			if reDoSPattern.MatchString(strNode.Value) {
+				return "", fmt.Errorf("potentially dangerous regex pattern: nested quantifiers detected")
+			}
+		}
 		return fmt.Sprintf("match(lower(%s), %s)", left, right), nil
 	default:
 		return "", fmt.Errorf("unknown string method: %s", n.Operator)
@@ -350,20 +364,24 @@ func (v *sqlVisitor) isStringField(node ast.Node) bool {
 }
 
 // mapOperator converts expr operators to SQL operators.
-func (v *sqlVisitor) mapOperator(op string) string {
+func (v *sqlVisitor) mapOperator(op string) (string, error) {
 	switch op {
 	case "==":
-		return "="
+		return "=", nil
 	case "!=":
-		return "!="
+		return "!=", nil
 	case "and", "&&":
-		return "AND"
+		return "AND", nil
 	case "or", "||":
-		return "OR"
+		return "OR", nil
 	case ">=", "<=", ">", "<":
-		return op
+		return op, nil
+	case "-", "+", "*", "/", "%":
+		return op, nil
+	case "not", "!":
+		return "NOT", nil
 	default:
-		return op
+		return "", fmt.Errorf("unknown operator: %s", op)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
 	"github.com/gorilla/csrf"
@@ -74,6 +75,11 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		h.lockoutTracker.ClearFailures(username)
 	}
 
+	// Invalidate any existing session to prevent session fixation
+	if cookie, err := r.Cookie("session_id"); err == nil {
+		h.sessions.Delete(cookie.Value)
+	}
+
 	// Determine session TTL based on remember-me
 	rememberMe := r.FormValue("remember_me") == "on"
 	sessionTTL := 24 * time.Hour
@@ -96,7 +102,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    sess.ID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   middleware.IsRequestSecure(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
 	})

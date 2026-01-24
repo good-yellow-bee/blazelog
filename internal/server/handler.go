@@ -12,13 +12,23 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/metrics"
 	blazelogv1 "github.com/good-yellow-bee/blazelog/internal/proto/blazelog/v1"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+// Validation limits for AgentInfo fields.
+const (
+	maxAgentHostnameLen = 255
+	maxAgentNameLen     = 128
+	maxAgentVersionLen  = 64
 )
 
 // agentEntry tracks an agent with its last activity time.
 type agentEntry struct {
 	info       *blazelogv1.AgentInfo
-	lastActive time.Time
+	lastActive atomic.Value // stores time.Time
 }
 
 // Handler implements the LogServiceServer gRPC interface.
@@ -34,18 +44,23 @@ type Handler struct {
 	totalEntries  uint64
 	activeStreams int32
 
+	// Rate limiters
+	registerLimiter *rate.Limiter // 10/sec with burst of 50
+
 	// Cleanup
 	agentTTL time.Duration
 	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // NewHandler creates a new gRPC handler.
 func NewHandler(processor *Processor, verbose bool) *Handler {
 	h := &Handler{
-		processor: processor,
-		verbose:   verbose,
-		agentTTL:  30 * time.Minute, // Agents inactive for 30 min are removed
-		stopCh:    make(chan struct{}),
+		processor:       processor,
+		verbose:         verbose,
+		registerLimiter: rate.NewLimiter(10, 50), // 10/sec with burst of 50
+		agentTTL:        30 * time.Minute,        // Agents inactive for 30 min are removed
+		stopCh:          make(chan struct{}),
 	}
 	go h.cleanupLoop()
 	return h
@@ -73,7 +88,8 @@ func (h *Handler) cleanupInactiveAgents() {
 
 	h.agents.Range(func(key, value any) bool {
 		entry := value.(*agentEntry)
-		if entry.lastActive.Before(cutoff) {
+		lastActive := entry.lastActive.Load().(time.Time)
+		if lastActive.Before(cutoff) {
 			h.agents.Delete(key)
 			removed++
 		}
@@ -87,16 +103,46 @@ func (h *Handler) cleanupInactiveAgents() {
 
 // Stop stops the handler's background goroutines.
 func (h *Handler) Stop() {
-	close(h.stopCh)
+	h.stopOnce.Do(func() {
+		close(h.stopCh)
+	})
 }
 
 // Register handles agent registration.
 func (h *Handler) Register(ctx context.Context, req *blazelogv1.RegisterRequest) (*blazelogv1.RegisterResponse, error) {
+	// Rate limit registration requests
+	if !h.registerLimiter.Allow() {
+		return &blazelogv1.RegisterResponse{
+			Success:      false,
+			ErrorMessage: "registration rate limit exceeded",
+		}, nil
+	}
+
 	agent := req.Agent
 	if agent == nil {
 		return &blazelogv1.RegisterResponse{
 			Success:      false,
 			ErrorMessage: "agent info is required",
+		}, nil
+	}
+
+	// Validate AgentInfo fields
+	if len(agent.Hostname) > maxAgentHostnameLen {
+		return &blazelogv1.RegisterResponse{
+			Success:      false,
+			ErrorMessage: "hostname exceeds maximum length",
+		}, nil
+	}
+	if len(agent.Name) > maxAgentNameLen {
+		return &blazelogv1.RegisterResponse{
+			Success:      false,
+			ErrorMessage: "name exceeds maximum length",
+		}, nil
+	}
+	if len(agent.Version) > maxAgentVersionLen {
+		return &blazelogv1.RegisterResponse{
+			Success:      false,
+			ErrorMessage: "version exceeds maximum length",
 		}, nil
 	}
 
@@ -107,10 +153,9 @@ func (h *Handler) Register(ctx context.Context, req *blazelogv1.RegisterRequest)
 	}
 
 	// Store agent info with activity timestamp
-	h.agents.Store(agentID, &agentEntry{
-		info:       agent,
-		lastActive: time.Now(),
-	})
+	entry := &agentEntry{info: agent}
+	entry.lastActive.Store(time.Now())
+	h.agents.Store(agentID, entry)
 	metrics.GRPCAgentsRegistered.Inc()
 
 	projectID := agent.ProjectId
@@ -133,7 +178,18 @@ func (h *Handler) Register(ctx context.Context, req *blazelogv1.RegisterRequest)
 	}, nil
 }
 
+const (
+	maxBatchSize      = 100
+	streamIdleTimeout = 5 * time.Minute
+)
+
 // StreamLogs handles bidirectional log streaming from agents.
+//
+// Sequence number limitation: The server acknowledges sequence numbers from batches
+// but does not track or validate ordering/gaps per agent. Agents are expected to
+// handle their own retry logic based on acked sequences. This design is intentional
+// as it keeps the server stateless and simpler. Logs are idempotent (UUID-based IDs)
+// so duplicate delivery is safe.
 func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch, blazelogv1.StreamResponse]) error {
 	atomic.AddInt32(&h.activeStreams, 1)
 	metrics.GRPCStreamsActive.Inc()
@@ -146,43 +202,85 @@ func (h *Handler) StreamLogs(stream grpc.BidiStreamingServer[blazelogv1.LogBatch
 		log.Printf("stream started, active streams: %d", atomic.LoadInt32(&h.activeStreams))
 	}
 
+	// Idle timeout timer
+	idleTimer := time.NewTimer(streamIdleTimeout)
+	defer idleTimer.Stop()
+
+	recvCh := make(chan *blazelogv1.LogBatch, 1)
+	errCh := make(chan error, 1)
+
+	// Receive goroutine - blocks on stream.Recv() which unblocks when:
+	// 1. Client sends data (normal flow)
+	// 2. Client closes stream (returns io.EOF)
+	// 3. Server returns from StreamLogs (gRPC framework cancels stream context)
+	// On idle timeout, returning from this function triggers gRPC cleanup
+	// which cancels the stream context and unblocks stream.Recv().
+	go func() {
+		for {
+			batch, err := stream.Recv()
+			if err != nil {
+				errCh <- err
+				return
+			}
+			recvCh <- batch
+		}
+	}()
+
 	for {
-		batch, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			if h.verbose {
-				log.Printf("stream closed by client")
-			}
-			return nil
-		}
-		if err != nil {
-			return err
-		}
+		select {
+		case <-idleTimer.C:
+			return status.Error(codes.DeadlineExceeded, "stream idle timeout")
 
-		// Process the batch
-		if err := h.processor.ProcessBatch(batch); err != nil {
-			log.Printf("process batch error: %v", err)
-			metrics.GRPCBatchProcessErrors.Inc()
-			// Send error response but continue
-			if sendErr := stream.Send(&blazelogv1.StreamResponse{
+		case err := <-errCh:
+			if errors.Is(err, io.EOF) {
+				if h.verbose {
+					log.Printf("stream closed by client")
+				}
+				return nil
+			}
+			return err
+
+		case batch := <-recvCh:
+			// Reset idle timer
+			if !idleTimer.Stop() {
+				select {
+				case <-idleTimer.C:
+				default:
+				}
+			}
+			idleTimer.Reset(streamIdleTimeout)
+
+			// Validate batch size
+			if len(batch.Entries) > maxBatchSize {
+				return status.Errorf(codes.InvalidArgument, "batch size %d exceeds maximum %d", len(batch.Entries), maxBatchSize)
+			}
+
+			// Process the batch
+			if err := h.processor.ProcessBatch(batch); err != nil {
+				log.Printf("process batch error: %v", err)
+				metrics.GRPCBatchProcessErrors.Inc()
+				// Send error response but continue
+				if sendErr := stream.Send(&blazelogv1.StreamResponse{
+					AckedSequence: batch.Sequence,
+					Error:         err.Error(),
+				}); sendErr != nil {
+					return sendErr
+				}
+				continue
+			}
+
+			// Update metrics
+			atomic.AddUint64(&h.totalBatches, 1)
+			atomic.AddUint64(&h.totalEntries, uint64(len(batch.Entries)))
+			metrics.GRPCBatchesTotal.Inc()
+			metrics.GRPCEntriesTotal.Add(float64(len(batch.Entries)))
+
+			// Send acknowledgement
+			if err := stream.Send(&blazelogv1.StreamResponse{
 				AckedSequence: batch.Sequence,
-				Error:         err.Error(),
-			}); sendErr != nil {
-				return sendErr
+			}); err != nil {
+				return err
 			}
-			continue
-		}
-
-		// Update metrics
-		atomic.AddUint64(&h.totalBatches, 1)
-		atomic.AddUint64(&h.totalEntries, uint64(len(batch.Entries)))
-		metrics.GRPCBatchesTotal.Inc()
-		metrics.GRPCEntriesTotal.Add(float64(len(batch.Entries)))
-
-		// Send acknowledgement
-		if err := stream.Send(&blazelogv1.StreamResponse{
-			AckedSequence: batch.Sequence,
-		}); err != nil {
-			return err
 		}
 	}
 }
@@ -193,15 +291,15 @@ func (h *Handler) Heartbeat(ctx context.Context, req *blazelogv1.HeartbeatReques
 	if req.AgentId != "" {
 		if entry, ok := h.agents.Load(req.AgentId); ok {
 			e := entry.(*agentEntry)
-			e.lastActive = time.Now()
+			e.lastActive.Store(time.Now())
 		}
 	}
 
 	if h.verbose {
-		status := req.Status
-		if status != nil {
+		reqStatus := req.Status
+		if reqStatus != nil {
 			log.Printf("heartbeat from %s: processed=%d buffer=%d sources=%d",
-				req.AgentId, status.EntriesProcessed, status.BufferSize, status.ActiveSources)
+				req.AgentId, reqStatus.EntriesProcessed, reqStatus.BufferSize, reqStatus.ActiveSources)
 		} else {
 			log.Printf("heartbeat from %s", req.AgentId)
 		}

@@ -3,8 +3,8 @@ package notifier
 import (
 	"bytes"
 	"embed"
+	"html/template"
 	"strings"
-	"text/template"
 
 	"github.com/good-yellow-bee/blazelog/internal/alerting"
 )

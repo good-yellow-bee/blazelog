@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -17,9 +18,15 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/pages"
 	"github.com/gorilla/csrf"
+	"golang.org/x/time/rate"
 )
 
 const maxFilterLength = 1000
+const maxStreamDuration = 30 * time.Minute
+
+// Export rate limiter: 10 requests per minute globally
+// Note: rate.Limiter is already thread-safe, no mutex needed
+var exportLimiter = rate.NewLimiter(rate.Every(6*time.Second), 10) // 10/min with burst of 10
 
 func (h *Handler) ShowLogs(w http.ResponseWriter, r *http.Request) {
 	sess := GetSession(r)
@@ -216,7 +223,9 @@ func (h *Handler) GetLogsData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func recordToLogItem(r *storage.LogRecord) *LogItem {
@@ -250,6 +259,12 @@ func (h *Handler) ExportLogs(w http.ResponseWriter, r *http.Request) {
 	sess := GetSession(r)
 	if sess == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Rate limit exports (10 per minute globally)
+	if !exportLimiter.Allow() {
+		http.Error(w, "export rate limit exceeded, try again later", http.StatusTooManyRequests)
 		return
 	}
 
@@ -349,7 +364,9 @@ func (h *Handler) writeJSON(w http.ResponseWriter, entries []*storage.LogRecord)
 	for i, entry := range entries {
 		items[i] = recordToLogItem(entry)
 	}
-	json.NewEncoder(w).Encode(items)
+	if err := json.NewEncoder(w).Encode(items); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func (h *Handler) writeCSV(w http.ResponseWriter, entries []*storage.LogRecord) {
@@ -447,9 +464,17 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 	heartbeatInterval := 15 * time.Second
 	lastHeartbeat := time.Now()
 
+	// Max stream duration timeout
+	streamTimeout := time.After(maxStreamDuration)
+
 	for {
 		select {
 		case <-ctx.Done():
+			return
+
+		case <-streamTimeout:
+			fmt.Fprintf(w, "event: timeout\ndata: {\"message\":\"stream max duration reached\"}\n\n")
+			flusher.Flush()
 			return
 
 		case <-ticker.C:
@@ -464,6 +489,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 
 			result, err := h.logStorage.Logs().Query(ctx, &filter)
 			if err != nil {
+				log.Printf("streaming logs query error: %v", err)
 				continue
 			}
 
@@ -474,7 +500,11 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 				}
 
 				item := recordToLogItem(entry)
-				data, _ := json.Marshal(item)
+				data, err := json.Marshal(item)
+				if err != nil {
+					log.Printf("streaming logs marshal error: %v", err)
+					continue
+				}
 				fmt.Fprintf(w, "event: log\ndata: %s\n\n", data)
 				flusher.Flush()
 

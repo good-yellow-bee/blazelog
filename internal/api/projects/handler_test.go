@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 )
@@ -199,17 +200,14 @@ func newMockStorage() (*mockStorage, *mockProjectRepository, *mockUserRepository
 	}, projectRepo, userRepo
 }
 
-type contextKey string
+func withAdminContext(r *http.Request) *http.Request {
+	ctx := middleware.WithUserContext(r.Context(), "admin-user", "admin", models.RoleAdmin)
+	return r.WithContext(ctx)
+}
 
-const (
-	contextKeyRole   contextKey = "role"
-	contextKeyUserID contextKey = "user_id"
-)
-
-func withRole(ctx context.Context, role models.Role, userID string) context.Context {
-	ctx = context.WithValue(ctx, contextKeyRole, role)
-	ctx = context.WithValue(ctx, contextKeyUserID, userID)
-	return ctx
+func withUserContext(r *http.Request, userID string, role models.Role) *http.Request {
+	ctx := middleware.WithUserContext(r.Context(), userID, "testuser", role)
+	return r.WithContext(ctx)
 }
 
 func TestList_AdminSeesAll(t *testing.T) {
@@ -222,7 +220,7 @@ func TestList_AdminSeesAll(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("GET", "/api/v1/projects", nil)
-	req = req.WithContext(withRole(req.Context(), models.RoleAdmin, "admin-1"))
+	req = withUserContext(req, "admin-1", models.RoleAdmin)
 	rec := httptest.NewRecorder()
 
 	handler.List(rec, req)
@@ -252,7 +250,7 @@ func TestList_NonAdminSeesOwn(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("GET", "/api/v1/projects", nil)
-	req = req.WithContext(withRole(req.Context(), models.RoleViewer, "user-1"))
+	req = withUserContext(req, "user-1", models.RoleViewer)
 	rec := httptest.NewRecorder()
 
 	handler.List(rec, req)
@@ -327,6 +325,7 @@ func TestGetByID_Found(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("GET", "/api/v1/projects/proj-1", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -356,6 +355,7 @@ func TestGetByID_NotFound(t *testing.T) {
 	handler := NewHandler(mockStore)
 
 	req := httptest.NewRequest("GET", "/api/v1/projects/nonexistent", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -478,6 +478,7 @@ func TestGetUsers_Success(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("GET", "/api/v1/projects/proj-1/users", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -510,6 +511,7 @@ func TestGetUsers_ProjectNotFound(t *testing.T) {
 	handler := NewHandler(mockStore)
 
 	req := httptest.NewRequest("GET", "/api/v1/projects/nonexistent/users", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()

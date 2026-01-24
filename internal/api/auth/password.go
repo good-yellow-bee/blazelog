@@ -6,6 +6,10 @@ import (
 	"unicode"
 )
 
+// BcryptCost is the bcrypt work factor for password hashing.
+// Cost 12 provides ~300ms hash time (good balance of security vs performance).
+const BcryptCost = 12
+
 // PasswordValidationError contains details about password validation failure.
 type PasswordValidationError struct {
 	Messages []string

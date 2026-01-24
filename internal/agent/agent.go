@@ -151,7 +151,10 @@ func (a *Agent) Run(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return
-			case <-hbReconnectCh:
+			case _, ok := <-hbReconnectCh:
+				if !ok {
+					return
+				}
 				a.connMgr.TriggerReconnect()
 			}
 		}
@@ -222,9 +225,19 @@ func (a *Agent) buildStatus() *blazelogv1.AgentStatus {
 func (a *Agent) onConnected(ctx context.Context) {
 	a.logf("connected, replaying %d buffered entries...", a.buffer.Len())
 
-	// Replay buffered entries
+	// Replay buffered entries with mutex protection to prevent races with batchSender
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	replayed := 0
 	for a.buffer.Len() > 0 {
+		// Check context before each batch to exit promptly on shutdown
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		entries, err := a.buffer.Read(a.config.BatchSize)
 		if err != nil || len(entries) == 0 {
 			break
@@ -341,6 +354,10 @@ func (a *Agent) flushBatch(ctx context.Context) {
 
 	batch := a.batchBuffer
 	a.batchBuffer = make([]*blazelogv1.LogEntry, 0, a.config.BatchSize)
+
+	// Acquire lock to prevent race with buffer replay in onConnected
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
 	// Try to send if connected
 	if a.connMgr != nil && a.connMgr.IsConnected() {

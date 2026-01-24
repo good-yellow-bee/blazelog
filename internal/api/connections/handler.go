@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 )
@@ -31,25 +32,32 @@ const (
 	errCodeValidationFailed = "VALIDATION_FAILED"
 	errCodeNotFound         = "NOT_FOUND"
 	errCodeConflict         = "CONFLICT"
+	errCodeForbidden        = "FORBIDDEN"
 	errCodeInternalError    = "INTERNAL_ERROR"
 )
 
 func jsonError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}})
+	if err := json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonOK(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonCreated(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonNoContent(w http.ResponseWriter) {
@@ -106,14 +114,46 @@ type UpdateRequest struct {
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	projectID := r.URL.Query().Get("project_id")
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("list connections error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+
+	if projectID != "" && !access.CanAccessProject(projectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
 
 	var connections []*models.Connection
-	var err error
 
 	if projectID != "" {
 		connections, err = h.storage.Connections().ListByProject(ctx, projectID)
-	} else {
+	} else if access.AllProjects {
 		connections, err = h.storage.Connections().List(ctx)
+	} else {
+		// Filter to user's accessible projects
+		connections = []*models.Connection{}
+		for _, pid := range access.ProjectIDs {
+			projectConns, pErr := h.storage.Connections().ListByProject(ctx, pid)
+			if pErr != nil {
+				err = pErr
+				break
+			}
+			connections = append(connections, projectConns...)
+		}
+		if access.IncludeUnassigned {
+			unassigned, pErr := h.storage.Connections().ListByProject(ctx, "")
+			if pErr != nil && err == nil {
+				err = pErr
+			} else if pErr == nil {
+				connections = append(connections, unassigned...)
+			}
+		}
 	}
 
 	if err != nil {
@@ -167,6 +207,36 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+
+	// Validate project access if project_id is specified
+	if req.ProjectID != "" {
+		userID := middleware.GetUserID(ctx)
+		role := middleware.GetRole(ctx)
+		access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+		if err != nil {
+			log.Printf("create connection error: get access: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if !access.CanAccessProject(req.ProjectID) {
+			jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+			return
+		}
+	}
+
+	// Validate project exists if specified
+	if req.ProjectID != "" {
+		project, err := h.storage.Projects().GetByID(ctx, req.ProjectID)
+		if err != nil {
+			log.Printf("create connection error: check project: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if project == nil {
+			jsonError(w, http.StatusBadRequest, errCodeValidationFailed, "project does not exist")
+			return
+		}
+	}
 
 	// Check name uniqueness
 	existing, err := h.storage.Connections().GetByName(ctx, req.Name)
@@ -224,6 +294,19 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("get connection error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if !access.CanAccessProject(conn.ProjectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
+
 	jsonOK(w, connectionToResponse(conn))
 }
 
@@ -250,6 +333,19 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if conn == nil {
 		jsonError(w, http.StatusNotFound, errCodeNotFound, "connection not found")
+		return
+	}
+
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("update connection error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if !access.CanAccessProject(conn.ProjectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
 		return
 	}
 
@@ -284,6 +380,17 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		conn.User = strings.TrimSpace(req.User)
 	}
 	if req.ProjectID != "" {
+		// Validate project exists
+		project, err := h.storage.Projects().GetByID(ctx, req.ProjectID)
+		if err != nil {
+			log.Printf("update connection error: check project: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if project == nil {
+			jsonError(w, http.StatusBadRequest, errCodeValidationFailed, "project does not exist")
+			return
+		}
 		conn.ProjectID = req.ProjectID
 	}
 

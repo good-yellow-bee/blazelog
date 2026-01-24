@@ -3,6 +3,7 @@ package alerting
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,6 +34,7 @@ type EngineStats struct {
 	ThresholdTriggers atomic.Int64
 	ExprTriggers      atomic.Int64
 	AlertsSuppressed  atomic.Int64
+	AlertsDropped     atomic.Int64
 }
 
 // EngineOptions configures the alert engine.
@@ -107,7 +109,11 @@ func (e *Engine) EvaluateAt(entry *models.LogEntry, now time.Time) []*Alert {
 			select {
 			case e.alerts <- alert:
 			default:
-				// Channel full, drop alert
+				// Channel full, drop alert and track
+				dropped := e.stats.AlertsDropped.Add(1)
+				if dropped == 1 || dropped%100 == 0 {
+					log.Printf("warning: alert channel full, dropped %d alerts total", dropped)
+				}
 			}
 		}
 	}
@@ -383,6 +389,7 @@ type EngineStatsSnapshot struct {
 	ThresholdTriggers int64
 	ExprTriggers      int64
 	AlertsSuppressed  int64
+	AlertsDropped     int64
 }
 
 // Stats returns a snapshot of engine statistics.
@@ -393,6 +400,7 @@ func (e *Engine) Stats() EngineStatsSnapshot {
 		ThresholdTriggers: e.stats.ThresholdTriggers.Load(),
 		ExprTriggers:      e.stats.ExprTriggers.Load(),
 		AlertsSuppressed:  e.stats.AlertsSuppressed.Load(),
+		AlertsDropped:     e.stats.AlertsDropped.Load(),
 	}
 }
 

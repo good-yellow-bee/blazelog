@@ -66,6 +66,7 @@ type ConnManager struct {
 	client  *Client
 	backoff *Backoff
 	state   atomic.Int32
+	closed  atomic.Bool
 	agentID string
 	verbose bool
 
@@ -228,23 +229,50 @@ func (cm *ConnManager) handleReconnect(ctx context.Context) {
 
 // doConnect performs the actual connection and registration.
 func (cm *ConnManager) doConnect(ctx context.Context) error {
+	// Check context before starting to avoid unnecessary work
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	// Create new client
 	client, err := NewClient(cm.config.ServerAddress, cm.config.TLS)
 	if err != nil {
 		return fmt.Errorf("create client: %w", err)
 	}
 
+	// Use defer to ensure client is closed on any error or context cancellation
+	success := false
+	defer func() {
+		if !success {
+			client.Close()
+		}
+	}()
+
+	// Check context again before register
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	// Register
 	cm.setState(ConnStateRegistering)
 	resp, err := client.Register(ctx, cm.config.AgentInfo)
 	if err != nil {
-		client.Close()
 		return fmt.Errorf("register: %w", err)
+	}
+
+	// Check context again before starting stream
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	// Start stream
 	if err := client.StartStream(ctx); err != nil {
-		client.Close()
 		return fmt.Errorf("start stream: %w", err)
 	}
 
@@ -253,11 +281,16 @@ func (cm *ConnManager) doConnect(ctx context.Context) error {
 	cm.agentID = resp.AgentId
 	cm.mu.Unlock()
 
+	success = true
 	return nil
 }
 
 // Close stops the connection manager and closes the client.
 func (cm *ConnManager) Close() error {
+	if cm.closed.Swap(true) {
+		return nil // Already closed
+	}
+
 	close(cm.stopCh)
 
 	cm.mu.Lock()

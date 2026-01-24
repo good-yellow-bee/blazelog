@@ -189,7 +189,7 @@ Example:
 		}
 
 		// Hash password
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), auth.BcryptCost)
 		if err != nil {
 			return fmt.Errorf("hash password: %w", err)
 		}
@@ -283,7 +283,7 @@ Example:
 		}
 
 		// Hash new password
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), auth.BcryptCost)
 		if err != nil {
 			return fmt.Errorf("hash password: %w", err)
 		}

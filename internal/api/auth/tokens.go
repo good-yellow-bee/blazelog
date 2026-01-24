@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/models"
@@ -80,8 +81,10 @@ func (s *TokenService) RevokeAllUserTokens(ctx context.Context, userID string) e
 // RotateRefreshToken revokes the old token and creates a new one.
 // Returns the new plaintext token.
 func (s *TokenService) RotateRefreshToken(ctx context.Context, oldPlainToken string, userID string) (string, error) {
-	// Revoke old token (ignore error - we still want to issue new token)
-	_ = s.RevokeRefreshToken(ctx, oldPlainToken)
+	// Revoke old token (log error but continue - we still want to issue new token)
+	if err := s.RevokeRefreshToken(ctx, oldPlainToken); err != nil {
+		log.Printf("token rotation: failed to revoke old token for user %s: %v", userID, err)
+	}
 
 	// Create new token
 	return s.CreateRefreshToken(ctx, userID)

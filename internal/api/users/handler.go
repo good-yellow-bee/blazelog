@@ -46,19 +46,25 @@ const (
 func jsonError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}})
+	if err := json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonOK(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonCreated(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonNoContent(w http.ResponseWriter) {
@@ -181,7 +187,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Hash password
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), auth.BcryptCost)
 	if err != nil {
 		log.Printf("create user error: hash password: %v", err)
 		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
@@ -421,7 +427,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Hash new password
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), auth.BcryptCost)
 	if err != nil {
 		log.Printf("change password error: hash password: %v", err)
 		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
@@ -506,7 +512,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Hash new password
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), auth.BcryptCost)
 	if err != nil {
 		log.Printf("reset password error: hash: %v", err)
 		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")

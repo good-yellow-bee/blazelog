@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -152,12 +153,14 @@ func (rl *RateLimiter) cleanup() {
 func jsonRateLimited(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusTooManyRequests)
-	json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]string{
 			"code":    "RATE_LIMITED",
 			"message": "too many requests",
 		},
-	})
+	}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 // RateLimitByIP returns middleware that rate limits by client IP.

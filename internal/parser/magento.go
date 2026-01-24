@@ -4,12 +4,16 @@ package parser
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/models"
 )
+
+// maxJSONSize is the maximum size for JSON context/extra in log lines (1MB).
+const magentoMaxJSONSize = 1024 * 1024
 
 // MagentoParser parses Magento logs (system.log, exception.log, debug.log).
 // Magento uses Monolog format: [YYYY-MM-DD HH:MM:SS] channel.LEVEL: message {context} [extra]
@@ -122,6 +126,11 @@ func (p *MagentoParser) ParseWithContext(ctx context.Context, line string) (*mod
 // Magento/Monolog format typically ends with: {} [] or {"key":"value"} [] or [] []
 func parseMessageAndContext(s string) (string, map[string]interface{}, []interface{}) {
 	s = strings.TrimSpace(s)
+
+	// Reject lines that are too large to prevent unbounded JSON parsing
+	if len(s) > magentoMaxJSONSize {
+		return fmt.Sprintf("[line truncated: exceeds %d bytes]", magentoMaxJSONSize), nil, nil
+	}
 
 	var extra []interface{}
 	var magentoContext map[string]interface{}

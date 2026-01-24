@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 )
@@ -32,25 +33,32 @@ const (
 	errCodeValidationFailed = "VALIDATION_FAILED"
 	errCodeNotFound         = "NOT_FOUND"
 	errCodeConflict         = "CONFLICT"
+	errCodeForbidden        = "FORBIDDEN"
 	errCodeInternalError    = "INTERNAL_ERROR"
 )
 
 func jsonError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}})
+	if err := json.NewEncoder(w).Encode(errorResponse{Error: errorBody{Code: code, Message: message}}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonOK(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonCreated(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(dataResponse{Data: data})
+	if err := json.NewEncoder(w).Encode(dataResponse{Data: data}); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func jsonNoContent(w http.ResponseWriter) {
@@ -133,14 +141,47 @@ type UpdateRequest struct {
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	projectID := r.URL.Query().Get("project_id")
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("list alerts error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+
+	if projectID != "" && !access.CanAccessProject(projectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
 
 	var alerts []*models.AlertRule
-	var err error
 
 	if projectID != "" {
 		alerts, err = h.storage.Alerts().ListByProject(ctx, projectID)
-	} else {
+	} else if access.AllProjects {
 		alerts, err = h.storage.Alerts().List(ctx)
+	} else {
+		// Filter to user's accessible projects
+		alerts = []*models.AlertRule{}
+		for _, pid := range access.ProjectIDs {
+			projectAlerts, pErr := h.storage.Alerts().ListByProject(ctx, pid)
+			if pErr != nil {
+				log.Printf("error listing alerts for project %s: %v", pid, pErr)
+				err = pErr
+				break
+			}
+			alerts = append(alerts, projectAlerts...)
+		}
+		if access.IncludeUnassigned {
+			unassigned, pErr := h.storage.Alerts().ListByProject(ctx, "")
+			if pErr != nil && err == nil {
+				err = pErr
+			} else if pErr == nil {
+				alerts = append(alerts, unassigned...)
+			}
+		}
 	}
 
 	if err != nil {
@@ -194,6 +235,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
+	// Validate project exists if specified
+	if req.ProjectID != "" {
+		project, err := h.storage.Projects().GetByID(ctx, req.ProjectID)
+		if err != nil {
+			log.Printf("create alert error: check project: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if project == nil {
+			jsonError(w, http.StatusBadRequest, errCodeValidationFailed, "project not found")
+			return
+		}
+	}
+
 	now := time.Now()
 	alert := &models.AlertRule{
 		ID:          uuid.New().String(),
@@ -214,7 +271,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		alert.Notify = []string{}
 	}
 
-	ctx := r.Context()
 	if err := h.storage.Alerts().Create(ctx, alert); err != nil {
 		log.Printf("create alert error: %v", err)
 		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
@@ -245,6 +301,19 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("get alert error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if !access.CanAccessProject(alert.ProjectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
+
 	jsonOK(w, alertToResponse(alert))
 }
 
@@ -271,6 +340,19 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if alert == nil {
 		jsonError(w, http.StatusNotFound, errCodeNotFound, "alert not found")
+		return
+	}
+
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("update alert error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if !access.CanAccessProject(alert.ProjectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
 		return
 	}
 
@@ -366,6 +448,19 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("delete alert error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if !access.CanAccessProject(alert.ProjectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
+
 	if err := h.storage.Alerts().Delete(ctx, id); err != nil {
 		log.Printf("delete alert error: %v", err)
 		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
@@ -381,6 +476,38 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	alertID := r.URL.Query().Get("alert_id")
 	projectID := r.URL.Query().Get("project_id")
+	userID := middleware.GetUserID(ctx)
+	role := middleware.GetRole(ctx)
+
+	access, err := middleware.GetProjectAccess(ctx, userID, role, h.storage)
+	if err != nil {
+		log.Printf("list alert history error: get access: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+
+	if projectID != "" && !access.CanAccessProject(projectID) {
+		jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+		return
+	}
+
+	// If filtering by alert_id, verify access to the alert's project
+	if alertID != "" {
+		alert, aErr := h.storage.Alerts().GetByID(ctx, alertID)
+		if aErr != nil {
+			log.Printf("list alert history error: get alert: %v", aErr)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if alert == nil {
+			jsonError(w, http.StatusNotFound, errCodeNotFound, "alert not found")
+			return
+		}
+		if !access.CanAccessProject(alert.ProjectID) {
+			jsonError(w, http.StatusForbidden, errCodeForbidden, "no access to project")
+			return
+		}
+	}
 
 	page := 1
 	perPage := 50
@@ -398,14 +525,18 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * perPage
 	var histories []*models.AlertHistory
 	var total int64
-	var err error
 
 	if alertID != "" {
 		histories, total, err = h.storage.AlertHistory().ListByAlert(ctx, alertID, perPage, offset)
 	} else if projectID != "" {
 		histories, total, err = h.storage.AlertHistory().ListByProject(ctx, projectID, perPage, offset)
-	} else {
+	} else if access.AllProjects {
 		histories, total, err = h.storage.AlertHistory().List(ctx, perPage, offset)
+	} else {
+		// Non-admin without specific project filter: return empty or filter by accessible projects
+		// For simplicity, require project_id filter for non-admins
+		histories = []*models.AlertHistory{}
+		total = 0
 	}
 
 	if err != nil {
@@ -415,8 +546,8 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 	}
 
 	items := make([]*AlertHistoryResponse, len(histories))
-	for i, h := range histories {
-		items[i] = historyToResponse(h)
+	for i, hist := range histories {
+		items[i] = historyToResponse(hist)
 	}
 
 	jsonOK(w, HistoryListResponse{

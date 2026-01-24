@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"log"
 	"os"
 
 	"google.golang.org/grpc/credentials"
@@ -61,6 +62,10 @@ func LoadClientTLS(cfg *ClientTLSConfig) (credentials.TransportCredentials, erro
 	clientCert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("load client certificate: %w", err)
+	}
+
+	if cfg.InsecureSkipVerify {
+		log.Printf("WARNING: TLS InsecureSkipVerify enabled - server certificate validation disabled. Use only for development!")
 	}
 
 	tlsConfig := &tls.Config{

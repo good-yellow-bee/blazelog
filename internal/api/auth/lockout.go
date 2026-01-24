@@ -13,6 +13,11 @@ type lockoutEntry struct {
 }
 
 // LockoutTracker tracks failed login attempts and account lockouts.
+//
+// Persistence limitation: Lockout state is stored in memory only and will be lost
+// on server restart. This is acceptable for single-instance deployments where a
+// restart provides a natural cooldown period. For clustered deployments requiring
+// persistent lockout state, consider using Redis or database-backed storage.
 type LockoutTracker struct {
 	mu              sync.RWMutex
 	entries         map[string]*lockoutEntry // keyed by username or IP

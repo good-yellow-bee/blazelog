@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
 )
@@ -127,24 +128,58 @@ func (m *mockConnectionRepository) DecryptCredentials(encrypted []byte) ([]byte,
 	return encrypted, nil // mock: return encrypted unchanged
 }
 
-type mockStorage struct {
-	connRepo *mockConnectionRepository
+type mockProjectRepository struct{}
+
+func (m *mockProjectRepository) Create(ctx context.Context, project *models.Project) error { return nil }
+func (m *mockProjectRepository) GetByID(ctx context.Context, id string) (*models.Project, error) {
+	return nil, nil
+}
+func (m *mockProjectRepository) GetByName(ctx context.Context, name string) (*models.Project, error) {
+	return nil, nil
+}
+func (m *mockProjectRepository) List(ctx context.Context) ([]*models.Project, error) { return nil, nil }
+func (m *mockProjectRepository) Update(ctx context.Context, project *models.Project) error { return nil }
+func (m *mockProjectRepository) Delete(ctx context.Context, id string) error              { return nil }
+func (m *mockProjectRepository) AddUser(ctx context.Context, projectID, userID string, role models.Role) error {
+	return nil
+}
+func (m *mockProjectRepository) RemoveUser(ctx context.Context, projectID, userID string) error {
+	return nil
+}
+func (m *mockProjectRepository) GetProjectsForUser(ctx context.Context, userID string) ([]*models.Project, error) {
+	return []*models.Project{}, nil
+}
+func (m *mockProjectRepository) GetProjectMembers(ctx context.Context, projectID string) ([]*models.ProjectMember, error) {
+	return nil, nil
+}
+func (m *mockProjectRepository) GetUsers(ctx context.Context, projectID string) ([]*models.User, error) {
+	return nil, nil
 }
 
-func (m *mockStorage) Open() error                        { return nil }
-func (m *mockStorage) Close() error                       { return nil }
-func (m *mockStorage) Migrate() error                     { return nil }
-func (m *mockStorage) EnsureAdminUser() error             { return nil }
-func (m *mockStorage) Users() storage.UserRepository      { return nil }
-func (m *mockStorage) Projects() storage.ProjectRepository { return nil }
-func (m *mockStorage) Alerts() storage.AlertRepository     { return nil }
-func (m *mockStorage) Connections() storage.ConnectionRepository { return m.connRepo }
-func (m *mockStorage) Tokens() storage.TokenRepository     { return nil }
+type mockStorage struct {
+	connRepo    *mockConnectionRepository
+	projectRepo *mockProjectRepository
+}
+
+func (m *mockStorage) Open() error                                  { return nil }
+func (m *mockStorage) Close() error                                 { return nil }
+func (m *mockStorage) Migrate() error                               { return nil }
+func (m *mockStorage) EnsureAdminUser() error                       { return nil }
+func (m *mockStorage) Users() storage.UserRepository                { return nil }
+func (m *mockStorage) Projects() storage.ProjectRepository          { return m.projectRepo }
+func (m *mockStorage) Alerts() storage.AlertRepository              { return nil }
+func (m *mockStorage) Connections() storage.ConnectionRepository    { return m.connRepo }
+func (m *mockStorage) Tokens() storage.TokenRepository              { return nil }
 func (m *mockStorage) AlertHistory() storage.AlertHistoryRepository { return nil }
 
 func newMockStorage() (*mockStorage, *mockConnectionRepository) {
 	connRepo := &mockConnectionRepository{}
-	return &mockStorage{connRepo: connRepo}, connRepo
+	return &mockStorage{connRepo: connRepo, projectRepo: &mockProjectRepository{}}, connRepo
+}
+
+func withAdminContext(r *http.Request) *http.Request {
+	ctx := middleware.WithUserContext(r.Context(), "admin-user", "admin", models.RoleAdmin)
+	return r.WithContext(ctx)
 }
 
 func TestList_All(t *testing.T) {
@@ -157,6 +192,7 @@ func TestList_All(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("GET", "/api/v1/connections", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	handler.List(rec, req)
@@ -187,6 +223,7 @@ func TestList_WithProjectFilter(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("GET", "/api/v1/connections?project_id=proj-1", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	handler.List(rec, req)
@@ -223,6 +260,7 @@ func TestCreate_SSHConnection(t *testing.T) {
 	}`
 
 	req := httptest.NewRequest("POST", "/api/v1/connections", strings.NewReader(body))
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	handler.Create(rec, req)
@@ -259,6 +297,7 @@ func TestCreate_LocalConnection(t *testing.T) {
 	}`
 
 	req := httptest.NewRequest("POST", "/api/v1/connections", strings.NewReader(body))
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	handler.Create(rec, req)
@@ -297,6 +336,7 @@ func TestCreate_ValidationErrors(t *testing.T) {
 			handler := NewHandler(mockStore)
 
 			req := httptest.NewRequest("POST", "/api/v1/connections", strings.NewReader(tt.body))
+			req = withAdminContext(req)
 			rec := httptest.NewRecorder()
 
 			handler.Create(rec, req)
@@ -318,6 +358,7 @@ func TestCreate_NameConflict(t *testing.T) {
 	handler := NewHandler(mockStore)
 	body := `{"name": "Existing", "type": "local"}`
 	req := httptest.NewRequest("POST", "/api/v1/connections", strings.NewReader(body))
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	handler.Create(rec, req)
@@ -336,6 +377,7 @@ func TestGetByID_Found(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("GET", "/api/v1/connections/conn-1", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -365,6 +407,7 @@ func TestGetByID_NotFound(t *testing.T) {
 	handler := NewHandler(mockStore)
 
 	req := httptest.NewRequest("GET", "/api/v1/connections/nonexistent", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -388,6 +431,7 @@ func TestUpdate_Success(t *testing.T) {
 	handler := NewHandler(mockStore)
 	body := `{"name": "Updated Name", "host": "new.com"}`
 	req := httptest.NewRequest("PUT", "/api/v1/connections/conn-1", strings.NewReader(body))
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -421,6 +465,7 @@ func TestUpdate_NotFound(t *testing.T) {
 
 	body := `{"name": "Updated"}`
 	req := httptest.NewRequest("PUT", "/api/v1/connections/nonexistent", strings.NewReader(body))
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -445,6 +490,7 @@ func TestUpdate_SSHValidationAfterUpdate(t *testing.T) {
 	// Update with invalid port, which should fail validation
 	body := `{"port": 99999}`
 	req := httptest.NewRequest("PUT", "/api/v1/connections/conn-1", strings.NewReader(body))
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -467,6 +513,7 @@ func TestDelete_Success(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("DELETE", "/api/v1/connections/conn-1", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -489,6 +536,7 @@ func TestDelete_NotFound(t *testing.T) {
 	handler := NewHandler(mockStore)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/connections/nonexistent", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -511,6 +559,7 @@ func TestTest_Success(t *testing.T) {
 
 	handler := NewHandler(mockStore)
 	req := httptest.NewRequest("POST", "/api/v1/connections/conn-1/test", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()
@@ -543,6 +592,7 @@ func TestTest_NotFound(t *testing.T) {
 	handler := NewHandler(mockStore)
 
 	req := httptest.NewRequest("POST", "/api/v1/connections/nonexistent/test", nil)
+	req = withAdminContext(req)
 	rec := httptest.NewRecorder()
 
 	rctx := chi.NewRouteContext()

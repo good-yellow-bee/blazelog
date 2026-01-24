@@ -10,6 +10,11 @@ import (
 	"github.com/expr-lang/expr/vm"
 )
 
+const (
+	maxASTDepth = 20
+	maxASTNodes = 100
+)
+
 // ParsedQuery holds a validated and parsed expression.
 type ParsedQuery struct {
 	program *vm.Program
@@ -104,11 +109,77 @@ func (d *DSL) buildEnv() map[string]any {
 	return env
 }
 
-// validateAST walks the AST to validate fields and operators.
+// validateAST walks the AST to validate fields, operators, depth and complexity.
 func (d *DSL) validateAST(node *ast.Node) error {
 	v := &validationVisitor{fields: d.fields}
 	ast.Walk(node, v)
-	return v.err
+	if v.err != nil {
+		return v.err
+	}
+
+	// Check AST complexity limits
+	depth, nodes := measureASTComplexity(node, 0)
+	if depth > maxASTDepth {
+		return fmt.Errorf("query too deeply nested: depth %d exceeds limit %d", depth, maxASTDepth)
+	}
+	if nodes > maxASTNodes {
+		return fmt.Errorf("query too complex: %d nodes exceeds limit %d", nodes, maxASTNodes)
+	}
+
+	return nil
+}
+
+// measureASTComplexity recursively measures AST depth and node count.
+func measureASTComplexity(node *ast.Node, currentDepth int) (maxDepth, nodeCount int) {
+	if node == nil || *node == nil {
+		return currentDepth, 0
+	}
+
+	maxDepth = currentDepth + 1
+	nodeCount = 1
+
+	switch n := (*node).(type) {
+	case *ast.BinaryNode:
+		leftDepth, leftCount := measureASTComplexity(&n.Left, currentDepth+1)
+		rightDepth, rightCount := measureASTComplexity(&n.Right, currentDepth+1)
+		if leftDepth > maxDepth {
+			maxDepth = leftDepth
+		}
+		if rightDepth > maxDepth {
+			maxDepth = rightDepth
+		}
+		nodeCount += leftCount + rightCount
+	case *ast.UnaryNode:
+		childDepth, childCount := measureASTComplexity(&n.Node, currentDepth+1)
+		if childDepth > maxDepth {
+			maxDepth = childDepth
+		}
+		nodeCount += childCount
+	case *ast.ArrayNode:
+		for _, elem := range n.Nodes {
+			elemDepth, elemCount := measureASTComplexity(&elem, currentDepth+1)
+			if elemDepth > maxDepth {
+				maxDepth = elemDepth
+			}
+			nodeCount += elemCount
+		}
+	case *ast.CallNode:
+		for _, arg := range n.Arguments {
+			argDepth, argCount := measureASTComplexity(&arg, currentDepth+1)
+			if argDepth > maxDepth {
+				maxDepth = argDepth
+			}
+			nodeCount += argCount
+		}
+	case *ast.MemberNode:
+		baseDepth, baseCount := measureASTComplexity(&n.Node, currentDepth+1)
+		if baseDepth > maxDepth {
+			maxDepth = baseDepth
+		}
+		nodeCount += baseCount
+	}
+
+	return maxDepth, nodeCount
 }
 
 // validationVisitor checks fields and operators in the AST.
@@ -132,11 +203,20 @@ func (v *validationVisitor) Visit(node *ast.Node) {
 		}
 
 	case *ast.BinaryNode:
-		// Validate operator against field type
+		// Validate operator against field type (check both left and right sides)
 		if ident, ok := n.Left.(*ast.IdentifierNode); ok {
 			if field, ok := v.fields[ident.Value]; ok {
 				if !field.IsOperatorAllowed(n.Operator) {
 					v.err = fmt.Errorf("operator %q not allowed for field %q", n.Operator, ident.Value)
+					return
+				}
+			}
+		}
+		if ident, ok := n.Right.(*ast.IdentifierNode); ok {
+			if field, ok := v.fields[ident.Value]; ok {
+				if !field.IsOperatorAllowed(n.Operator) {
+					v.err = fmt.Errorf("operator %q not allowed for field %q", n.Operator, ident.Value)
+					return
 				}
 			}
 		}

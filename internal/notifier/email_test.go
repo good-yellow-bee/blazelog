@@ -507,10 +507,11 @@ func TestEmailNotifierSendWithMockSMTP(t *testing.T) {
 	}
 
 	config := EmailConfig{
-		Host:       host,
-		Port:       port,
-		From:       "test@example.com",
-		Recipients: []string{"admin@example.com"},
+		Host:          host,
+		Port:          port,
+		From:          "test@example.com",
+		Recipients:    []string{"admin@example.com"},
+		AllowInsecure: true, // Allow plaintext for test mock server
 	}
 
 	notifier, err := NewEmailNotifier(&config)
