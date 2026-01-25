@@ -1232,12 +1232,12 @@ templ LogsScript() {
 						const details = document.createElement('div');
 						details.className = 'mt-2 pt-2 border-t border-slate-200 text-xs text-slate-600 space-y-1';
 
-					const infoItems = [
-						['Source', log.source],
-						['Type', log.type],
-						['File', log.file_path],
-						['Agent', log.agent_id ? log.agent_id.slice(0, 8) + '...' : '']
-					];
+						const infoItems = [
+							['Source', log.source],
+							['Type', log.type],
+							['File', log.file_path],
+							['Agent', log.agent_id ? log.agent_id.slice(0, 8) + '...' : '']
+						];
 
 						infoItems.forEach(([label, value]) => {
 							if (value) {
@@ -1259,8 +1259,6 @@ templ LogsScript() {
 					}
 
 					container.appendChild(div);
-					if (isAnchor) {
-						}
 				});
 			}
 		};

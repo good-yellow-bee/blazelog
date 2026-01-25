@@ -57,6 +57,9 @@ Desktop.ini
 tmp/
 temp/
 
+# PID files
+*.pid
+
 # Security - certificates and keys (never commit!)
 *.pem
 *.key
@@ -82,6 +85,10 @@ data/*.db-journal
 .claude
 .serena
 .history
+
+# Local/machine-specific configs
+configs/agent-inpost.yaml
+configs/server-dev.yaml
 
 # Built binaries (root level only)
 /agent

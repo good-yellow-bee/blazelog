@@ -802,6 +802,10 @@ func (h *Handler) Context(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
 		return
 	}
+	if result == nil || result.Target == nil {
+		jsonError(w, http.StatusNotFound, "NOT_FOUND", "log not found")
+		return
+	}
 
 	// Convert to response
 	resp := &ContextResponse{

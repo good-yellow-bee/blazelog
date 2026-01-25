@@ -64,6 +64,14 @@ func (r *mockLogRepo) GetHTTPStats(ctx context.Context, filter *storage.Aggregat
 	return r.mock.httpStats, nil
 }
 
+func (r *mockLogRepo) GetByID(ctx context.Context, id string) (*storage.LogRecord, error) {
+	return nil, nil
+}
+
+func (r *mockLogRepo) GetContext(ctx context.Context, filter *storage.ContextFilter) (*storage.ContextResult, error) {
+	return &storage.ContextResult{}, nil
+}
+
 func TestHandler_HasLogStorage(t *testing.T) {
 	// Test that handler can be created with nil logStorage
 	h := NewHandler(nil, nil, nil, "csrf")
