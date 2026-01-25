@@ -81,7 +81,7 @@ func Base(title string, user *session.Session, csrfToken string) templ.Component
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<main class=\"flex-1 md:ml-0 p-4 md:p-8 pt-16 md:pt-8 page-enter\"><div class=\"max-w-7xl mx-auto\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<main :class=\"$store.sidebar.open ? 'md:pl-64' : ''\" class=\"flex-1 p-4 md:p-8 pt-16 md:pt-8 page-enter\"><div class=\"max-w-7xl mx-auto\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

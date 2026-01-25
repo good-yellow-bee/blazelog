@@ -116,6 +116,7 @@ func (s *Server) setupRouter() *chi.Mux {
 			r.Get("/", logsHandler.Query)
 			r.Get("/stats", logsHandler.Stats)
 			r.Get("/stream", logsHandler.Stream)
+			r.Get("/{id}/context", logsHandler.Context)
 		})
 
 		// Alert routes (protected)

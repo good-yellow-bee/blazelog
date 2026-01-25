@@ -400,28 +400,17 @@ func (r *clickhouseLogRepo) Query(ctx context.Context, filter *LogFilter) (*LogQ
 		entries = entries[:filter.Limit] // Return only requested limit
 	}
 
-	// Only compute Total for first page (offset=0) to enable pagination UI
-	// For subsequent pages, Total is approximated from offset + len
+	// Compute Total for accurate pagination
 	var total int64
-	if filter.Offset == 0 {
-		if hasMore {
-			// If there are more results, we need actual count for pagination
-			total, err = r.Count(ctx, filter)
-			if err != nil {
-				return nil, fmt.Errorf("count: %w", err)
-			}
-		} else {
-			// No more results, total is just the count we have
-			total = int64(len(entries))
+	if hasMore {
+		// Always get actual count for accurate pagination
+		total, err = r.Count(ctx, filter)
+		if err != nil {
+			return nil, fmt.Errorf("count: %w", err)
 		}
 	} else {
-		// For non-first pages, estimate total from what we know
-		// This is an approximation but avoids the COUNT query
-		if hasMore {
-			total = int64(filter.Offset + len(entries) + 1) // At least this many
-		} else {
-			total = int64(filter.Offset + len(entries))
-		}
+		// No more results, total is offset + entries we have
+		total = int64(filter.Offset + len(entries))
 	}
 
 	return &LogQueryResult{
@@ -862,6 +851,263 @@ func (r *clickhouseLogRepo) buildAggregationProjectFilter(filter *AggregationFil
 	}
 
 	return "(" + strings.Join(conditions, " OR ") + ")", args
+}
+
+// GetByID retrieves a single log entry by ID.
+func (r *clickhouseLogRepo) GetByID(ctx context.Context, id string) (*LogRecord, error) {
+	query := `
+		SELECT id, project_id, timestamp, level, message, source, type, raw,
+		       agent_id, file_path, line_number, fields, labels,
+		       http_status, http_method, uri
+		FROM logs
+		WHERE id = ?
+		LIMIT 1
+	`
+
+	entry := &LogRecord{}
+	var fieldsJSON, labelsJSON string
+
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&entry.ID,
+		&entry.ProjectID,
+		&entry.Timestamp,
+		&entry.Level,
+		&entry.Message,
+		&entry.Source,
+		&entry.Type,
+		&entry.Raw,
+		&entry.AgentID,
+		&entry.FilePath,
+		&entry.LineNumber,
+		&fieldsJSON,
+		&labelsJSON,
+		&entry.HTTPStatus,
+		&entry.HTTPMethod,
+		&entry.URI,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			//nolint:nilnil
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get by id: %w", err)
+	}
+
+	// Parse JSON fields
+	if fieldsJSON != "" {
+		if err := json.Unmarshal([]byte(fieldsJSON), &entry.Fields); err != nil {
+			log.Printf("warning: failed to unmarshal fields for log entry %s: %v", entry.ID, err)
+		}
+	}
+	if labelsJSON != "" {
+		if err := json.Unmarshal([]byte(labelsJSON), &entry.Labels); err != nil {
+			log.Printf("warning: failed to unmarshal labels for log entry %s: %v", entry.ID, err)
+		}
+	}
+
+	return entry, nil
+}
+
+// GetContext retrieves logs surrounding a target log entry.
+func (r *clickhouseLogRepo) GetContext(ctx context.Context, filter *ContextFilter) (*ContextResult, error) {
+	if filter.Before > 50 {
+		filter.Before = 50
+	}
+	if filter.After > 50 {
+		filter.After = 50
+	}
+
+	// 1-hour window around anchor
+	windowStart := filter.Timestamp.Add(-1 * time.Hour)
+	windowEnd := filter.Timestamp.Add(1 * time.Hour)
+
+	result := &ContextResult{}
+
+	// Get target log
+	target, err := r.GetByID(ctx, filter.TargetID)
+	if err != nil {
+		return nil, fmt.Errorf("get target: %w", err)
+	}
+	if target == nil {
+		//nolint:nilnil
+		return nil, nil
+	}
+	result.Target = target
+
+	// Build base conditions
+	baseConditions := "project_id = ? AND agent_id = ?"
+	baseArgs := []interface{}{filter.ProjectID, filter.AgentID}
+
+	// Query BEFORE logs (older than anchor)
+	if filter.Before > 0 {
+		beforeQuery := fmt.Sprintf(`
+			SELECT id, project_id, timestamp, level, message, source, type, raw,
+			       agent_id, file_path, line_number, fields, labels,
+			       http_status, http_method, uri
+			FROM logs
+			PREWHERE timestamp >= ? AND timestamp <= ?
+			WHERE %s AND (timestamp < ? OR (timestamp = ? AND id < ?))
+			ORDER BY timestamp DESC, id DESC
+			LIMIT ?
+		`, baseConditions)
+
+		cursorTS, cursorID := filter.Timestamp, filter.TargetID
+		if filter.BeforeCursor != "" {
+			parsedTS, parsedID, ok := parseCursor(filter.BeforeCursor)
+			if ok {
+				cursorTS, cursorID = parsedTS, parsedID
+			}
+		}
+
+		beforeArgs := append([]interface{}{windowStart, filter.Timestamp}, baseArgs...)
+		beforeArgs = append(beforeArgs, cursorTS, cursorTS, cursorID, filter.Before+1)
+
+		beforeRows, err := r.db.QueryContext(ctx, beforeQuery, beforeArgs...)
+		if err != nil {
+			return nil, fmt.Errorf("query before: %w", err)
+		}
+		defer beforeRows.Close()
+
+		beforeLogs, err := r.scanLogRows(beforeRows)
+		if err != nil {
+			return nil, fmt.Errorf("scan before: %w", err)
+		}
+
+		// Check HasMore and trim
+		if len(beforeLogs) > filter.Before {
+			result.HasMoreBefore = true
+			beforeLogs = beforeLogs[:filter.Before]
+		}
+
+		// Set cursor from oldest log in result
+		if len(beforeLogs) > 0 {
+			oldest := beforeLogs[len(beforeLogs)-1]
+			result.BeforeCursor = formatCursor(oldest.Timestamp, oldest.ID)
+		}
+
+		// Reverse to oldest-first order
+		for i, j := 0, len(beforeLogs)-1; i < j; i, j = i+1, j-1 {
+			beforeLogs[i], beforeLogs[j] = beforeLogs[j], beforeLogs[i]
+		}
+		result.Before = beforeLogs
+	}
+
+	// Query AFTER logs (newer than anchor)
+	if filter.After > 0 {
+		afterQuery := fmt.Sprintf(`
+			SELECT id, project_id, timestamp, level, message, source, type, raw,
+			       agent_id, file_path, line_number, fields, labels,
+			       http_status, http_method, uri
+			FROM logs
+			PREWHERE timestamp >= ? AND timestamp <= ?
+			WHERE %s AND (timestamp > ? OR (timestamp = ? AND id > ?))
+			ORDER BY timestamp ASC, id ASC
+			LIMIT ?
+		`, baseConditions)
+
+		cursorTS, cursorID := filter.Timestamp, filter.TargetID
+		if filter.AfterCursor != "" {
+			parsedTS, parsedID, ok := parseCursor(filter.AfterCursor)
+			if ok {
+				cursorTS, cursorID = parsedTS, parsedID
+			}
+		}
+
+		afterArgs := append([]interface{}{filter.Timestamp, windowEnd}, baseArgs...)
+		afterArgs = append(afterArgs, cursorTS, cursorTS, cursorID, filter.After+1)
+
+		afterRows, err := r.db.QueryContext(ctx, afterQuery, afterArgs...)
+		if err != nil {
+			return nil, fmt.Errorf("query after: %w", err)
+		}
+		defer afterRows.Close()
+
+		afterLogs, err := r.scanLogRows(afterRows)
+		if err != nil {
+			return nil, fmt.Errorf("scan after: %w", err)
+		}
+
+		// Check HasMore and trim
+		if len(afterLogs) > filter.After {
+			result.HasMoreAfter = true
+			afterLogs = afterLogs[:filter.After]
+		}
+
+		// Set cursor from newest log in result
+		if len(afterLogs) > 0 {
+			newest := afterLogs[len(afterLogs)-1]
+			result.AfterCursor = formatCursor(newest.Timestamp, newest.ID)
+		}
+
+		result.After = afterLogs
+	}
+
+	return result, nil
+}
+
+// scanLogRows scans rows into LogRecord slice.
+func (r *clickhouseLogRepo) scanLogRows(rows *sql.Rows) ([]*LogRecord, error) {
+	var entries []*LogRecord
+	for rows.Next() {
+		entry := &LogRecord{}
+		var fieldsJSON, labelsJSON string
+
+		err := rows.Scan(
+			&entry.ID,
+			&entry.ProjectID,
+			&entry.Timestamp,
+			&entry.Level,
+			&entry.Message,
+			&entry.Source,
+			&entry.Type,
+			&entry.Raw,
+			&entry.AgentID,
+			&entry.FilePath,
+			&entry.LineNumber,
+			&fieldsJSON,
+			&labelsJSON,
+			&entry.HTTPStatus,
+			&entry.HTTPMethod,
+			&entry.URI,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+
+		if fieldsJSON != "" {
+			if err := json.Unmarshal([]byte(fieldsJSON), &entry.Fields); err != nil {
+				log.Printf("warning: failed to unmarshal fields: %v", err)
+			}
+		}
+		if labelsJSON != "" {
+			if err := json.Unmarshal([]byte(labelsJSON), &entry.Labels); err != nil {
+				log.Printf("warning: failed to unmarshal labels: %v", err)
+			}
+		}
+
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
+// formatCursor creates a cursor string from timestamp and ID.
+func formatCursor(ts time.Time, id string) string {
+	return ts.Format(time.RFC3339Nano) + ":" + id
+}
+
+// parseCursor extracts timestamp and ID from cursor string.
+func parseCursor(cursor string) (time.Time, string, bool) {
+	idx := strings.LastIndex(cursor, ":")
+	if idx == -1 {
+		return time.Time{}, "", false
+	}
+	tsStr := cursor[:idx]
+	id := cursor[idx+1:]
+	ts, err := time.Parse(time.RFC3339Nano, tsStr)
+	if err != nil {
+		return time.Time{}, "", false
+	}
+	return ts, id, true
 }
 
 // buildAggregationWhere builds WHERE clause for aggregation queries.

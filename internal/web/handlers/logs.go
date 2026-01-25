@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/models"
 	"github.com/good-yellow-bee/blazelog/internal/query"
@@ -64,6 +65,17 @@ type LogItem struct {
 	HTTPStatus int                    `json:"http_status,omitempty"`
 	HTTPMethod string                 `json:"http_method,omitempty"`
 	URI        string                 `json:"uri,omitempty"`
+}
+
+// ContextResponse wraps logs surrounding the anchor log.
+type ContextResponse struct {
+	Target        *LogItem   `json:"target"`
+	Before        []*LogItem `json:"before"`
+	After         []*LogItem `json:"after"`
+	HasMoreBefore bool       `json:"has_more_before"`
+	HasMoreAfter  bool       `json:"has_more_after"`
+	BeforeCursor  string     `json:"before_cursor,omitempty"`
+	AfterCursor   string     `json:"after_cursor,omitempty"`
 }
 
 func (h *Handler) GetLogsData(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +240,104 @@ func (h *Handler) GetLogsData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handler) Context(w http.ResponseWriter, r *http.Request) {
+	sess := GetSession(r)
+	if sess == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if h.logStorage == nil {
+		http.Error(w, "log storage not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "log id is required", http.StatusBadRequest)
+		return
+	}
+
+	q := r.URL.Query()
+	before := parseIntDefault(q.Get("before"), 10)
+	if before > 50 {
+		before = 50
+	}
+	after := parseIntDefault(q.Get("after"), 10)
+	if after > 50 {
+		after = 50
+	}
+	beforeCursor := q.Get("before_cursor")
+	afterCursor := q.Get("after_cursor")
+
+	anchor, err := h.logStorage.Logs().GetByID(ctx, id)
+	if err != nil {
+		log.Printf("get log by id error: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if anchor == nil {
+		http.Error(w, "log not found", http.StatusNotFound)
+		return
+	}
+
+	if h.storage != nil {
+		role := models.ParseRole(sess.Role)
+		access, err := middleware.GetProjectAccess(ctx, sess.UserID, role, h.storage)
+		if err != nil {
+			log.Printf("project access error: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if !access.CanAccessProject(anchor.ProjectID) {
+			http.Error(w, "log not found", http.StatusNotFound)
+			return
+		}
+	}
+
+	result, err := h.logStorage.Logs().GetContext(ctx, &storage.ContextFilter{
+		TargetID:     id,
+		ProjectID:    anchor.ProjectID,
+		AgentID:      anchor.AgentID,
+		Timestamp:    anchor.Timestamp,
+		Before:       before,
+		After:        after,
+		BeforeCursor: beforeCursor,
+		AfterCursor:  afterCursor,
+	})
+	if err != nil {
+		log.Printf("get context error: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if result == nil || result.Target == nil {
+		http.Error(w, "log not found", http.StatusNotFound)
+		return
+	}
+
+	resp := &ContextResponse{
+		Target:        recordToLogItem(result.Target),
+		Before:        make([]*LogItem, len(result.Before)),
+		After:         make([]*LogItem, len(result.After)),
+		HasMoreBefore: result.HasMoreBefore,
+		HasMoreAfter:  result.HasMoreAfter,
+		BeforeCursor:  result.BeforeCursor,
+		AfterCursor:   result.AfterCursor,
+	}
+
+	for i, entry := range result.Before {
+		resp.Before[i] = recordToLogItem(entry)
+	}
+	for i, entry := range result.After {
+		resp.After[i] = recordToLogItem(entry)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
+}
+
 func recordToLogItem(r *storage.LogRecord) *LogItem {
 	item := &LogItem{
 		ID:         r.ID,
@@ -253,6 +363,18 @@ func recordToLogItem(r *storage.LogRecord) *LogItem {
 		item.URI = r.URI
 	}
 	return item
+}
+
+// parseIntDefault parses an int from string, returning default if empty/invalid.
+func parseIntDefault(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 {
+		return def
+	}
+	return v
 }
 
 func (h *Handler) ExportLogs(w http.ResponseWriter, r *http.Request) {
@@ -390,6 +512,54 @@ func (h *Handler) writeCSV(w http.ResponseWriter, entries []*storage.LogRecord) 
 			e.HTTPMethod,
 			e.URI,
 		})
+	}
+}
+
+// ProjectListItem represents a project for dropdown selection.
+type ProjectListItem struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// GetProjects returns accessible projects for the current user.
+func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
+	sess := GetSession(r)
+	if sess == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx := r.Context()
+	var rawProjects []*models.Project
+
+	if h.storage != nil {
+		role := models.ParseRole(sess.Role)
+		access, err := middleware.GetProjectAccess(ctx, sess.UserID, role, h.storage)
+		if err != nil {
+			http.Error(w, "failed to get project access", http.StatusInternalServerError)
+			return
+		}
+
+		if access.AllProjects {
+			rawProjects, err = h.storage.Projects().List(ctx)
+		} else {
+			rawProjects, err = h.storage.Projects().GetProjectsForUser(ctx, sess.UserID)
+		}
+		if err != nil {
+			http.Error(w, "failed to get projects", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	projects := make([]*ProjectListItem, len(rawProjects))
+	for i, p := range rawProjects {
+		projects[i] = &ProjectListItem{ID: p.ID, Name: p.Name}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(projects); err != nil {
+		log.Printf("json encode error: %v", err)
+		return
 	}
 }
 

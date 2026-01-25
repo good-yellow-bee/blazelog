@@ -235,6 +235,14 @@ func (m *mockLogRepo) GetHTTPStats(ctx context.Context, filter *AggregationFilte
 	return &HTTPStatsResult{}, nil
 }
 
+func (m *mockLogRepo) GetByID(ctx context.Context, id string) (*LogRecord, error) {
+	return nil, nil
+}
+
+func (m *mockLogRepo) GetContext(ctx context.Context, filter *ContextFilter) (*ContextResult, error) {
+	return &ContextResult{}, nil
+}
+
 // Milestone 21: SearchMode tests
 
 func TestSearchMode_Constants(t *testing.T) {

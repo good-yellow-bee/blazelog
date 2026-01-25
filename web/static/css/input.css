@@ -53,6 +53,15 @@
 }
 
 @layer components {
+  /* HTMX indicator - hidden by default, shown during requests */
+  .htmx-indicator {
+    display: none;
+  }
+  .htmx-request .htmx-indicator,
+  .htmx-request.htmx-indicator {
+    display: inline;
+  }
+
   .page-enter {
     animation: lift-in 0.45s ease-out;
   }
@@ -309,5 +318,12 @@
   .badge-rose {
     background: rgba(244, 63, 94, 0.16);
     color: #9f1239;
+  }
+
+  /* Anchor log highlight for context view */
+  .anchor-highlight {
+    background-color: #ccfbf1 !important; /* teal-100 */
+    border-left: 4px solid #0d9488 !important; /* teal-600 */
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 0 0 2px #5eead4 !important; /* shadow + ring teal-300 */
   }
 }

@@ -147,12 +147,12 @@ templ-watch:
 ## web-build: Build Tailwind CSS
 web-build:
 	@echo "Building Tailwind CSS..."
-	$(HOME)/.local/bin/tailwindcss -i web/static/css/input.css -o web/static/css/output.css --minify
+	$(HOME)/.local/bin/tailwindcss -i web/static/css/input.css -o internal/web/static/css/output.css --minify
 
 ## web-watch: Watch and rebuild Tailwind CSS (development)
 web-watch:
 	@echo "Watching Tailwind CSS..."
-	$(HOME)/.local/bin/tailwindcss -i web/static/css/input.css -o web/static/css/output.css --watch
+	$(HOME)/.local/bin/tailwindcss -i web/static/css/input.css -o internal/web/static/css/output.css --watch
 
 ## dev-web: Start web development watchers
 dev-web:

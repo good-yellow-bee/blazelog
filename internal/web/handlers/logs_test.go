@@ -33,6 +33,16 @@ func TestShowLogs_WithSession(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "md:fixed") {
+		t.Errorf("response missing md:fixed sidebar class")
+	}
+	if !strings.Contains(body, "md:inset-y-0") {
+		t.Errorf("response missing md:inset-y-0 sidebar class")
+	}
+	if !strings.Contains(body, "md:left-0") {
+		t.Errorf("response missing md:left-0 sidebar class")
+	}
 }
 
 func TestGetLogsData_RequiresSession(t *testing.T) {

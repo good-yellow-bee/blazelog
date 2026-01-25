@@ -70,8 +70,10 @@ func (s *Server) Routes() chi.Router {
 		// Log viewer routes
 		r.Get("/logs", s.handler.ShowLogs)
 		r.Get("/logs/data", s.handler.GetLogsData)
+		r.Get("/logs/projects", s.handler.GetProjects)
 		r.Get("/logs/export", s.handler.ExportLogs)
 		r.Get("/logs/stream", s.handler.StreamLogs)
+		r.Get("/logs/{id}/context", s.handler.Context)
 
 		// Settings routes
 		r.Get("/settings/alerts", s.handler.ShowAlerts)
