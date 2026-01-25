@@ -7,12 +7,12 @@ templ Sidebar(user *session.Session, csrfToken string) {
 	<!-- Mobile menu button -->
 	<button
 		@click="$store.sidebar.toggle()"
-		class="fixed top-4 left-4 z-50 md:hidden bg-white/80 backdrop-blur border border-slate-200/70 p-2 rounded-xl shadow-sm"
+		class="fixed top-4 left-4 z-50 md:hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200/70 dark:border-slate-700/70 p-2 rounded-xl shadow-sm"
 	>
-		<svg x-show="!$store.sidebar.open" class="w-6 h-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+		<svg x-show="!$store.sidebar.open" class="w-6 h-6 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
 		</svg>
-		<svg x-show="$store.sidebar.open" x-cloak class="w-6 h-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+		<svg x-show="$store.sidebar.open" x-cloak class="w-6 h-6 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 		</svg>
 	</button>
@@ -22,11 +22,11 @@ templ Sidebar(user *session.Session, csrfToken string) {
 		x-cloak
 		x-show="!$store.sidebar.open"
 		@click="$store.sidebar.toggle()"
-		class="hidden md:flex fixed top-6 left-6 z-40 bg-white/80 backdrop-blur border border-slate-200/70 p-2 rounded-lg shadow-sm"
+		class="hidden md:flex fixed top-6 left-6 z-40 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200/70 dark:border-slate-700/70 p-2 rounded-lg shadow-sm"
 		title="Show sidebar"
 		aria-label="Show sidebar"
 	>
-		<svg class="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+		<svg class="w-5 h-5 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
 		</svg>
 	</button>
@@ -49,41 +49,60 @@ templ Sidebar(user *session.Session, csrfToken string) {
 	<aside
 		x-data="sidebarNav()"
 		:class="$store.sidebar.open ? 'translate-x-0' : '-translate-x-full'"
-		class="fixed top-0 bottom-0 left-0 h-screen z-50 w-64 bg-white/90 backdrop-blur-xl border-r border-slate-200/70 shadow-[0_12px_32px_rgba(15,23,42,0.08)] transform transition-transform duration-200 ease-in-out flex flex-col"
+		class="fixed top-0 bottom-0 left-0 h-screen z-50 w-64 bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200/70 dark:border-slate-700/70 shadow-[0_12px_32px_rgba(15,23,42,0.08)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.3)] transform transition-transform duration-200 ease-in-out flex flex-col"
 	>
 		<!-- Logo -->
-		<div class="h-16 flex items-center px-6 border-b border-slate-200/70">
-			<a href="/dashboard" class="text-xl font-semibold text-slate-900 hover:text-teal-700 transition-colors">
+		<div class="h-16 flex items-center px-6 border-b border-slate-200/70 dark:border-slate-700/70">
+			<a href="/dashboard" class="text-xl font-semibold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-400 transition-colors">
 				BlazeLog
 			</a>
-			<button
-				@click="$store.sidebar.toggle()"
-				class="ml-auto hidden md:inline-flex items-center justify-center p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
-				title="Hide sidebar"
-				aria-label="Hide sidebar"
-			>
-				<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-				</svg>
-			</button>
+			<div class="ml-auto flex items-center gap-1">
+				<!-- Theme toggle -->
+				<button
+					@click="$store.theme.toggle()"
+					class="inline-flex items-center justify-center p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70 transition-colors"
+					title="Toggle theme"
+					aria-label="Toggle theme"
+				>
+					<!-- Sun icon (shown in dark mode) -->
+					<svg x-show="$store.theme.isDark" x-cloak class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+					</svg>
+					<!-- Moon icon (shown in light mode) -->
+					<svg x-show="!$store.theme.isDark" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+					</svg>
+				</button>
+				<!-- Hide sidebar button -->
+				<button
+					@click="$store.sidebar.toggle()"
+					class="hidden md:inline-flex items-center justify-center p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70 transition-colors"
+					title="Hide sidebar"
+					aria-label="Hide sidebar"
+				>
+					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+					</svg>
+				</button>
+			</div>
 		</div>
 
 		<!-- Navigation -->
 		<nav class="flex-1 mt-6 px-3 space-y-1 overflow-y-auto">
 			<a
 				href="/dashboard"
-				:class="isActive('/dashboard') ? 'bg-teal-600/10 text-teal-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'"
+				:class="isActive('/dashboard') ? 'bg-teal-600/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70'"
 				class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors"
 			>
 				<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
 				</svg>
 				<span class="ml-3">Dashboard</span>
 			</a>
 
 			<a
 				href="/logs"
-				:class="isActive('/logs') ? 'bg-teal-600/10 text-teal-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'"
+				:class="isActive('/logs') ? 'bg-teal-600/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70'"
 				class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors"
 			>
 				<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -93,10 +112,10 @@ templ Sidebar(user *session.Session, csrfToken string) {
 			</a>
 
 			<!-- Settings Section -->
-			<div class="mt-6 pt-4 border-t border-slate-200/70">
+			<div class="mt-6 pt-4 border-t border-slate-200/70 dark:border-slate-700/70">
 				<button
 					@click="settingsOpen = !settingsOpen"
-					class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 rounded-lg transition-colors"
+					class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70 rounded-lg transition-colors"
 				>
 					<span class="flex items-center">
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,7 +138,7 @@ templ Sidebar(user *session.Session, csrfToken string) {
 				<div x-show="settingsOpen" x-collapse x-cloak class="ml-4 mt-2 space-y-1">
 					<a
 						href="/settings/alerts"
-						:class="isActive('/settings/alerts') ? 'bg-teal-600/10 text-teal-700 font-medium' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'"
+						:class="isActive('/settings/alerts') ? 'bg-teal-600/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70'"
 						class="block px-3 py-2 text-sm rounded-lg transition-colors"
 					>
 						Alerts
@@ -127,21 +146,21 @@ templ Sidebar(user *session.Session, csrfToken string) {
 					if user.Role == "admin" {
 						<a
 							href="/settings/projects"
-							:class="isActive('/settings/projects') ? 'bg-teal-600/10 text-teal-700 font-medium' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'"
+							:class="isActive('/settings/projects') ? 'bg-teal-600/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70'"
 							class="block px-3 py-2 text-sm rounded-lg transition-colors"
 						>
 							Projects
 						</a>
 						<a
 							href="/settings/connections"
-							:class="isActive('/settings/connections') ? 'bg-teal-600/10 text-teal-700 font-medium' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'"
+							:class="isActive('/settings/connections') ? 'bg-teal-600/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70'"
 							class="block px-3 py-2 text-sm rounded-lg transition-colors"
 						>
 							Connections
 						</a>
 						<a
 							href="/settings/users"
-							:class="isActive('/settings/users') ? 'bg-teal-600/10 text-teal-700 font-medium' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'"
+							:class="isActive('/settings/users') ? 'bg-teal-600/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70'"
 							class="block px-3 py-2 text-sm rounded-lg transition-colors"
 						>
 							Users
@@ -152,7 +171,7 @@ templ Sidebar(user *session.Session, csrfToken string) {
 		</nav>
 
 		<!-- User section -->
-		<div class="flex-shrink-0 p-4 border-t border-slate-200/70 bg-white/80">
+		<div class="flex-shrink-0 p-4 border-t border-slate-200/70 dark:border-slate-700/70 bg-white/80 dark:bg-slate-800/80">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center min-w-0">
 					<div class="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -161,15 +180,15 @@ templ Sidebar(user *session.Session, csrfToken string) {
 						</span>
 					</div>
 					<div class="ml-3 min-w-0">
-						<p class="text-sm font-medium text-slate-900 truncate">{ user.Username }</p>
-						<p class="text-xs text-slate-500 capitalize">{ string(user.Role) }</p>
+						<p class="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{ user.Username }</p>
+						<p class="text-xs text-slate-500 dark:text-slate-400 capitalize">{ string(user.Role) }</p>
 					</div>
 				</div>
 				<form method="POST" action="/logout">
 				<input type="hidden" name="csrf_token" value={ csrfToken }/>
 				<button
 						type="submit"
-						class="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100/70 rounded-md transition-colors"
+						class="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-700/70 rounded-md transition-colors"
 						title="Logout"
 					>
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -184,13 +203,23 @@ templ Sidebar(user *session.Session, csrfToken string) {
 
 templ SidebarScript() {
 	<script>
-		// Initialize sidebar store
+		// Initialize sidebar and theme stores
 		document.addEventListener('alpine:init', () => {
 			const desktopQuery = window.matchMedia('(min-width: 768px)');
 			Alpine.store('sidebar', {
 				open: desktopQuery.matches,
 				toggle() {
 					this.open = !this.open;
+				}
+			});
+
+			// Theme store - syncs with localStorage and system preference
+			Alpine.store('theme', {
+				isDark: document.documentElement.classList.contains('dark'),
+				toggle() {
+					this.isDark = !this.isDark;
+					document.documentElement.classList.toggle('dark', this.isDark);
+					localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
 				}
 			});
 		});
