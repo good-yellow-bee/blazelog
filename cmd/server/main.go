@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 
 var (
 	configFile string
+	profile    string
 	grpcAddr   string
 	verbose    bool
 )
@@ -52,6 +54,7 @@ var healthCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "config file path (optional)")
+	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "config profile (dev, prod) - loads configs/server-{profile}.yaml")
 	rootCmd.PersistentFlags().StringVarP(&grpcAddr, "address", "a", ":9443", "gRPC listen address")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
@@ -94,15 +97,42 @@ func runHealthCheck(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// profilePattern validates profile names (alphanumeric and hyphens only).
+var profilePattern = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+
 func runServer(cmd *cobra.Command, args []string) error {
 	var cfg *Config
 
+	// Validate flag combinations
+	if configFile != "" && profile != "" {
+		return fmt.Errorf("cannot use both --config and --profile flags; choose one")
+	}
+
+	// Determine config file path
+	cfgPath := configFile
+	if cfgPath == "" && profile != "" {
+		// Validate profile name
+		if !profilePattern.MatchString(profile) {
+			return fmt.Errorf("invalid profile %q: must contain only letters, numbers, and hyphens", profile)
+		}
+		// Use profile-based config: configs/server-{profile}.yaml
+		cfgPath = fmt.Sprintf("configs/server-%s.yaml", profile)
+	}
+
 	// Load configuration from file if provided
-	if configFile != "" {
+	if cfgPath != "" {
 		var err error
-		cfg, err = LoadConfig(configFile)
+		cfg, err = LoadConfig(cfgPath)
 		if err != nil {
+			if profile != "" {
+				return fmt.Errorf("load config for profile %q: %w", profile, err)
+			}
 			return fmt.Errorf("load config: %w", err)
+		}
+		if profile != "" {
+			log.Printf("loaded config from %s (profile: %s)", cfgPath, profile)
+		} else {
+			log.Printf("loaded config from %s", cfgPath)
 		}
 	} else {
 		cfg = DefaultConfig()

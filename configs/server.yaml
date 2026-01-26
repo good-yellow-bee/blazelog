@@ -24,6 +24,8 @@ server:
 
     # CA certificate for verifying client certificates
     # client_ca_file: "/etc/blazelog/certs/ca.crt"
+metrics:
+  enabled: false
 
 # Database configuration
 # NOTE: BLAZELOG_MASTER_KEY environment variable is REQUIRED

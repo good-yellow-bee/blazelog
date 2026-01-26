@@ -1,39 +1,42 @@
 # BlazeLog First Run - Multi-Server Setup (Agent Per Container)
 
-## Your Setup
+This guide shows how to simulate multiple servers locally using separate containers, each with its
+own BlazeLog agent.
+
+## Example Setup
 
 Each container simulates a separate server with its own agent:
 
-| Project | Container | Agent Inside |
-|---------|-----------|--------------|
-| PrestaShop 1 | prestashop1 | ✅ |
-| PrestaShop 2 | prestashop2 | ✅ |
-| Magento | magento | ✅ |
-| Custom | custom | ✅ |
+| App | Container | Agent Inside |
+|-----|-----------|--------------|
+| App 1 | app1 | yes |
+| App 2 | app2 | yes |
+| App 3 | app3 | yes |
+| App 4 | app4 | yes |
 
 ```
-┌──────────────────┐     ┌──────────────────┐
-│  PrestaShop 1    │     │  PrestaShop 2    │
-│  ┌────────────┐  │     │  ┌────────────┐  │
-│  │ Agent      │──┼─────┼──│ Agent      │  │
-│  └────────────┘  │     │  └────────────┘  │
-└──────────────────┘     └──────────────────┘
-         │                        │
-         └────────┬───────────────┘
-                  ▼
-         ┌──────────────────┐
-         │  BlazeLog Server │
-         │  localhost:9443  │
-         └──────────────────┘
-                  ▲
-         ┌────────┴───────────────┐
-         │                        │
-┌──────────────────┐     ┌──────────────────┐
-│  Magento         │     │  Custom App      │
-│  ┌────────────┐  │     │  ┌────────────┐  │
-│  │ Agent      │──┼─────┼──│ Agent      │  │
-│  └────────────┘  │     │  └────────────┘  │
-└──────────────────┘     └──────────────────┘
++------------------+     +------------------+
+|  App 1           |     |  App 2           |
+|  +-----------+   |     |  +-----------+   |
+|  | Agent     |---+-----+--| Agent     |   |
+|  +-----------+   |     |  +-----------+   |
++------------------+     +------------------+
+         |                        |
+         +---------+--------------+
+                   v
+         +------------------+
+         |  BlazeLog Server |
+         |  localhost:9443  |
+         +------------------+
+                   ^
+         +---------+--------------+
+         |                        |
++------------------+     +------------------+
+|  App 3           |     |  App 4           |
+|  +-----------+   |     |  +-----------+   |
+|  | Agent     |---+-----+--| Agent     |   |
+|  +-----------+   |     |  +-----------+   |
++------------------+     +------------------+
 ```
 
 ---
@@ -60,11 +63,11 @@ make build-agent
 
 ## Step 3: Setup Each Container
 
-### PrestaShop 1
+### App 1
 
 **Directory structure:**
 ```
-prestashop1/
+app1/
 ├── docker-compose.yml
 ├── blazelog/
 │   ├── blazelog-agent      # Copy from blazelog/build/
@@ -73,10 +76,10 @@ prestashop1/
 
 **Copy agent binary:**
 ```bash
-cp /path/to/blazelog/build/blazelog-agent ./prestashop1/blazelog/
+cp /path/to/blazelog/build/blazelog-agent ./app1/blazelog/
 ```
 
-**Create `prestashop1/blazelog/agent.yaml`:**
+**Create `app1/blazelog/agent.yaml`:**
 ```yaml
 server:
   address: "host.docker.internal:9443"  # Mac/Windows
@@ -85,109 +88,14 @@ server:
     enabled: false
 
 agent:
-  name: "prestashop1-server"
+  name: "app1-server"
   batch_size: 100
   flush_interval: 1s
 
 sources:
-  - name: "prestashop-logs"
-    type: "prestashop"
-    path: "/var/www/html/var/logs/*.log"
-    follow: true
-
-  - name: "apache-access"
-    type: "apache"
-    path: "/var/log/apache2/access.log"
-    follow: true
-
-  - name: "apache-error"
-    type: "apache"
-    path: "/var/log/apache2/error.log"
-    follow: true
-
-labels:
-  project: "prestashop1"
-  environment: "development"
-```
-
-**Update `prestashop1/docker-compose.yml`:**
-```yaml
-services:
-  prestashop:
-    # ... existing config ...
-    volumes:
-      - ./blazelog:/opt/blazelog:ro
-    # Option A: Run agent in background (add to entrypoint)
-    command: >
-      bash -c "
-        /opt/blazelog/blazelog-agent -c /opt/blazelog/agent.yaml &
-        apache2-foreground
-      "
-    # Option B: Or add to existing entrypoint script
-```
-
----
-
-### PrestaShop 2
-
-**Create `prestashop2/blazelog/agent.yaml`:**
-```yaml
-server:
-  address: "host.docker.internal:9443"
-  tls:
-    enabled: false
-
-agent:
-  name: "prestashop2-server"
-  batch_size: 100
-  flush_interval: 1s
-
-sources:
-  - name: "prestashop-logs"
-    type: "prestashop"
-    path: "/var/www/html/var/logs/*.log"
-    follow: true
-
-  - name: "apache-access"
-    type: "apache"
-    path: "/var/log/apache2/access.log"
-    follow: true
-
-labels:
-  project: "prestashop2"
-  environment: "development"
-```
-
----
-
-### Magento
-
-**Create `magento/blazelog/agent.yaml`:**
-```yaml
-server:
-  address: "host.docker.internal:9443"
-  tls:
-    enabled: false
-
-agent:
-  name: "magento-server"
-  batch_size: 100
-  flush_interval: 1s
-
-sources:
-  - name: "system"
-    type: "magento"
-    path: "/var/www/html/var/log/system.log"
-    follow: true
-
-  - name: "exception"
-    type: "magento"
-    path: "/var/www/html/var/log/exception.log"
-    follow: true
-
-  - name: "debug"
-    type: "magento"
-    path: "/var/www/html/var/log/debug.log"
+  - name: "app-logs"
+    type: "raw"
+    path: "/var/log/app/*.log"
     follow: true
 
   - name: "nginx-access"
@@ -196,15 +104,31 @@ sources:
     follow: true
 
 labels:
-  project: "magento"
+  project: "app1"
   environment: "development"
+```
+
+**Update `app1/docker-compose.yml`:**
+```yaml
+services:
+  app1:
+    # ... existing config ...
+    volumes:
+      - ./blazelog:/opt/blazelog:ro
+    # Option A: Run agent in background (add to entrypoint)
+    command: >
+      bash -c "
+        /opt/blazelog/blazelog-agent -c /opt/blazelog/agent.yaml &
+        exec your-main-command
+      "
+    # Option B: Or add to existing entrypoint script
 ```
 
 ---
 
-### Custom App
+### App 2
 
-**Create `custom/blazelog/agent.yaml`:**
+**Create `app2/blazelog/agent.yaml`:**
 ```yaml
 server:
   address: "host.docker.internal:9443"
@@ -212,7 +136,66 @@ server:
     enabled: false
 
 agent:
-  name: "custom-server"
+  name: "app2-server"
+  batch_size: 100
+  flush_interval: 1s
+
+sources:
+  - name: "apache-access"
+    type: "apache"
+    path: "/var/log/apache2/access.log"
+    follow: true
+
+labels:
+  project: "app2"
+  environment: "development"
+```
+
+---
+
+### App 3
+
+**Create `app3/blazelog/agent.yaml`:**
+```yaml
+server:
+  address: "host.docker.internal:9443"
+  tls:
+    enabled: false
+
+agent:
+  name: "app3-server"
+  batch_size: 100
+  flush_interval: 1s
+
+sources:
+  - name: "nginx-access"
+    type: "nginx"
+    path: "/var/log/nginx/access.log"
+    follow: true
+
+  - name: "app-logs"
+    type: "raw"
+    path: "/var/log/app/*.log"
+    follow: true
+
+labels:
+  project: "app3"
+  environment: "development"
+```
+
+---
+
+### App 4
+
+**Create `app4/blazelog/agent.yaml`:**
+```yaml
+server:
+  address: "host.docker.internal:9443"
+  tls:
+    enabled: false
+
+agent:
+  name: "app4-server"
   batch_size: 100
   flush_interval: 1s
 
@@ -223,7 +206,7 @@ sources:
     follow: true
 
 labels:
-  project: "custom"
+  project: "app4"
   environment: "development"
 ```
 
@@ -275,7 +258,7 @@ stdout_logfile_maxbytes=0
 
 ```yaml
 services:
-  prestashop:
+  app1:
     volumes:
       - logs:/var/www/html/var/logs
 
@@ -337,10 +320,10 @@ server:
 Open http://localhost:8080
 
 Filter by project:
-- `project:prestashop1`
-- `project:prestashop2`
-- `project:magento`
-- `project:custom`
+- `project:app1`
+- `project:app2`
+- `project:app3`
+- `project:app4`
 
 ---
 
@@ -351,7 +334,7 @@ Run this to set up all containers:
 ```bash
 #!/bin/bash
 BLAZELOG_PATH="/path/to/blazelog"
-PROJECTS=("prestashop1" "prestashop2" "magento" "custom")
+PROJECTS=("app1" "app2" "app3" "app4")
 
 for proj in "${PROJECTS[@]}"; do
   mkdir -p "$proj/blazelog"
@@ -378,14 +361,14 @@ done
 
 ```bash
 # Test connectivity from inside container
-docker exec -it prestashop1 bash
+docker exec -it app1 bash
 curl -v telnet://host.docker.internal:9443
 
 # Check agent logs inside container
-docker exec -it prestashop1 cat /var/log/blazelog-agent.log
+docker exec -it app1 cat /var/log/blazelog-agent.log
 
 # Verify agent is running
-docker exec -it prestashop1 ps aux | grep blazelog
+docker exec -it app1 ps aux | grep blazelog
 
 # Check BlazeLog server logs
 docker compose -f /path/to/blazelog/deployments/docker/docker-compose.yml logs

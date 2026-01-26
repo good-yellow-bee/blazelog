@@ -163,6 +163,12 @@ rules:
 
 See [configs/](configs/) for full examples.
 
+## Documentation
+
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Configuration Reference](docs/CONFIGURATION.md)
+- [First Run (Multi-Server Demo)](docs/guides/first-run.md)
+
 ## CLI Management
 
 BlazeLog includes `blazectl` for full administrative control:
