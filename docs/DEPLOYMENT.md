@@ -659,6 +659,7 @@ curl http://localhost:9090/metrics | grep blazelog_buffer
 - [Configuration Reference](CONFIGURATION.md) - All configuration options
 - [Security Guide](SECURITY.md) - Security hardening
 - [mTLS Guide](guides/mtls.md) - Certificate setup
+- [First Run (Multi-Server Demo)](guides/first-run.md) - Agent per container setup
 - [Performance Tuning](PERFORMANCE.md) - Optimization guide
 - [Troubleshooting](TROUBLESHOOTING.md) - Common issues
 - [Architecture Overview](ARCHITECTURE.md) - System design

@@ -1,17 +1,17 @@
 # BlazeLog Docker Compose Configuration
 #
 # Profiles:
-#   dev  - Server only with SQLite (for development)
-#   prod - Full stack with ClickHouse (for production)
+#   dev  - Server + ClickHouse (for development)
+#   prod - Server + ClickHouse (for production)
 #
 # Usage:
-#   docker compose --profile dev up -d     # Development
-#   docker compose --profile prod up -d    # Production
+#   docker compose --profile dev up -d     # Development (uses server-dev.yaml)
+#   docker compose --profile prod up -d    # Production (uses server-prod.yaml)
 #
 # Required environment variables (see .env.example):
 #   BLAZELOG_MASTER_KEY  - Encryption key for sensitive data
 #   BLAZELOG_JWT_SECRET  - JWT signing secret
-#   CLICKHOUSE_PASSWORD  - ClickHouse password (prod only)
+#   CLICKHOUSE_PASSWORD  - ClickHouse password (default: devpassword for dev)
 
 services:
   server:
@@ -32,7 +32,7 @@ services:
       - BLAZELOG_MASTER_KEY=${BLAZELOG_MASTER_KEY:?required}
       - BLAZELOG_JWT_SECRET=${BLAZELOG_JWT_SECRET:?required}
       - BLAZELOG_CSRF_SECRET=${BLAZELOG_CSRF_SECRET:-}
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-devpassword}
     volumes:
       # Data persistence (SQLite database)
       - blazelog-data:/data
@@ -66,7 +66,7 @@ services:
     environment:
       - CLICKHOUSE_DB=blazelog
       - CLICKHOUSE_USER=blazelog
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:?required for prod}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-devpassword}
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
@@ -81,35 +81,11 @@ services:
     networks:
       - blazelog
     profiles:
+      - dev
       - prod
 
-  agent:
-    build:
-      context: ../..
-      dockerfile: deployments/docker/Dockerfile.agent
-      args:
-        VERSION: ${VERSION:-dev}
-        COMMIT: ${COMMIT:-unknown}
-        BUILD_TIME: ${BUILD_TIME:-unknown}
-    image: blazelog/agent:${VERSION:-latest}
-    container_name: blazelog-agent
-    environment:
-      - BLAZELOG_SERVER_ADDRESS=server:9443
-    volumes:
-      # Configuration
-      - ./config/agent.yaml:/etc/blazelog/agent.yaml:ro
-      # mTLS certificates (optional)
-      - blazelog-certs:/etc/blazelog/certs:ro
-      # Log directories to monitor (read-only)
-      - /var/log:/var/log:ro
-    depends_on:
-      server:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - blazelog
-    profiles:
-      - prod
+  # Agent is deployed separately on app servers, not with the central server.
+  # See deployments/agent/ for standalone agent deployment.
 
 volumes:
   blazelog-data:

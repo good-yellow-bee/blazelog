@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start BlazeLog server and agent for Inpost Magento development
+# Start BlazeLog server and agent for local development
 
 set -e
 
@@ -28,16 +28,37 @@ if [ -n "$missing_vars" ]; then
     exit 1
 fi
 
+SERVER_CONFIG="${BLAZELOG_SERVER_CONFIG:-configs/server.yaml}"
+AGENT_CONFIG="${BLAZELOG_AGENT_CONFIG:-configs/agent.yaml}"
+START_AGENT="${BLAZELOG_START_AGENT:-true}"
+
+if [ ! -f "$SERVER_CONFIG" ]; then
+    echo "ERROR: Server config not found: $SERVER_CONFIG"
+    exit 1
+fi
+
+if [ "$START_AGENT" = "true" ] && [ ! -f "$AGENT_CONFIG" ]; then
+    echo "ERROR: Agent config not found: $AGENT_CONFIG"
+    exit 1
+fi
+
 mkdir -p logs data
 
 # Create nginx log files if they don't exist (mounted from Docker)
-NGINX_LOGS="/Users/storm/PhpstormProjects/sii/inpost/magento-docker-configuration/logs/nginx"
-mkdir -p "$NGINX_LOGS"
-touch "$NGINX_LOGS/access.log" "$NGINX_LOGS/error.log" 2>/dev/null
+if [ -n "$BLAZELOG_NGINX_LOGS_DIR" ]; then
+    mkdir -p "$BLAZELOG_NGINX_LOGS_DIR"
+    touch "$BLAZELOG_NGINX_LOGS_DIR/access.log" "$BLAZELOG_NGINX_LOGS_DIR/error.log" 2>/dev/null
+fi
+
+if [ -f .blazelog-server.pid ] && kill -0 "$(cat .blazelog-server.pid)" 2>/dev/null; then
+    echo "ERROR: Server already running (PID: $(cat .blazelog-server.pid))."
+    echo "Stop it with: ./scripts/blazelog-stop.sh"
+    exit 1
+fi
 
 # Start server
 echo "Starting server..."
-nohup ./build/blazelog-server -c configs/server-dev.yaml > logs/server.log 2>&1 &
+nohup ./build/blazelog-server -c "$SERVER_CONFIG" > logs/server.log 2>&1 &
 echo $! > .blazelog-server.pid
 echo "Server started (PID: $!)"
 
@@ -50,16 +71,20 @@ if ! kill -0 $(cat .blazelog-server.pid) 2>/dev/null; then
     exit 1
 fi
 
-# Start agent
-echo "Starting agent..."
-nohup ./build/blazelog-agent -c configs/agent-inpost.yaml > logs/agent.log 2>&1 &
-echo $! > .blazelog-agent.pid
-echo "Agent started (PID: $!)"
+if [ "$START_AGENT" = "true" ]; then
+    # Start agent
+    echo "Starting agent..."
+    nohup ./build/blazelog-agent -c "$AGENT_CONFIG" > logs/agent.log 2>&1 &
+    echo $! > .blazelog-agent.pid
+    echo "Agent started (PID: $!)"
+fi
 
 echo ""
 echo "BlazeLog running:"
 echo "  Web UI: http://localhost:8080"
 echo "  Server log: logs/server.log"
-echo "  Agent log: logs/agent.log"
+if [ "$START_AGENT" = "true" ]; then
+    echo "  Agent log: logs/agent.log"
+fi
 echo ""
 echo "Stop with: ./scripts/blazelog-stop.sh"

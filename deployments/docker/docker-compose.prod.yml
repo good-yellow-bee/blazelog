@@ -58,23 +58,3 @@ services:
         soft: 262144
         hard: 262144
 
-  agent:
-    # Wait for server to be ready
-    environment:
-      - BLAZELOG_SERVER_ADDRESS=server:9443
-      - BLAZELOG_WAIT_FOR_SERVER=1
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 64M
-    # Production logging
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"

@@ -21,8 +21,26 @@ type Config struct {
 
 // MetricsConfig contains Prometheus metrics settings.
 type MetricsConfig struct {
-	Enabled bool   `yaml:"enabled"` // Enable metrics server (default: true)
-	Address string `yaml:"address"` // Metrics server address (default: :9090)
+	Enabled    bool   `yaml:"enabled"` // Enable metrics server (default: true)
+	Address    string `yaml:"address"` // Metrics server address (default: :9090)
+	enabledSet bool   `yaml:"-"`
+}
+
+func (m *MetricsConfig) UnmarshalYAML(value *yaml.Node) error {
+	*m = MetricsConfig{}
+	var aux struct {
+		Enabled *bool  `yaml:"enabled"`
+		Address string `yaml:"address"`
+	}
+	if err := value.Decode(&aux); err != nil {
+		return err
+	}
+	if aux.Enabled != nil {
+		m.Enabled = *aux.Enabled
+		m.enabledSet = true
+	}
+	m.Address = aux.Address
+	return nil
 }
 
 // AuthConfig contains authentication settings.
@@ -138,10 +156,12 @@ func (c *Config) setDefaults() {
 	if c.Server.HTTPAddress == "" {
 		c.Server.HTTPAddress = ":8080"
 	}
-	// Metrics defaults (enabled by default)
+	if !c.Metrics.enabledSet {
+		c.Metrics.Enabled = true
+	}
+	// Metrics address default
 	if c.Metrics.Address == "" {
 		c.Metrics.Address = ":9090"
-		c.Metrics.Enabled = true
 	}
 	if c.Database.Path == "" {
 		c.Database.Path = "./data/blazelog.db"
