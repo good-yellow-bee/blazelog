@@ -137,5 +137,11 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 func renderLoginError(w http.ResponseWriter, r *http.Request, message string) {
 	w.Header().Set("Content-Type", "text/html")
-	components.Alert("error", message).Render(r.Context(), w)
+	if r.Header.Get("HX-Request") == "true" {
+		// HTMX: return just the alert for partial replacement
+		components.Alert("error", message).Render(r.Context(), w)
+		return
+	}
+	// Non-HTMX: return full login page with error
+	pages.Login(csrf.Token(r), message).Render(r.Context(), w)
 }

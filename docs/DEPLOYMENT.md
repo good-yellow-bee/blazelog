@@ -20,6 +20,79 @@ Web UI: http://localhost:8080 | gRPC: localhost:9443 | Metrics: localhost:9090/m
 
 ---
 
+## Local Development Workflow
+
+For active development with the start/stop scripts:
+
+### Initial Setup
+
+```bash
+# 1. Create local env file with secrets (one-time)
+cat > .env.local << 'EOF'
+export BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)
+export BLAZELOG_DB_KEY=$(openssl rand -base64 32)
+export BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)
+export BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)
+EOF
+
+# 2. Source and regenerate with actual values
+source .env.local
+cat > .env.local << EOF
+export BLAZELOG_MASTER_KEY="$BLAZELOG_MASTER_KEY"
+export BLAZELOG_DB_KEY="$BLAZELOG_DB_KEY"
+export BLAZELOG_JWT_SECRET="$BLAZELOG_JWT_SECRET"
+export BLAZELOG_CSRF_SECRET="$BLAZELOG_CSRF_SECRET"
+EOF
+```
+
+### Development Cycle
+
+```bash
+# Build server (includes templ generate + tailwind build)
+make build-server
+
+# Start server + agent
+./scripts/blazelog-start.sh
+
+# Stop all
+./scripts/blazelog-stop.sh
+
+# Rebuild and restart after code changes
+make build-server && ./scripts/blazelog-stop.sh && ./scripts/blazelog-start.sh
+```
+
+### Helper Commands
+
+```bash
+# Watch mode for templates (separate terminal)
+make templ-watch
+
+# Watch mode for CSS (separate terminal)
+make web-watch
+
+# Both watchers in parallel
+make dev-web
+
+# Run tests
+make test
+
+# Lint code
+make lint
+```
+
+### Log Files
+
+- Server logs: `logs/server.log`
+- Agent logs: `logs/agent.log`
+- PID files: `.blazelog-server.pid`, `.blazelog-agent.pid`
+
+### Configs for Local Dev
+
+- Server: `configs/server-dev.yaml`
+- Agent: `configs/agent-inpost.yaml` (customize for your setup)
+
+---
+
 ## Binary Installation
 
 ### Download Pre-built Binaries

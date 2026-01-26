@@ -100,6 +100,14 @@ func (m *mockLogRepository) GetHTTPStats(ctx context.Context, filter *storage.Ag
 	return m.httpStats, nil
 }
 
+func (m *mockLogRepository) GetByID(ctx context.Context, id string) (*storage.LogRecord, error) {
+	return nil, nil
+}
+
+func (m *mockLogRepository) GetContext(ctx context.Context, filter *storage.ContextFilter) (*storage.ContextResult, error) {
+	return &storage.ContextResult{}, nil
+}
+
 // mockLogStorage implements storage.LogStorage for testing.
 type mockLogStorage struct {
 	repo *mockLogRepository

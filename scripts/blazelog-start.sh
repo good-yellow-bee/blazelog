@@ -5,6 +5,11 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Source .env.local if it exists
+if [ -f .env.local ]; then
+    source .env.local
+fi
+
 # Require all secrets to be set - no defaults for security
 missing_vars=""
 [ -z "$BLAZELOG_MASTER_KEY" ] && missing_vars="$missing_vars BLAZELOG_MASTER_KEY"

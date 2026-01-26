@@ -40,6 +40,12 @@ type LogRepository interface {
 	// InsertBatch inserts multiple log entries in a single batch.
 	InsertBatch(ctx context.Context, entries []*LogRecord) error
 
+	// GetByID retrieves a single log entry by ID.
+	GetByID(ctx context.Context, id string) (*LogRecord, error)
+
+	// GetContext retrieves logs surrounding a target log entry.
+	GetContext(ctx context.Context, filter *ContextFilter) (*ContextResult, error)
+
 	// Query retrieves logs matching the given filters.
 	Query(ctx context.Context, filter *LogFilter) (*LogQueryResult, error)
 
@@ -207,4 +213,27 @@ type HTTPStatsResult struct {
 type URICount struct {
 	URI   string
 	Count int64
+}
+
+// ContextFilter defines parameters for fetching logs surrounding a target log.
+type ContextFilter struct {
+	TargetID     string    // Anchor log UUID
+	ProjectID    string    // For access filtering
+	AgentID      string    // Group by same agent
+	Timestamp    time.Time // Anchor timestamp
+	Before       int       // Count before (max 50)
+	After        int       // Count after (max 50)
+	BeforeCursor string    // Optional: timestamp:id for pagination
+	AfterCursor  string    // Optional: timestamp:id for pagination
+}
+
+// ContextResult contains logs surrounding a target log entry.
+type ContextResult struct {
+	Target        *LogRecord   // The anchor log
+	Before        []*LogRecord // Logs before anchor (oldest first)
+	After         []*LogRecord // Logs after anchor (oldest first)
+	HasMoreBefore bool         // More logs available before
+	HasMoreAfter  bool         // More logs available after
+	BeforeCursor  string       // Cursor for next before query
+	AfterCursor   string       // Cursor for next after query
 }

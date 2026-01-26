@@ -104,6 +104,23 @@ templ LogFilters() {
 			</div>
 		</div>
 
+		<!-- Second row: Project filter -->
+		<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+			<div>
+				<label class="label">Project</label>
+				<select
+					x-model="filters.project_id"
+					@change="applyFilters()"
+					class="select-field"
+				>
+					<option value="">All Projects</option>
+					<template x-for="project in projects" :key="project.id">
+						<option :value="project.id" x-text="project.name"></option>
+					</template>
+				</select>
+			</div>
+		</div>
+
 		<!-- Advanced Filters (collapsible) -->
 		<div x-show="showAdvanced" x-collapse class="mt-4 pt-4 border-t border-slate-200/70">
 			<!-- Filter Expression -->
@@ -315,132 +332,260 @@ templ LogDetailModal() {
 		x-transition:leave-start="opacity-100"
 		x-transition:leave-end="opacity-0"
 		class="fixed inset-0 z-50 overflow-y-auto"
-		@keydown.escape.window="selectedLog = null"
+		@keydown.escape.window="selectedLog = null; modalView = 'detail'"
 	>
 		<div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
 			<!-- Backdrop -->
-			<div class="fixed inset-0 bg-slate-900/40 transition-opacity" @click="selectedLog = null"></div>
+			<div class="fixed inset-0 bg-slate-900/40 transition-opacity" @click="selectedLog = null; modalView = 'detail'"></div>
 
 			<!-- Modal -->
 			<div class="relative z-10 inline-block align-bottom panel text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-				<div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-					<!-- Header -->
-					<div class="flex justify-between items-start mb-4">
-						<h3 class="text-lg font-semibold text-slate-900">Log Details</h3>
-						<button @click="selectedLog = null" class="text-slate-400 hover:text-slate-600">
+				<!-- ============ DETAIL VIEW ============ -->
+				<div x-show="modalView === 'detail'">
+					<div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+						<!-- Header -->
+						<div class="flex justify-between items-start mb-4">
+							<h3 class="text-lg font-semibold text-slate-900">Log Details</h3>
+						<button type="button" @click="selectedLog = null; modalView = 'detail'" class="text-slate-400 hover:text-slate-600">
+								<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+								</svg>
+							</button>
+						</div>
+
+						<!-- Metadata Grid -->
+						<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+							<div>
+								<span class="text-slate-500">Timestamp</span>
+								<p class="font-mono" x-text="selectedLog?.timestamp"></p>
+							</div>
+							<div>
+								<span class="text-slate-500">Level</span>
+								<p>
+									<span
+										class="badge"
+										:class="levelClass(selectedLog?.level)"
+										x-text="selectedLog?.level?.toUpperCase()"
+									></span>
+								</p>
+							</div>
+							<div>
+								<span class="text-slate-500">Source</span>
+								<p x-text="selectedLog?.source || '-'"></p>
+							</div>
+							<div>
+								<span class="text-slate-500">Type</span>
+								<p x-text="selectedLog?.type || '-'"></p>
+							</div>
+							<div>
+								<span class="text-slate-500">Agent ID</span>
+								<p class="font-mono text-xs" x-text="selectedLog?.agent_id || '-'"></p>
+							</div>
+							<div>
+								<span class="text-slate-500">File Path</span>
+								<p class="font-mono text-xs truncate" x-text="selectedLog?.file_path || '-'"></p>
+							</div>
+							<div>
+								<span class="text-slate-500">Line</span>
+								<p x-text="selectedLog?.line_number || '-'"></p>
+							</div>
+							<div>
+								<span class="text-slate-500">ID</span>
+								<p class="font-mono text-xs truncate" x-text="selectedLog?.id"></p>
+							</div>
+						</div>
+
+						<!-- HTTP Info (if present) -->
+						<template x-if="selectedLog?.http_status">
+							<div class="mb-4 p-3 panel-soft">
+								<h4 class="text-sm font-semibold text-slate-700 mb-2">HTTP Request</h4>
+								<div class="grid grid-cols-3 gap-4 text-sm">
+									<div>
+										<span class="text-slate-500">Method</span>
+										<p class="font-mono" x-text="selectedLog?.http_method"></p>
+									</div>
+									<div>
+										<span class="text-slate-500">Status</span>
+										<p class="font-mono" x-text="selectedLog?.http_status"></p>
+									</div>
+									<div>
+										<span class="text-slate-500">URI</span>
+										<p class="font-mono text-xs truncate" x-text="selectedLog?.uri"></p>
+									</div>
+								</div>
+							</div>
+						</template>
+
+						<!-- Message -->
+						<div class="mb-4">
+							<h4 class="text-sm font-semibold text-slate-700 mb-2">Message</h4>
+							<pre id="log-message-display" class="bg-slate-950 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap" x-text="selectedLog?.message"></pre>
+						</div>
+
+						<!-- Fields (if any) -->
+						<template x-if="selectedLog?.fields && Object.keys(selectedLog.fields).length > 0">
+							<div class="mb-4">
+								<h4 class="text-sm font-semibold text-slate-700 mb-2">Fields</h4>
+								<pre class="bg-slate-50/70 p-4 rounded-lg overflow-x-auto text-sm font-mono" x-text="JSON.stringify(selectedLog.fields, null, 2)"></pre>
+							</div>
+						</template>
+
+						<!-- Labels (if any) -->
+						<template x-if="selectedLog?.labels && Object.keys(selectedLog.labels).length > 0">
+							<div>
+								<h4 class="text-sm font-semibold text-slate-700 mb-2">Labels</h4>
+								<div id="log-labels-container" class="flex flex-wrap gap-2">
+									<!-- Labels populated via safe DOM methods -->
+								</div>
+							</div>
+						</template>
+					</div>
+
+					<!-- Detail Footer -->
+					<div class="bg-white/70 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200/70">
+					<button
+						type="button"
+						@click="openContext(selectedLog)"
+						class="btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm"
+					>
+						View Context
+					</button>
+					<button
+						type="button"
+						@click="copyLog()"
+						class="btn-secondary w-full sm:ml-3 sm:w-auto sm:text-sm mt-3 sm:mt-0"
+					>
+						Copy JSON
+					</button>
+					<button
+						type="button"
+						@click="selectedLog = null; modalView = 'detail'"
+						class="btn-secondary mt-3 w-full sm:mt-0 sm:w-auto sm:text-sm"
+					>
+						Close
+					</button>
+					</div>
+				</div>
+
+				<!-- ============ CONTEXT VIEW ============ -->
+				<div x-show="modalView === 'context'">
+					<div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4 max-h-[70vh] overflow-y-auto">
+						<!-- Header -->
+						<div class="flex justify-between items-start mb-4">
+							<div>
+								<h3 class="text-lg font-semibold text-slate-900">Log Context</h3>
+								<p class="text-sm text-slate-500" x-text="contextPanel.anchorLog ? 'Agent: ' + (contextPanel.anchorLog.agent_id || 'unknown').slice(0, 8) + '...' : ''"></p>
+							</div>
+						<button type="button" @click="selectedLog = null; modalView = 'detail'" class="text-slate-400 hover:text-slate-600">
 							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 							</svg>
 						</button>
 					</div>
 
-					<!-- Metadata Grid -->
-					<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
-						<div>
-							<span class="text-slate-500">Timestamp</span>
-							<p class="font-mono" x-text="selectedLog?.timestamp"></p>
-						</div>
-						<div>
-							<span class="text-slate-500">Level</span>
-							<p>
-								<span
-									class="badge"
-									:class="levelClass(selectedLog?.level)"
-									x-text="selectedLog?.level?.toUpperCase()"
-								></span>
-							</p>
-						</div>
-						<div>
-							<span class="text-slate-500">Source</span>
-							<p x-text="selectedLog?.source || '-'"></p>
-						</div>
-						<div>
-							<span class="text-slate-500">Type</span>
-							<p x-text="selectedLog?.type || '-'"></p>
-						</div>
-						<div>
-							<span class="text-slate-500">Agent ID</span>
-							<p class="font-mono text-xs" x-text="selectedLog?.agent_id || '-'"></p>
-						</div>
-						<div>
-							<span class="text-slate-500">File Path</span>
-							<p class="font-mono text-xs truncate" x-text="selectedLog?.file_path || '-'"></p>
-						</div>
-						<div>
-							<span class="text-slate-500">Line</span>
-							<p x-text="selectedLog?.line_number || '-'"></p>
-						</div>
-						<div>
-							<span class="text-slate-500">ID</span>
-							<p class="font-mono text-xs truncate" x-text="selectedLog?.id"></p>
-						</div>
-					</div>
+					<div x-show="contextPanel.error" class="mb-4 p-3 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg" x-text="contextPanel.error"></div>
 
-					<!-- HTTP Info (if present) -->
-					<template x-if="selectedLog?.http_status">
-						<div class="mb-4 p-3 panel-soft">
-							<h4 class="text-sm font-semibold text-slate-700 mb-2">HTTP Request</h4>
-							<div class="grid grid-cols-3 gap-4 text-sm">
-								<div>
-									<span class="text-slate-500">Method</span>
-									<p class="font-mono" x-text="selectedLog?.http_method"></p>
-								</div>
-								<div>
-									<span class="text-slate-500">Status</span>
-									<p class="font-mono" x-text="selectedLog?.http_status"></p>
-								</div>
-								<div>
-									<span class="text-slate-500">URI</span>
-									<p class="font-mono text-xs truncate" x-text="selectedLog?.uri"></p>
+					<!-- Loading -->
+					<div x-show="contextPanel.loading" class="flex items-center justify-center py-8">
+						<svg class="animate-spin h-8 w-8 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+						</div>
+
+						<div x-show="!contextPanel.loading">
+							<!-- Load Earlier Button -->
+							<div x-show="contextPanel.hasMoreBefore" class="mb-4 text-center">
+								<button
+									@click="loadMoreBefore()"
+									:disabled="contextPanel.loadingMore"
+									class="btn-secondary text-sm"
+								>
+									<span x-show="contextPanel.loadingMore" class="mr-2">
+										<svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+										</svg>
+									</span>
+									Load 10 earlier
+								</button>
+							</div>
+
+							<!-- Before Logs -->
+							<div id="context-before-logs" class="space-y-2">
+								<!-- Populated by JavaScript -->
+							</div>
+
+							<!-- Anchor Log (highlighted) -->
+							<div x-show="contextPanel.anchorLog" class="my-4 p-3 rounded-r-lg anchor-highlight">
+								<div class="flex items-start justify-between">
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2 mb-1">
+											<span class="font-mono text-xs text-slate-500" x-text="formatTimestamp(contextPanel.anchorLog?.timestamp)"></span>
+											<span
+												class="badge"
+												:class="levelClass(contextPanel.anchorLog?.level)"
+												x-text="(contextPanel.anchorLog?.level || 'unknown').toUpperCase()"
+											></span>
+											<span class="text-xs text-teal-700 font-semibold">ANCHOR</span>
+										</div>
+										<p class="text-sm text-slate-900 whitespace-pre-wrap break-words" x-text="contextPanel.anchorLog?.message"></p>
+									</div>
 								</div>
 							</div>
-						</div>
-					</template>
 
-					<!-- Message -->
-					<div class="mb-4">
-						<h4 class="text-sm font-semibold text-slate-700 mb-2">Message</h4>
-						<pre id="log-message-display" class="bg-slate-950 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap" x-text="selectedLog?.message"></pre>
-					</div>
-
-					<!-- Fields (if any) -->
-					<template x-if="selectedLog?.fields && Object.keys(selectedLog.fields).length > 0">
-						<div class="mb-4">
-							<h4 class="text-sm font-semibold text-slate-700 mb-2">Fields</h4>
-							<pre class="bg-slate-50/70 p-4 rounded-lg overflow-x-auto text-sm font-mono" x-text="JSON.stringify(selectedLog.fields, null, 2)"></pre>
-						</div>
-					</template>
-
-					<!-- Labels (if any) -->
-					<template x-if="selectedLog?.labels && Object.keys(selectedLog.labels).length > 0">
-						<div>
-							<h4 class="text-sm font-semibold text-slate-700 mb-2">Labels</h4>
-							<div id="log-labels-container" class="flex flex-wrap gap-2">
-								<!-- Labels populated via safe DOM methods -->
+							<!-- After Logs -->
+							<div id="context-after-logs" class="space-y-2">
+								<!-- Populated by JavaScript -->
 							</div>
-						</div>
-					</template>
+
+							<!-- Load Later Button -->
+							<div x-show="contextPanel.hasMoreAfter" class="mt-4 text-center">
+								<button
+									@click="loadMoreAfter()"
+									:disabled="contextPanel.loadingMore"
+									class="btn-secondary text-sm"
+								>
+									<span x-show="contextPanel.loadingMore" class="mr-2">
+										<svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+										</svg>
+									</span>
+									Load 10 later
+								</button>
+							</div>
+
+					<!-- Empty State -->
+					<div x-show="!contextPanel.beforeLogs.length && !contextPanel.afterLogs.length && !contextPanel.loading && !contextPanel.error" class="text-center py-8 text-slate-500">
+						No surrounding logs found within 1-hour window
+					</div>
 				</div>
+			</div>
 
-				<!-- Footer -->
-				<div class="bg-white/70 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200/70">
-					<button
-						@click="copyLog()"
-						class="btn-secondary w-full sm:ml-3 sm:w-auto sm:text-sm"
-					>
-						Copy JSON
-					</button>
-					<button
-						@click="selectedLog = null"
-						class="btn-secondary mt-3 w-full sm:mt-0 sm:w-auto sm:text-sm"
-					>
-						Close
-					</button>
+			<!-- Context Footer -->
+			<div class="bg-white/70 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200/70">
+				<button
+					type="button"
+					@click="backToDetails()"
+					class="btn-primary w-full sm:ml-3 sm:w-auto sm:text-sm"
+				>
+					← Back to Details
+				</button>
+				<button
+					type="button"
+					@click="selectedLog = null; modalView = 'detail'"
+					class="btn-secondary mt-3 w-full sm:mt-0 sm:w-auto sm:text-sm"
+				>
+					Close
+				</button>
+					</div>
 				</div>
 			</div>
 		</div>
 	</div>
 }
+
 
 templ ExportModal() {
 	<div
@@ -524,6 +669,7 @@ templ LogsScript() {
 		return {
 			// State
 			logs: [],
+			projects: [],
 			page: 1,
 			perPage: 50,
 			total: 0,
@@ -532,6 +678,7 @@ templ LogsScript() {
 			isLive: false,
 			eventSource: null,
 			selectedLog: null,
+			modalView: 'detail',  // 'detail' | 'context'
 			showAdvanced: false,
 			showFilterHelp: false,
 			filterError: null,
@@ -543,13 +690,29 @@ templ LogsScript() {
 				q: '',
 				range: '24h',
 				level: '',
+				project_id: '',
 				source: '',
 				type: '',
 				search_mode: 'token',
 				filter: ''
 			},
+			// Context state
+			contextPanel: {
+				anchorLog: null,
+				beforeLogs: [],
+				afterLogs: [],
+				hasMoreBefore: false,
+				hasMoreAfter: false,
+				cursorBefore: null,
+				cursorAfter: null,
+				loading: false,
+				loadingMore: false,
+				error: null,
+				expandedIds: new Set(),
+			},
 
 			init() {
+				this.fetchProjects();
 				this.loadLogs();
 				this.$watch('selectedLog', (log) => {
 					if (log && log.labels) {
@@ -573,6 +736,21 @@ templ LogsScript() {
 				return { start: start.toISOString(), end: now.toISOString() };
 			},
 
+			async fetchProjects() {
+				try {
+					const res = await fetch('/logs/projects');
+					if (!res.ok) {
+						console.error('Failed to fetch projects:', res.status, res.statusText);
+						this.projects = [];
+						return;
+					}
+					this.projects = await res.json();
+				} catch (err) {
+					console.error('Failed to fetch projects:', err);
+					this.projects = [];
+				}
+			},
+
 			buildQueryParams() {
 				const { start, end } = this.getTimeRange();
 				const params = new URLSearchParams({
@@ -581,6 +759,8 @@ templ LogsScript() {
 					page: this.page.toString(),
 					per_page: this.perPage.toString()
 				});
+				// Project filter applies regardless of DSL mode
+				if (this.filters.project_id) params.set('project_id', this.filters.project_id);
 				// DSL filter takes precedence if set
 				if (this.filters.filter) {
 					params.set('filter', this.filters.filter);
@@ -716,9 +896,10 @@ templ LogsScript() {
 				}
 			},
 
-			selectLog(index) {
-				this.selectedLog = this.logs[index];
-			},
+		selectLog(index) {
+			this.selectedLog = this.logs[index];
+			this.modalView = 'detail';
+		},
 
 			copyLog() {
 				if (this.selectedLog) {
@@ -738,7 +919,7 @@ templ LogsScript() {
 
 			resetFilters() {
 				this.filters = {
-					q: '', range: '24h', level: '',
+					q: '', range: '24h', level: '', project_id: '',
 					source: '', type: '', search_mode: 'token',
 					filter: ''
 				};
@@ -772,6 +953,7 @@ templ LogsScript() {
 				this.isLive = true;
 				const { start } = this.getTimeRange();
 				const params = new URLSearchParams({ start });
+				if (this.filters.project_id) params.set('project_id', this.filters.project_id);
 				if (this.filters.q) params.set('q', this.filters.q);
 				if (this.filters.level) params.set('level', this.filters.level);
 				if (this.filters.type) params.set('type', this.filters.type);
@@ -838,6 +1020,7 @@ templ LogsScript() {
 						format: this.exportFormat,
 						limit: this.exportLimit
 					});
+					if (this.filters.project_id) params.set('project_id', this.filters.project_id);
 					if (this.filters.q) params.set('q', this.filters.q);
 					if (this.filters.level) params.set('level', this.filters.level);
 					if (this.filters.type) params.set('type', this.filters.type);
@@ -859,6 +1042,224 @@ templ LogsScript() {
 				} finally {
 					this.exporting = false;
 				}
+			},
+
+			// Context methods
+		async openContext(log) {
+			if (!log) return;
+			this.modalView = 'context';
+			this.contextPanel.anchorLog = log;
+			this.contextPanel.loading = true;
+			this.contextPanel.beforeLogs = [];
+			this.contextPanel.afterLogs = [];
+			this.contextPanel.hasMoreBefore = false;
+			this.contextPanel.hasMoreAfter = false;
+			this.contextPanel.cursorBefore = null;
+			this.contextPanel.cursorAfter = null;
+			this.contextPanel.error = null;
+			this.contextPanel.expandedIds = new Set();
+
+			try {
+				const res = await fetch(`/logs/${log.id}/context?before=10&after=10`);
+				if (!res.ok) throw new Error('Failed to fetch context');
+				const data = await res.json();
+				const ctx = data.data || data;
+				if (!ctx) throw new Error('Invalid context response');
+				const target = ctx.target || log;
+
+				this.contextPanel.anchorLog = target;
+				this.selectedLog = target;
+				this.contextPanel.beforeLogs = ctx.before || [];
+				this.contextPanel.afterLogs = ctx.after || [];
+				this.contextPanel.hasMoreBefore = ctx.has_more_before || false;
+				this.contextPanel.hasMoreAfter = ctx.has_more_after || false;
+				this.contextPanel.cursorBefore = ctx.before_cursor || null;
+				this.contextPanel.cursorAfter = ctx.after_cursor || null;
+
+				this.renderContextLogs();
+			} catch (err) {
+				console.error('Failed to load context:', err);
+				this.contextPanel.error = 'Failed to load context logs.';
+				this.contextPanel.beforeLogs = [];
+				this.contextPanel.afterLogs = [];
+				this.contextPanel.hasMoreBefore = false;
+				this.contextPanel.hasMoreAfter = false;
+				this.contextPanel.cursorBefore = null;
+				this.contextPanel.cursorAfter = null;
+				this.renderContextLogs();
+			} finally {
+				this.contextPanel.loading = false;
+			}
+		},
+
+			backToDetails() {
+				this.modalView = 'detail';
+			},
+
+		async loadMoreBefore() {
+			if (!this.contextPanel.anchorLog || this.contextPanel.loadingMore) return;
+			this.contextPanel.loadingMore = true;
+			this.contextPanel.error = null;
+
+			try {
+				const params = new URLSearchParams({ before: '10', after: '0' });
+				if (this.contextPanel.cursorBefore) {
+					params.set('before_cursor', this.contextPanel.cursorBefore);
+				}
+
+				const res = await fetch(`/logs/${this.contextPanel.anchorLog.id}/context?${params}`);
+				if (!res.ok) throw new Error('Failed to load more');
+				const data = await res.json();
+				const ctx = data.data || data;
+				if (!ctx) throw new Error('Invalid context response');
+
+				// Prepend new logs
+				this.contextPanel.beforeLogs = [...(ctx.before || []), ...this.contextPanel.beforeLogs];
+				this.contextPanel.hasMoreBefore = ctx.has_more_before || false;
+					this.contextPanel.cursorBefore = ctx.before_cursor || null;
+
+					this.renderContextLogs();
+			} catch (err) {
+				console.error('Failed to load more before:', err);
+				this.contextPanel.error = 'Failed to load earlier logs.';
+			} finally {
+				this.contextPanel.loadingMore = false;
+			}
+		},
+
+		async loadMoreAfter() {
+			if (!this.contextPanel.anchorLog || this.contextPanel.loadingMore) return;
+			this.contextPanel.loadingMore = true;
+			this.contextPanel.error = null;
+
+			try {
+				const params = new URLSearchParams({ before: '0', after: '10' });
+				if (this.contextPanel.cursorAfter) {
+					params.set('after_cursor', this.contextPanel.cursorAfter);
+				}
+
+				const res = await fetch(`/logs/${this.contextPanel.anchorLog.id}/context?${params}`);
+				if (!res.ok) throw new Error('Failed to load more');
+				const data = await res.json();
+				const ctx = data.data || data;
+				if (!ctx) throw new Error('Invalid context response');
+
+				// Append new logs
+				this.contextPanel.afterLogs = [...this.contextPanel.afterLogs, ...(ctx.after || [])];
+				this.contextPanel.hasMoreAfter = ctx.has_more_after || false;
+					this.contextPanel.cursorAfter = ctx.after_cursor || null;
+
+					this.renderContextLogs();
+			} catch (err) {
+				console.error('Failed to load more after:', err);
+				this.contextPanel.error = 'Failed to load later logs.';
+			} finally {
+				this.contextPanel.loadingMore = false;
+			}
+		},
+
+			toggleExpanded(logId) {
+				if (this.contextPanel.expandedIds.has(logId)) {
+					this.contextPanel.expandedIds.delete(logId);
+				} else {
+					this.contextPanel.expandedIds.add(logId);
+				}
+				this.renderContextLogs();
+			},
+
+			renderContextLogs() {
+				const beforeContainer = document.getElementById('context-before-logs');
+				const afterContainer = document.getElementById('context-after-logs');
+
+				if (beforeContainer) {
+					this.renderContextLogList(beforeContainer, this.contextPanel.beforeLogs);
+				}
+				if (afterContainer) {
+					this.renderContextLogList(afterContainer, this.contextPanel.afterLogs);
+				}
+			},
+
+			renderContextLogList(container, logs) {
+				while (container.firstChild) {
+					container.removeChild(container.firstChild);
+				}
+
+				const anchorId = this.contextPanel.anchorLog?.id;
+
+				logs.forEach((log) => {
+					const isExpanded = this.contextPanel.expandedIds.has(log.id);
+					const isAnchor = log.id === anchorId;
+					const div = document.createElement('div');
+					if (isAnchor) {
+						div.className = 'p-2 rounded-lg cursor-pointer transition-colors anchor-highlight';
+					} else {
+						div.className = 'p-2 bg-slate-50/70 rounded-lg cursor-pointer hover:bg-slate-100/70 transition-colors';
+					}
+					div.addEventListener('click', () => this.toggleExpanded(log.id));
+
+					// Header row
+					const header = document.createElement('div');
+					header.className = 'flex items-center gap-2 mb-1';
+
+					const tsSpan = document.createElement('span');
+					tsSpan.className = 'font-mono text-xs text-slate-500';
+					tsSpan.textContent = this.formatTimestamp(log.timestamp);
+					header.appendChild(tsSpan);
+
+					const levelSpan = document.createElement('span');
+					levelSpan.className = 'badge ' + this.levelClass(log.level);
+					levelSpan.textContent = (log.level || 'unknown').toUpperCase();
+					header.appendChild(levelSpan);
+
+					// Add ANCHOR badge if this is the anchor log
+					if (isAnchor) {
+						const anchorBadge = document.createElement('span');
+						anchorBadge.className = 'text-xs text-teal-700 font-semibold bg-teal-200 px-2 py-0.5 rounded';
+						anchorBadge.textContent = 'ANCHOR';
+						header.appendChild(anchorBadge);
+					}
+
+					div.appendChild(header);
+
+					// Message
+					const msg = document.createElement('p');
+					msg.className = 'text-sm text-slate-900 ' + (isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate');
+					msg.textContent = log.message || '';
+					div.appendChild(msg);
+
+					// Expanded details
+					if (isExpanded) {
+						const details = document.createElement('div');
+						details.className = 'mt-2 pt-2 border-t border-slate-200 text-xs text-slate-600 space-y-1';
+
+						const infoItems = [
+							['Source', log.source],
+							['Type', log.type],
+							['File', log.file_path],
+							['Agent', log.agent_id ? log.agent_id.slice(0, 8) + '...' : '']
+						];
+
+						infoItems.forEach(([label, value]) => {
+							if (value) {
+								const row = document.createElement('div');
+								row.className = 'flex gap-2';
+								const labelSpan = document.createElement('span');
+								labelSpan.className = 'font-semibold';
+								labelSpan.textContent = label + ':';
+								const valueSpan = document.createElement('span');
+								valueSpan.className = 'font-mono';
+								valueSpan.textContent = value;
+								row.appendChild(labelSpan);
+								row.appendChild(valueSpan);
+								details.appendChild(row);
+							}
+						});
+
+						div.appendChild(details);
+					}
+
+					container.appendChild(div);
+				});
 			}
 		};
 	}

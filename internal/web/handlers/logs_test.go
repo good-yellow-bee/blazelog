@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -32,6 +33,20 @@ func TestShowLogs_WithSession(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "fixed top-0 bottom-0 left-0") {
+		t.Errorf("response missing fixed sidebar positioning classes")
+	}
+
+	infoItemsIndented := regexp.MustCompile(`\n\t{6}const infoItems = \[`)
+	if !infoItemsIndented.MatchString(body) {
+		t.Errorf("response missing properly indented infoItems block")
+	}
+
+	emptyAnchorBlock := regexp.MustCompile(`if \(isAnchor\) \{\s*\}`)
+	if emptyAnchorBlock.MatchString(body) {
+		t.Errorf("response contains empty isAnchor block")
 	}
 }
 

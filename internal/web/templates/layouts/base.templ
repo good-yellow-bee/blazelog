@@ -11,10 +11,22 @@ templ Base(title string, user *session.Session, csrfToken string) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<meta name="color-scheme" content="light dark"/>
 			<meta name="csrf-token" content={ csrfToken }/>
 			<title>{ title } - BlazeLog</title>
 			<link rel="icon" href="/static/favicon.ico"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
+			<script>
+				// FOUC-safe theme initialization - runs before page renders
+				(function() {
+					const stored = localStorage.getItem('theme');
+					const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					const isDark = stored === 'dark' || (!stored && prefersDark);
+					if (isDark) {
+						document.documentElement.classList.add('dark');
+					}
+				})();
+			</script>
 			<script src="/static/vendor/htmx.min.js"></script>
 			<script defer src="/static/vendor/alpine-collapse.min.js"></script>
 			<script defer src="/static/vendor/alpine.min.js"></script>
@@ -31,11 +43,11 @@ templ Base(title string, user *session.Session, csrfToken string) {
 			</script>
 			@components.SidebarScript()
 		</head>
-		<body class="min-h-screen text-slate-900" x-data>
+		<body class="min-h-screen text-slate-900 dark:text-slate-100" x-data>
 			if user != nil {
 				<div class="flex min-h-screen">
 					@components.Sidebar(user, csrfToken)
-					<main class="flex-1 md:ml-0 p-4 md:p-8 pt-16 md:pt-8 page-enter">
+				<main :class="$store.sidebar.open ? 'md:pl-64' : ''" class="flex-1 p-4 md:p-8 pt-16 md:pt-8 page-enter">
 						<div class="max-w-7xl mx-auto">
 							{ children... }
 						</div>

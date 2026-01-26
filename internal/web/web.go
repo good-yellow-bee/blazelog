@@ -45,7 +45,10 @@ func (s *Server) StaticFS() http.Handler {
 		// Unrecoverable init error - server cannot function without static assets
 		panic(fmt.Sprintf("failed to create static FS: %v", err))
 	}
-	return http.FileServer(http.FS(sub))
+	fileServer := http.FileServer(http.FS(sub))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fileServer.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) Sessions() *session.Store {

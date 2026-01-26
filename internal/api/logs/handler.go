@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
 	"github.com/good-yellow-bee/blazelog/internal/query"
 	"github.com/good-yellow-bee/blazelog/internal/storage"
@@ -142,6 +143,17 @@ type HTTPStatsResponse struct {
 type URIResponse struct {
 	URI   string `json:"uri"`
 	Count int64  `json:"count"`
+}
+
+// ContextResponse contains logs surrounding a target log entry.
+type ContextResponse struct {
+	Target        *LogResponse   `json:"target"`
+	Before        []*LogResponse `json:"before"`
+	After         []*LogResponse `json:"after"`
+	HasMoreBefore bool           `json:"has_more_before"`
+	HasMoreAfter  bool           `json:"has_more_after"`
+	BeforeCursor  string         `json:"before_cursor,omitempty"`
+	AfterCursor   string         `json:"after_cursor,omitempty"`
 }
 
 // Query handles GET /api/v1/logs - query logs with filters and pagination.
@@ -714,6 +726,118 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// Context handles GET /api/v1/logs/{id}/context - surrounding logs.
+func (h *Handler) Context(w http.ResponseWriter, r *http.Request) {
+	if h.logStorage == nil {
+		jsonError(w, http.StatusServiceUnavailable, errCodeInternalError, "log storage not configured")
+		return
+	}
+
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		jsonError(w, http.StatusBadRequest, errCodeBadRequest, "log id is required")
+		return
+	}
+
+	q := r.URL.Query()
+
+	// Parse before/after counts
+	before := parseIntDefault(q.Get("before"), 10)
+	if before > 50 {
+		before = 50
+	}
+	after := parseIntDefault(q.Get("after"), 10)
+	if after > 50 {
+		after = 50
+	}
+
+	beforeCursor := q.Get("before_cursor")
+	afterCursor := q.Get("after_cursor")
+
+	// Get anchor log first
+	anchor, err := h.logStorage.Logs().GetByID(ctx, id)
+	if err != nil {
+		log.Printf("get log by id error: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if anchor == nil {
+		jsonError(w, http.StatusNotFound, "NOT_FOUND", "log not found")
+		return
+	}
+
+	// Check project access
+	if h.store != nil {
+		userID := middleware.GetUserID(ctx)
+		role := middleware.GetRole(ctx)
+		access, err := middleware.GetProjectAccess(ctx, userID, role, h.store)
+		if err != nil {
+			log.Printf("project access error: %v", err)
+			jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+			return
+		}
+		if !access.CanAccessProject(anchor.ProjectID) {
+			// Don't leak existence - return 404
+			jsonError(w, http.StatusNotFound, "NOT_FOUND", "log not found")
+			return
+		}
+	}
+
+	// Fetch context
+	result, err := h.logStorage.Logs().GetContext(ctx, &storage.ContextFilter{
+		TargetID:     id,
+		ProjectID:    anchor.ProjectID,
+		AgentID:      anchor.AgentID,
+		Timestamp:    anchor.Timestamp,
+		Before:       before,
+		After:        after,
+		BeforeCursor: beforeCursor,
+		AfterCursor:  afterCursor,
+	})
+	if err != nil {
+		log.Printf("get context error: %v", err)
+		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		return
+	}
+	if result == nil || result.Target == nil {
+		jsonError(w, http.StatusNotFound, "NOT_FOUND", "log not found")
+		return
+	}
+
+	// Convert to response
+	resp := &ContextResponse{
+		Target:        recordToResponse(result.Target),
+		Before:        make([]*LogResponse, len(result.Before)),
+		After:         make([]*LogResponse, len(result.After)),
+		HasMoreBefore: result.HasMoreBefore,
+		HasMoreAfter:  result.HasMoreAfter,
+		BeforeCursor:  result.BeforeCursor,
+		AfterCursor:   result.AfterCursor,
+	}
+
+	for i, entry := range result.Before {
+		resp.Before[i] = recordToResponse(entry)
+	}
+	for i, entry := range result.After {
+		resp.After[i] = recordToResponse(entry)
+	}
+
+	jsonOK(w, resp)
+}
+
+// parseIntDefault parses an int from string, returning default if empty/invalid.
+func parseIntDefault(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 {
+		return def
+	}
+	return v
 }
 
 // recordToResponse converts a LogRecord to LogResponse.
