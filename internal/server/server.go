@@ -139,8 +139,9 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
-// Shutdown gracefully stops the server.
+// Shutdown gracefully stops the server and cleans up resources.
 func (s *Server) Shutdown() {
+	s.handler.Stop()
 	s.grpcServer.GracefulStop()
 }
 

@@ -17,6 +17,13 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// shellQuote returns a shell-safe quoted string using single quotes.
+// Single quotes prevent all shell expansion ($, `, \, etc.).
+// Any embedded single quotes are escaped via the pattern: 'text'"'"'more'.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
 // ClientConfig holds SSH client configuration.
 type ClientConfig struct {
 	// Host is the SSH server address (host:port).
@@ -234,8 +241,8 @@ func (c *Client) ReadFile(ctx context.Context, path string) ([]byte, error) {
 	}
 	defer session.Close()
 
-	// Use cat to read file contents
-	cmd := fmt.Sprintf("cat %q", path)
+	// Use cat to read file contents (shellQuote prevents command injection)
+	cmd := fmt.Sprintf("cat %s", shellQuote(path))
 	output, err := session.Output(cmd)
 	duration := time.Since(start)
 
@@ -268,8 +275,8 @@ func (c *Client) ReadFileRange(ctx context.Context, path string, offset, limit i
 	}
 	defer session.Close()
 
-	// Use tail with byte offset to read from specific position
-	cmd := fmt.Sprintf("tail -c +%d %q | head -c %d", offset+1, path, limit)
+	// Use tail with byte offset to read from specific position (shellQuote prevents command injection)
+	cmd := fmt.Sprintf("tail -c +%d %s | head -c %d", offset+1, shellQuote(path), limit)
 	output, err := session.Output(cmd)
 	duration := time.Since(start)
 
@@ -302,8 +309,8 @@ func (c *Client) FileInfo(ctx context.Context, path string) (*RemoteFileInfo, er
 	}
 	defer session.Close()
 
-	// Use stat to get file info (size, mtime, inode)
-	cmd := fmt.Sprintf("stat -c '%%s %%Y %%i' %q 2>/dev/null || stat -f '%%z %%m %%i' %q", path, path)
+	// Use stat to get file info (size, mtime, inode) - shellQuote prevents command injection
+	cmd := fmt.Sprintf("stat -c '%%s %%Y %%i' %s 2>/dev/null || stat -f '%%z %%m %%i' %s", shellQuote(path), shellQuote(path))
 	output, err := session.Output(cmd)
 	duration := time.Since(start)
 
@@ -413,12 +420,12 @@ func (c *Client) StreamFile(ctx context.Context, path string, offset int64) (io.
 		return nil, fmt.Errorf("get stdout pipe: %w", err)
 	}
 
-	// Use tail -f to stream file with optional offset
+	// Use tail -f to stream file with optional offset (shellQuote prevents command injection)
 	var cmd string
 	if offset > 0 {
-		cmd = fmt.Sprintf("tail -c +%d -f %q", offset+1, path)
+		cmd = fmt.Sprintf("tail -c +%d -f %s", offset+1, shellQuote(path))
 	} else {
-		cmd = fmt.Sprintf("tail -f %q", path)
+		cmd = fmt.Sprintf("tail -f %s", shellQuote(path))
 	}
 
 	if err := session.Start(cmd); err != nil {

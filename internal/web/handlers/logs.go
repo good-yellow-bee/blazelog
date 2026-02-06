@@ -408,7 +408,12 @@ func (h *Handler) ExportLogs(w http.ResponseWriter, r *http.Request) {
 	// Parse end time
 	endTime := time.Now()
 	if endStr := q.Get("end"); endStr != "" {
-		endTime, _ = time.Parse(time.RFC3339, endStr)
+		parsed, parseErr := time.Parse(time.RFC3339, endStr)
+		if parseErr != nil {
+			http.Error(w, "invalid end time format", http.StatusBadRequest)
+			return
+		}
+		endTime = parsed
 	}
 
 	// Parse format
@@ -496,11 +501,14 @@ func (h *Handler) writeCSV(w http.ResponseWriter, entries []*storage.LogRecord) 
 	defer writer.Flush()
 
 	// Header
-	writer.Write([]string{"timestamp", "project_id", "level", "source", "type", "message", "file_path", "http_status", "http_method", "uri"})
+	if err := writer.Write([]string{"timestamp", "project_id", "level", "source", "type", "message", "file_path", "http_status", "http_method", "uri"}); err != nil {
+		log.Printf("csv header write error: %v", err)
+		return
+	}
 
 	// Rows
 	for _, e := range entries {
-		writer.Write([]string{
+		if err := writer.Write([]string{
 			e.Timestamp.Format(time.RFC3339),
 			e.ProjectID,
 			e.Level,
@@ -511,7 +519,10 @@ func (h *Handler) writeCSV(w http.ResponseWriter, entries []*storage.LogRecord) 
 			strconv.Itoa(e.HTTPStatus),
 			e.HTTPMethod,
 			e.URI,
-		})
+		}); err != nil {
+			log.Printf("csv row write error: %v", err)
+			return
+		}
 	}
 }
 

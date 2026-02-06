@@ -354,7 +354,9 @@ func (b *DiskBuffer) dropOldest(needed int64) error {
 	}
 
 	if entriesToDrop == 0 {
-		return nil
+		// Seek back to end for appending since we moved the file position
+		_, err := b.file.Seek(0, io.SeekEnd)
+		return err
 	}
 
 	// Update offset instead of rewriting file

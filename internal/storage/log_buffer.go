@@ -2,11 +2,15 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+// ErrBufferStopped is returned when AddBatch is called on a stopped buffer.
+var ErrBufferStopped = errors.New("log buffer is stopped")
 
 // LogBuffer buffers log entries for batch insertion.
 // It flushes on either batch size threshold or time interval,
@@ -37,6 +41,9 @@ type LogBuffer struct {
 	dropped  atomic.Int64
 	flushed  atomic.Int64
 	inserted atomic.Int64
+
+	// flushErr holds the error from the final flush on shutdown.
+	flushErr error
 }
 
 // LogBufferConfig holds LogBuffer configuration.
@@ -86,7 +93,7 @@ func (b *LogBuffer) Add(entry *LogRecord) error {
 // AddBatch adds multiple log entries to the buffer.
 func (b *LogBuffer) AddBatch(entries []*LogRecord) error {
 	if b.stopped.Load() {
-		return nil
+		return ErrBufferStopped
 	}
 
 	b.mu.Lock()
@@ -177,6 +184,7 @@ func (b *LogBuffer) flushLoop() {
 			// Final flush on shutdown
 			if err := b.Flush(); err != nil {
 				log.Printf("log buffer final flush error: %v", err)
+				b.flushErr = err
 			}
 			return
 		}
@@ -184,13 +192,14 @@ func (b *LogBuffer) flushLoop() {
 }
 
 // Close stops the buffer and flushes remaining entries.
+// Returns an error if the final flush fails, indicating potential data loss.
 func (b *LogBuffer) Close() error {
 	if b.stopped.Swap(true) {
 		return nil // Already stopped
 	}
 	close(b.stopCh)
 	<-b.doneCh
-	return nil
+	return b.flushErr
 }
 
 // Stats returns buffer statistics.

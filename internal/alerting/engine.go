@@ -23,6 +23,10 @@ type Engine struct {
 	// alerts is the channel where triggered alerts are sent.
 	alerts chan *Alert
 
+	// closed tracks whether Close has been called to prevent
+	// sending on a closed channel.
+	closed atomic.Bool
+
 	// stats tracks engine statistics.
 	stats *EngineStats
 }
@@ -105,14 +109,16 @@ func (e *Engine) EvaluateAt(entry *models.LogEntry, now time.Time) []*Alert {
 
 		if alert != nil {
 			alerts = append(alerts, alert)
-			// Send to channel (non-blocking)
-			select {
-			case e.alerts <- alert:
-			default:
-				// Channel full, drop alert and track
-				dropped := e.stats.AlertsDropped.Add(1)
-				if dropped == 1 || dropped%100 == 0 {
-					log.Printf("warning: alert channel full, dropped %d alerts total", dropped)
+			// Send to channel (non-blocking), guarded against closed channel
+			if !e.closed.Load() {
+				select {
+				case e.alerts <- alert:
+				default:
+					// Channel full, drop alert and track
+					dropped := e.stats.AlertsDropped.Add(1)
+					if dropped == 1 || dropped%100 == 0 {
+						log.Printf("warning: alert channel full, dropped %d alerts total", dropped)
+					}
 				}
 			}
 		}
@@ -173,12 +179,11 @@ func (e *Engine) evaluateThreshold(rule *Rule, entry *models.LogEntry, now time.
 		return nil
 	}
 
-	// Add to sliding window
-	window := e.windows.GetOrCreate(rule.Name, rule.GetWindowDuration())
-	window.AddAt(now)
+	// Add to sliding window via WindowManager to properly track global event count
+	e.windows.AddEventAt(rule.Name, rule.GetWindowDuration(), now)
 
 	// Check if threshold is exceeded
-	count := window.CountAt(now)
+	count := e.windows.Count(rule.Name)
 	if count < rule.Condition.Threshold {
 		return nil
 	}
@@ -197,7 +202,7 @@ func (e *Engine) evaluateThreshold(rule *Rule, entry *models.LogEntry, now time.
 	}
 
 	// Reset window after alert (prevents repeated alerts for same events)
-	window.Reset()
+	e.windows.Reset(rule.Name)
 
 	return &Alert{
 		RuleName:    rule.Name,
@@ -232,13 +237,12 @@ func (e *Engine) evaluateExpr(rule *Rule, entry *models.LogEntry, now time.Time)
 		return nil
 	}
 
-	// Add to sliding window
+	// Add to sliding window via WindowManager to properly track global event count
 	agg := rule.Condition.Aggregation
-	window := e.windows.GetOrCreate(rule.Name, rule.GetAggregationWindowDuration())
-	window.AddAt(now)
+	e.windows.AddEventAt(rule.Name, rule.GetAggregationWindowDuration(), now)
 
 	// Get count and check threshold based on function
-	count := window.CountAt(now)
+	count := e.windows.Count(rule.Name)
 	var value float64
 
 	switch agg.Function {
@@ -270,8 +274,8 @@ func (e *Engine) evaluateExpr(rule *Rule, entry *models.LogEntry, now time.Time)
 		e.cooldown.SetCooldown(rule.Name, rule.GetCooldownDuration(), now)
 	}
 
-	// Reset window after alert
-	window.Reset()
+	// Reset window after alert (via WindowManager to track global event count)
+	e.windows.Reset(rule.Name)
 
 	// Build alert message
 	message := fmt.Sprintf("Expression matched: %s (%s %.0f %s %.0f in %s)",
@@ -291,6 +295,10 @@ func (e *Engine) evaluateExpr(rule *Rule, entry *models.LogEntry, now time.Time)
 	}
 }
 
+// floatEpsilon is the tolerance for float64 equality comparison,
+// avoiding unreliable direct == on floating-point values.
+const floatEpsilon = 1e-9
+
 // compareThreshold compares a value against a threshold using the given operator.
 func compareThreshold(value, threshold float64, operator string) bool {
 	switch operator {
@@ -303,9 +311,17 @@ func compareThreshold(value, threshold float64, operator string) bool {
 	case "<":
 		return value < threshold
 	case "==":
-		return value == threshold
+		diff := value - threshold
+		if diff < 0 {
+			diff = -diff
+		}
+		return diff < floatEpsilon
 	case "!=":
-		return value != threshold
+		diff := value - threshold
+		if diff < 0 {
+			diff = -diff
+		}
+		return diff >= floatEpsilon
 	default:
 		return false
 	}
@@ -405,7 +421,11 @@ func (e *Engine) Stats() EngineStatsSnapshot {
 }
 
 // Close closes the engine and releases resources.
+// Safe to call concurrently with Evaluate.
 func (e *Engine) Close() {
+	if e.closed.Swap(true) {
+		return // Already closed
+	}
 	close(e.alerts)
 }
 

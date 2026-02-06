@@ -702,8 +702,8 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 
 			// Send new logs
 			for _, entry := range result.Entries {
-				// Skip if we've already sent this timestamp
-				if !entry.Timestamp.After(lastTimestamp) && entry.Timestamp.Equal(lastTimestamp) {
+				// Skip entries at or before the last sent timestamp
+				if !entry.Timestamp.After(lastTimestamp) {
 					continue
 				}
 
