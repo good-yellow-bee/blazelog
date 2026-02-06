@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/good-yellow-bee/blazelog/internal/api/middleware"
@@ -42,12 +43,24 @@ func (h *Handler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Fetch real stats from storage
-	stats := pages.DashboardStats{
-		TotalLogs:    12543,
-		ErrorCount:   87,
-		WarningCount: 234,
-		ActiveAlerts: 3,
+	// Fetch real stats for initial page render
+	stats := pages.DashboardStats{}
+	if h.logStorage != nil {
+		ctx := r.Context()
+		filter := &storage.AggregationFilter{
+			StartTime: time.Now().Add(-24 * time.Hour),
+			EndTime:   time.Now(),
+		}
+		if rates, err := h.logStorage.Logs().GetErrorRates(ctx, filter); err == nil && rates != nil {
+			stats.TotalLogs = int(rates.TotalLogs)
+			stats.ErrorCount = int(rates.ErrorCount)
+			stats.WarningCount = int(rates.WarningCount)
+		}
+	}
+	if h.storage != nil {
+		if alerts, err := h.storage.Alerts().ListEnabled(r.Context()); err == nil {
+			stats.ActiveAlerts = len(alerts)
+		}
 	}
 
 	pages.Dashboard(sess, stats, csrf.Token(r)).Render(r.Context(), w)
@@ -168,27 +181,60 @@ func (h *Handler) fetchDashboardStats(ctx context.Context, timeRange, projectID 
 	if h.logStorage != nil {
 		logs := h.logStorage.Logs()
 
-		// Fetch error rates
-		if rates, err := logs.GetErrorRates(ctx, filter); err == nil && rates != nil {
+		// Fetch all stats in parallel to reduce dashboard latency
+		var wg sync.WaitGroup
+		var (
+			rates     *storage.ErrorRateResult
+			vol       []*storage.VolumePoint
+			src       []*storage.SourceCount
+			httpStats *storage.HTTPStatsResult
+		)
+
+		wg.Add(4)
+		go func() {
+			defer wg.Done()
+			r, err := logs.GetErrorRates(ctx, filter)
+			if err == nil {
+				rates = r
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			v, err := logs.GetLogVolume(ctx, filter, interval)
+			if err == nil {
+				vol = v
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			s, err := logs.GetTopSources(ctx, filter, 5)
+			if err == nil {
+				src = s
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			h, err := logs.GetHTTPStats(ctx, filter)
+			if err == nil {
+				httpStats = h
+			}
+		}()
+		wg.Wait()
+
+		if rates != nil {
 			response.TotalLogs = rates.TotalLogs
 			response.ErrorCount = rates.ErrorCount
 			response.WarningCount = rates.WarningCount
 			response.FatalCount = rates.FatalCount
 			response.ErrorRate = rates.ErrorRate
 		}
-
-		// Fetch volume data
-		if vol, err := logs.GetLogVolume(ctx, filter, interval); err == nil {
+		if vol != nil {
 			response.Volume = convertVolume(vol)
 		}
-
-		// Fetch top sources
-		if src, err := logs.GetTopSources(ctx, filter, 5); err == nil {
+		if src != nil {
 			response.TopSources = convertSources(src)
 		}
-
-		// Fetch HTTP stats
-		if httpStats, err := logs.GetHTTPStats(ctx, filter); err == nil && httpStats != nil {
+		if httpStats != nil {
 			response.HTTPStats = convertHTTPStats(httpStats)
 		}
 	}

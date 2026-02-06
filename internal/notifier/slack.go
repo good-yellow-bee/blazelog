@@ -234,10 +234,12 @@ func severityEmoji(severity alerting.Severity) string {
 	}
 }
 
-// truncate truncates a string to max length with ellipsis.
+// truncate truncates a string to max runes with ellipsis.
+// Operates on runes instead of bytes to avoid splitting multi-byte UTF-8 characters.
 func truncate(s string, max int) string {
-	if len(s) <= max {
+	runes := []rune(s)
+	if len(runes) <= max {
 		return s
 	}
-	return s[:max-3] + "..."
+	return string(runes[:max-3]) + "..."
 }

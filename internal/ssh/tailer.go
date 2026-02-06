@@ -55,6 +55,10 @@ type Tailer struct {
 	lastInode int64
 	lastSize  int64
 	offset    int64
+
+	// partial holds an incomplete line from the previous chunk read.
+	// This prevents line corruption when data is split across chunk boundaries.
+	partial []byte
 }
 
 // NewTailer creates a new remote file tailer.
@@ -218,6 +222,34 @@ func (t *Tailer) readFromOffset(ctx context.Context) {
 }
 
 func (t *Tailer) parseLines(data []byte) {
+	// Prepend any partial line from the previous chunk
+	if len(t.partial) > 0 {
+		data = append(t.partial, data...)
+		t.partial = nil
+	}
+
+	// If data doesn't end with a newline, the last segment is a partial line
+	// that should be buffered until the next chunk completes it.
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		lastNewline := -1
+		for i := len(data) - 1; i >= 0; i-- {
+			if data[i] == '\n' {
+				lastNewline = i
+				break
+			}
+		}
+		if lastNewline == -1 {
+			// No complete line in this chunk, buffer everything
+			t.partial = make([]byte, len(data))
+			copy(t.partial, data)
+			return
+		}
+		// Buffer the partial tail
+		t.partial = make([]byte, len(data)-lastNewline-1)
+		copy(t.partial, data[lastNewline+1:])
+		data = data[:lastNewline+1]
+	}
+
 	scanner := bufio.NewScanner(&bytesReader{data: data})
 	for scanner.Scan() {
 		t.sendLine(&Line{

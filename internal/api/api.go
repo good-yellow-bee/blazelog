@@ -99,10 +99,15 @@ func New(cfg *Config, store storage.Storage, logStore storage.LogStorage) (*Serv
 	router := s.setupRouter()
 
 	s.server = &http.Server{
-		Addr:         cfg.Address,
-		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr:        cfg.Address,
+		Handler:     router,
+		ReadTimeout: 15 * time.Second,
+		// WriteTimeout is intentionally 0 (disabled) because the server
+		// supports SSE streams that can last up to 30 minutes. A global
+		// WriteTimeout would prematurely kill those long-lived connections.
+		// Individual non-streaming handlers use http.TimeoutHandler or
+		// context deadlines to bound response time.
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
 	}
 	if cfg.HTTPTLSEnabled {

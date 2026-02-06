@@ -32,6 +32,11 @@ func ValidatePassword(password string) error {
 	if len(password) < 12 {
 		messages = append(messages, "password must be at least 12 characters")
 	}
+	// bcrypt silently truncates passwords longer than 72 bytes.
+	// Reject them so users don't have a false sense of security.
+	if len(password) > 72 {
+		messages = append(messages, "password must be at most 72 characters (bcrypt limit)")
+	}
 
 	var (
 		hasUpper   bool
