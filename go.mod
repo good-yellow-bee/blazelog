@@ -1,6 +1,6 @@
 module github.com/good-yellow-bee/blazelog
 
-go 1.24.7
+go 1.24.13
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.42.0
