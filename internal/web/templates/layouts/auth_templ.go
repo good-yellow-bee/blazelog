@@ -55,7 +55,7 @@ func Auth(title string, cspNonce string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" src=\"/static/vendor/htmx.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.15.4/dist/cdn.min.js\"></script></head><body class=\"min-h-screen text-slate-900\"><main class=\"flex items-center justify-center min-h-screen px-4 page-enter\"><div class=\"w-full max-w-md\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" src=\"/static/vendor/htmx.min.js\"></script><script defer src=\"/static/vendor/alpine.csp.min.js\"></script></head><body class=\"min-h-screen text-slate-900\"><main class=\"flex items-center justify-center min-h-screen px-4 page-enter\"><div class=\"w-full max-w-md\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

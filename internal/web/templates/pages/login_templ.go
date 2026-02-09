@@ -69,19 +69,7 @@ func Login(csrfToken, errorMsg, cspNonce string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = components.Input("username", "Username", "text", "Enter your username", true).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = components.Input("password", "Password", "password", "Enter your password", true).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"flex items-center justify-between\"><div class=\"flex items-center\"><input id=\"remember\" name=\"remember_me\" type=\"checkbox\" class=\"h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500\"> <label for=\"remember\" class=\"ml-2 block text-sm text-slate-900\">Remember me</label></div></div><div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><div><label for=\"username\" class=\"label\">Username</label><div class=\"mt-1\"><input id=\"username\" name=\"username\" type=\"text\" autocomplete=\"username\" placeholder=\"Enter your username\" class=\"input-field\" required></div></div><div><label for=\"password\" class=\"label\">Password</label><div class=\"mt-1\"><input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" placeholder=\"Enter your password\" class=\"input-field\" required></div></div><div class=\"flex items-center justify-between\"><div class=\"flex items-center\"><input id=\"remember\" name=\"remember_me\" type=\"checkbox\" class=\"h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500\"> <label for=\"remember\" class=\"ml-2 block text-sm text-slate-900\">Remember me</label></div></div><div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -89,7 +77,7 @@ func Login(csrfToken, errorMsg, cspNonce string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

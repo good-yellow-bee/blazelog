@@ -30,8 +30,34 @@ templ Login(csrfToken, errorMsg, cspNonce string) {
 				>
 					<input type="hidden" name="csrf_token" value={ csrfToken }/>
 
-					@components.Input("username", "Username", "text", "Enter your username", true)
-					@components.Input("password", "Password", "password", "Enter your password", true)
+					<div>
+						<label for="username" class="label">Username</label>
+						<div class="mt-1">
+							<input
+								id="username"
+								name="username"
+								type="text"
+								autocomplete="username"
+								placeholder="Enter your username"
+								class="input-field"
+								required
+							/>
+						</div>
+					</div>
+					<div>
+						<label for="password" class="label">Password</label>
+						<div class="mt-1">
+							<input
+								id="password"
+								name="password"
+								type="password"
+								autocomplete="current-password"
+								placeholder="Enter your password"
+								class="input-field"
+								required
+							/>
+						</div>
+					</div>
 
 					<div class="flex items-center justify-between">
 						<div class="flex items-center">

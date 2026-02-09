@@ -54,8 +54,10 @@ templ Dashboard(user *session.Session, stats DashboardStats, csrfToken string, c
 
 templ TimeRangeSelector() {
 	<div class="flex items-center space-x-2">
-		<span class="text-sm text-slate-500">Range:</span>
+		<label for="dashboard-time-range" class="text-sm text-slate-500">Range:</label>
 		<select
+			id="dashboard-time-range"
+			name="dashboard_time_range"
 			x-model="$store.dashboard.timeRange"
 			@change="refreshDashboard()"
 			class="select-field text-sm"
@@ -72,8 +74,10 @@ templ TimeRangeSelector() {
 
 templ AutoRefreshToggle() {
 	<div class="flex items-center space-x-2">
-		<span class="text-sm text-slate-500">Refresh:</span>
+		<label for="dashboard-refresh-interval" class="text-sm text-slate-500">Refresh:</label>
 		<select
+			id="dashboard-refresh-interval"
+			name="dashboard_refresh_interval"
 			x-model="$store.dashboard.refreshInterval"
 			@change="setRefreshInterval()"
 			class="select-field text-sm"

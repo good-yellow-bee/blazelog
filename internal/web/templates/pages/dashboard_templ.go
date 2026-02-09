@@ -152,7 +152,7 @@ func TimeRangeSelector() templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-slate-500\">Range:</span> <select x-model=\"$store.dashboard.timeRange\" @change=\"refreshDashboard()\" class=\"select-field text-sm\"><option value=\"15m\">15 min</option> <option value=\"1h\">1 hour</option> <option value=\"6h\">6 hours</option> <option value=\"24h\">24 hours</option> <option value=\"7d\">7 days</option> <option value=\"30d\">30 days</option></select></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"flex items-center space-x-2\"><label for=\"dashboard-time-range\" class=\"text-sm text-slate-500\">Range:</label> <select id=\"dashboard-time-range\" name=\"dashboard_time_range\" x-model=\"$store.dashboard.timeRange\" @change=\"refreshDashboard()\" class=\"select-field text-sm\"><option value=\"15m\">15 min</option> <option value=\"1h\">1 hour</option> <option value=\"6h\">6 hours</option> <option value=\"24h\">24 hours</option> <option value=\"7d\">7 days</option> <option value=\"30d\">30 days</option></select></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -181,7 +181,7 @@ func AutoRefreshToggle() templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"flex items-center space-x-2\"><span class=\"text-sm text-slate-500\">Refresh:</span> <select x-model=\"$store.dashboard.refreshInterval\" @change=\"setRefreshInterval()\" class=\"select-field text-sm\"><option value=\"0\">Off</option> <option value=\"10\">10s</option> <option value=\"30\">30s</option> <option value=\"60\">1m</option> <option value=\"300\">5m</option></select> <span x-show=\"$store.dashboard.refreshInterval > 0\" class=\"w-2 h-2 bg-emerald-500 rounded-full animate-pulse\" title=\"Auto-refresh active\"></span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"flex items-center space-x-2\"><label for=\"dashboard-refresh-interval\" class=\"text-sm text-slate-500\">Refresh:</label> <select id=\"dashboard-refresh-interval\" name=\"dashboard_refresh_interval\" x-model=\"$store.dashboard.refreshInterval\" @change=\"setRefreshInterval()\" class=\"select-field text-sm\"><option value=\"0\">Off</option> <option value=\"10\">10s</option> <option value=\"30\">30s</option> <option value=\"60\">1m</option> <option value=\"300\">5m</option></select> <span x-show=\"$store.dashboard.refreshInterval > 0\" class=\"w-2 h-2 bg-emerald-500 rounded-full animate-pulse\" title=\"Auto-refresh active\"></span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -297,7 +297,7 @@ func StatCard(title string, value string, color string, icon string) templ.Compo
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 114, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 118, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -310,7 +310,7 @@ func StatCard(title string, value string, color string, icon string) templ.Compo
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 115, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 119, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -516,7 +516,7 @@ func DashboardScript(cspNonce string) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(cspNonce)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 174, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/dashboard.templ`, Line: 178, Col: 25}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {

@@ -73,7 +73,7 @@ func Base(title string, user *session.Session, csrfToken string, cspNonce string
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">\n\t\t\t\t// FOUC-safe theme initialization - runs before page renders\n\t\t\t\t(function() {\n\t\t\t\t\tconst stored = localStorage.getItem('theme');\n\t\t\t\t\tconst prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n\t\t\t\t\tconst isDark = stored === 'dark' || (!stored && prefersDark);\n\t\t\t\t\tif (isDark) {\n\t\t\t\t\t\tdocument.documentElement.classList.add('dark');\n\t\t\t\t\t}\n\t\t\t\t})();\n\t\t\t</script><script src=\"/static/vendor/htmx.min.js\"></script><script defer src=\"/static/vendor/alpine-collapse.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.15.4/dist/cdn.min.js\"></script><script nonce=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">\n\t\t\t\t// FOUC-safe theme initialization - runs before page renders\n\t\t\t\t(function() {\n\t\t\t\t\tconst stored = localStorage.getItem('theme');\n\t\t\t\t\tconst prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n\t\t\t\t\tconst isDark = stored === 'dark' || (!stored && prefersDark);\n\t\t\t\t\tif (isDark) {\n\t\t\t\t\t\tdocument.documentElement.classList.add('dark');\n\t\t\t\t\t}\n\t\t\t\t})();\n\t\t\t</script><script src=\"/static/vendor/htmx.min.js\"></script><script defer src=\"/static/vendor/alpine-collapse.min.js\"></script><script defer src=\"/static/vendor/alpine.csp.min.js\"></script><script nonce=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

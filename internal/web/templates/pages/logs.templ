@@ -54,9 +54,11 @@ templ LogFilters() {
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<!-- Search -->
 			<div class="lg:col-span-2">
-				<label class="label">Search</label>
+				<label for="logs-search-query" class="label">Search</label>
 				<div class="relative">
 					<input
+						id="logs-search-query"
+						name="logs_search_query"
 						type="text"
 						x-model="filters.q"
 						@input.debounce.300ms="applyFilters()"
@@ -71,8 +73,10 @@ templ LogFilters() {
 
 			<!-- Time Range -->
 			<div>
-				<label class="label">Time Range</label>
+				<label for="logs-time-range" class="label">Time Range</label>
 				<select
+					id="logs-time-range"
+					name="logs_time_range"
 					x-model="filters.range"
 					@change="applyFilters()"
 					class="select-field"
@@ -88,8 +92,10 @@ templ LogFilters() {
 
 			<!-- Level Filter -->
 			<div>
-				<label class="label">Level</label>
+				<label for="logs-level-filter" class="label">Level</label>
 				<select
+					id="logs-level-filter"
+					name="logs_level_filter"
 					x-model="filters.level"
 					@change="applyFilters()"
 					class="select-field"
@@ -107,8 +113,10 @@ templ LogFilters() {
 		<!-- Second row: Project filter -->
 		<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
 			<div>
-				<label class="label">Project</label>
+				<label for="logs-project-filter" class="label">Project</label>
 				<select
+					id="logs-project-filter"
+					name="logs_project_filter"
 					x-model="filters.project_id"
 					@change="applyFilters()"
 					class="select-field"
@@ -125,7 +133,7 @@ templ LogFilters() {
 		<div x-show="showAdvanced" x-collapse class="mt-4 pt-4 border-t border-slate-200/70">
 			<!-- Filter Expression -->
 			<div class="mb-4">
-				<label class="label flex items-center gap-2">
+				<label for="logs-advanced-filter" class="label flex items-center gap-2">
 					Advanced Filter
 					<button
 						@click="showFilterHelp = !showFilterHelp"
@@ -138,6 +146,8 @@ templ LogFilters() {
 					</button>
 				</label>
 				<input
+					id="logs-advanced-filter"
+					name="logs_advanced_filter"
 					type="text"
 					x-model="filters.filter"
 					@input.debounce.500ms="applyFilters()"
@@ -161,8 +171,10 @@ templ LogFilters() {
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 				<!-- Source -->
 				<div>
-					<label class="label">Source</label>
+					<label for="logs-source-filter" class="label">Source</label>
 					<input
+						id="logs-source-filter"
+						name="logs_source_filter"
 						type="text"
 						x-model="filters.source"
 						@input.debounce.300ms="applyFilters()"
@@ -173,8 +185,10 @@ templ LogFilters() {
 
 				<!-- Log Type -->
 				<div>
-					<label class="label">Type</label>
+					<label for="logs-type-filter" class="label">Type</label>
 					<select
+						id="logs-type-filter"
+						name="logs_type_filter"
 						x-model="filters.type"
 						@change="applyFilters()"
 						class="select-field"
@@ -190,8 +204,10 @@ templ LogFilters() {
 
 				<!-- Search Mode -->
 				<div>
-					<label class="label">Search Mode</label>
+					<label for="logs-search-mode" class="label">Search Mode</label>
 					<select
+						id="logs-search-mode"
+						name="logs_search_mode"
 						x-model="filters.search_mode"
 						@change="applyFilters()"
 						class="select-field"
@@ -286,6 +302,9 @@ templ LogTable() {
 			</div>
 			<div class="flex items-center gap-4">
 				<select
+					id="logs-per-page"
+					name="logs_per_page"
+					aria-label="Logs per page"
 					x-model="perPage"
 					@change="applyFilters()"
 					class="select-field text-sm"
@@ -608,8 +627,10 @@ templ ExportModal() {
 
 					<div class="space-y-4">
 						<div>
-							<label class="label">Format</label>
+							<label for="logs-export-format" class="label">Format</label>
 							<select
+								id="logs-export-format"
+								name="logs_export_format"
 								x-model="exportFormat"
 								class="select-field"
 							>
@@ -619,8 +640,10 @@ templ ExportModal() {
 						</div>
 
 						<div>
-							<label class="label">Max Records</label>
+							<label for="logs-export-limit" class="label">Max Records</label>
 							<select
+								id="logs-export-limit"
+								name="logs_export_limit"
 								x-model="exportLimit"
 								class="select-field"
 							>
