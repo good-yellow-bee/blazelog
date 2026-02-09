@@ -33,6 +33,9 @@ jobs:
       - name: Generate proto files
         run: cd proto && buf generate
 
+      - name: Verify generated proto files are committed
+        run: git diff --exit-code -- internal/proto
+
       - name: Run govulncheck
         run: govulncheck ./...
 

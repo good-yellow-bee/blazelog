@@ -63,21 +63,21 @@ func (h *Handler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pages.Dashboard(sess, stats, csrf.Token(r)).Render(r.Context(), w)
+	pages.Dashboard(sess, stats, csrf.Token(r), middleware.GetCSPNonce(r.Context())).Render(r.Context(), w)
 }
 
 // DashboardStatsResponse contains JSON response for dashboard stats
 type DashboardStatsResponse struct {
-	TimeRange    string          `json:"time_range"`
-	TotalLogs    int64           `json:"total_logs"`
-	ErrorCount   int64           `json:"error_count"`
-	WarningCount int64           `json:"warning_count"`
-	FatalCount   int64           `json:"fatal_count"`
-	ErrorRate    float64         `json:"error_rate"`
-	ActiveAlerts int             `json:"active_alerts"`
-	Volume       []VolumeData    `json:"volume,omitempty"`
-	TopSources   []SourceData    `json:"top_sources,omitempty"`
-	HTTPStats    *HTTPStatsData  `json:"http_stats,omitempty"`
+	TimeRange    string         `json:"time_range"`
+	TotalLogs    int64          `json:"total_logs"`
+	ErrorCount   int64          `json:"error_count"`
+	WarningCount int64          `json:"warning_count"`
+	FatalCount   int64          `json:"fatal_count"`
+	ErrorRate    float64        `json:"error_rate"`
+	ActiveAlerts int            `json:"active_alerts"`
+	Volume       []VolumeData   `json:"volume,omitempty"`
+	TopSources   []SourceData   `json:"top_sources,omitempty"`
+	HTTPStats    *HTTPStatsData `json:"http_stats,omitempty"`
 }
 
 // VolumeData represents a time-series data point for charts

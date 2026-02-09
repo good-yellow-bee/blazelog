@@ -10,6 +10,9 @@ server:
   # HTTP listen address for REST API and Web UI
   http_address: ":8080"
 
+  # Explicitly allow non-TLS mode (development only)
+  allow_insecure: true
+
   # TLS configuration for mTLS (mutual TLS)
   # Generate certificates with: blazelog ca init && blazelog cert server
   tls:
@@ -26,6 +29,13 @@ server:
     # client_ca_file: "/etc/blazelog/certs/ca.crt"
 metrics:
   enabled: false
+
+api:
+  # Safety limits for query/stream endpoints
+  max_query_range: "24h"
+  query_timeout: "10s"
+  stream_max_duration: "30m"
+  stream_poll_interval: "1s"
 
 # Database configuration
 # NOTE: BLAZELOG_MASTER_KEY environment variable is REQUIRED

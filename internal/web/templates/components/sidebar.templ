@@ -47,7 +47,7 @@ templ Sidebar(user *session.Session, csrfToken string) {
 
 	<!-- Sidebar -->
 	<aside
-		x-data="sidebarNav()"
+		x-data="sidebarNav"
 		:class="$store.sidebar.open ? 'translate-x-0' : '-translate-x-full'"
 		class="fixed top-0 bottom-0 left-0 h-screen z-50 w-64 bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200/70 dark:border-slate-700/70 shadow-[0_12px_32px_rgba(15,23,42,0.08)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.3)] transform transition-transform duration-200 ease-in-out flex flex-col"
 	>
@@ -201,8 +201,8 @@ templ Sidebar(user *session.Session, csrfToken string) {
 	</aside>
 }
 
-templ SidebarScript() {
-	<script>
+templ SidebarScript(cspNonce string) {
+	<script nonce={ cspNonce }>
 		// Initialize sidebar and theme stores
 		document.addEventListener('alpine:init', () => {
 			const desktopQuery = window.matchMedia('(min-width: 768px)');
@@ -222,11 +222,8 @@ templ SidebarScript() {
 					localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
 				}
 			});
-		});
 
-		// Sidebar navigation component
-		function sidebarNav() {
-			return {
+			Alpine.data('sidebarNav', () => ({
 				settingsOpen: window.location.pathname.startsWith('/settings'),
 				currentPath: window.location.pathname,
 				isActive(path) {
@@ -235,10 +232,10 @@ templ SidebarScript() {
 					}
 					return this.currentPath === path || this.currentPath.startsWith(path + '/');
 				}
-			};
-		}
+			}));
+		});
 	</script>
-	<style>
+	<style nonce={ cspNonce }>
 		[x-cloak] { display: none !important; }
 	</style>
 }

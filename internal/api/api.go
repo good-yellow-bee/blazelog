@@ -16,23 +16,27 @@ import (
 
 // Config contains HTTP API server configuration.
 type Config struct {
-	Address          string
-	JWTSecret        []byte
-	CSRFSecret       string   // For web UI CSRF protection
-	TrustedOrigins   []string // Trusted origins for CSRF (e.g., "localhost:8080")
-	TrustedProxies   []string // Trusted proxy IPs/CIDRs for X-Forwarded-For
-	WebUIEnabled     bool     // Enable web UI (default: true)
-	UseSecureCookies bool     // Use Secure flag for cookies (true in production with HTTPS)
-	HTTPTLSEnabled   bool     // Enable HTTPS for API server
-	HTTPTLSCertFile  string   // HTTPS certificate file
-	HTTPTLSKeyFile   string   // HTTPS private key file
-	AccessTokenTTL   time.Duration
-	RefreshTokenTTL  time.Duration
-	RateLimitPerIP   int
-	RateLimitPerUser int
-	LockoutThreshold int
-	LockoutDuration  time.Duration
-	Verbose          bool
+	Address            string
+	JWTSecret          []byte
+	CSRFSecret         string   // For web UI CSRF protection
+	TrustedOrigins     []string // Trusted origins for CSRF (e.g., "localhost:8080")
+	TrustedProxies     []string // Trusted proxy IPs/CIDRs for X-Forwarded-For
+	WebUIEnabled       bool     // Enable web UI (default: true)
+	UseSecureCookies   bool     // Use Secure flag for cookies (true in production with HTTPS)
+	HTTPTLSEnabled     bool     // Enable HTTPS for API server
+	HTTPTLSCertFile    string   // HTTPS certificate file
+	HTTPTLSKeyFile     string   // HTTPS private key file
+	AccessTokenTTL     time.Duration
+	RefreshTokenTTL    time.Duration
+	RateLimitPerIP     int
+	RateLimitPerUser   int
+	LockoutThreshold   int
+	LockoutDuration    time.Duration
+	MaxQueryRange      time.Duration // Max allowed logs query range
+	QueryTimeout       time.Duration // Timeout for storage-backed API calls
+	StreamMaxDuration  time.Duration // Max lifetime for log stream connections
+	StreamPollInterval time.Duration // Poll interval for stream query loop
+	Verbose            bool
 }
 
 // SetDefaults applies default values for missing configuration.
@@ -57,6 +61,18 @@ func (c *Config) SetDefaults() {
 	}
 	if c.LockoutDuration == 0 {
 		c.LockoutDuration = 30 * time.Minute
+	}
+	if c.MaxQueryRange == 0 {
+		c.MaxQueryRange = 24 * time.Hour
+	}
+	if c.QueryTimeout == 0 {
+		c.QueryTimeout = 10 * time.Second
+	}
+	if c.StreamMaxDuration == 0 {
+		c.StreamMaxDuration = 30 * time.Minute
+	}
+	if c.StreamPollInterval == 0 {
+		c.StreamPollInterval = time.Second
 	}
 }
 

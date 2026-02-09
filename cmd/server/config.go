@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -11,6 +12,7 @@ import (
 // Config represents the server configuration.
 type Config struct {
 	Server         ServerConfig     `yaml:"server"`
+	API            APIConfig        `yaml:"api"`             // API performance/safety limits
 	Metrics        MetricsConfig    `yaml:"metrics"`         // Metrics configuration
 	Database       DatabaseConfig   `yaml:"database"`        // Database configuration
 	ClickHouse     ClickHouseConfig `yaml:"clickhouse"`      // ClickHouse log storage configuration
@@ -81,10 +83,11 @@ type DatabaseConfig struct {
 
 // ServerConfig contains server settings.
 type ServerConfig struct {
-	GRPCAddress string        `yaml:"grpc_address"` // gRPC listen address (default: :9443)
-	HTTPAddress string        `yaml:"http_address"` // HTTP listen address (default: :8080)
-	TLS         TLSConfig     `yaml:"tls"`          // TLS configuration for mTLS
-	HTTPTLS     HTTPTLSConfig `yaml:"http_tls"`     // TLS configuration for HTTP API
+	GRPCAddress   string        `yaml:"grpc_address"`   // gRPC listen address (default: :9443)
+	HTTPAddress   string        `yaml:"http_address"`   // HTTP listen address (default: :8080)
+	AllowInsecure bool          `yaml:"allow_insecure"` // Explicitly allow non-TLS operation (development only)
+	TLS           TLSConfig     `yaml:"tls"`            // TLS configuration for mTLS
+	HTTPTLS       HTTPTLSConfig `yaml:"http_tls"`       // TLS configuration for HTTP API
 }
 
 // TLSConfig contains TLS settings for the server.
@@ -100,6 +103,14 @@ type HTTPTLSConfig struct {
 	Enabled  bool   `yaml:"enabled"`   // Enable HTTPS
 	CertFile string `yaml:"cert_file"` // Server certificate file
 	KeyFile  string `yaml:"key_file"`  // Server private key file
+}
+
+// APIConfig contains API query and streaming safety limits.
+type APIConfig struct {
+	MaxQueryRange      string `yaml:"max_query_range"`      // Max allowed query range (default: 24h)
+	QueryTimeout       string `yaml:"query_timeout"`        // Per-request storage timeout (default: 10s)
+	StreamMaxDuration  string `yaml:"stream_max_duration"`  // SSE stream max duration (default: 30m)
+	StreamPollInterval string `yaml:"stream_poll_interval"` // SSE polling interval (default: 1s)
 }
 
 // SSHConnection defines a remote server connection for log collection.
@@ -155,6 +166,18 @@ func (c *Config) setDefaults() {
 	}
 	if c.Server.HTTPAddress == "" {
 		c.Server.HTTPAddress = ":8080"
+	}
+	if c.API.MaxQueryRange == "" {
+		c.API.MaxQueryRange = "24h"
+	}
+	if c.API.QueryTimeout == "" {
+		c.API.QueryTimeout = "10s"
+	}
+	if c.API.StreamMaxDuration == "" {
+		c.API.StreamMaxDuration = "30m"
+	}
+	if c.API.StreamPollInterval == "" {
+		c.API.StreamPollInterval = "1s"
 	}
 	if !c.Metrics.enabledSet {
 		c.Metrics.Enabled = true
@@ -245,6 +268,46 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("server.http_tls.key_file is required when HTTP TLS is enabled")
 		}
 	}
+	if !c.Server.AllowInsecure {
+		if !c.Server.TLS.Enabled {
+			return fmt.Errorf("server.tls.enabled must be true unless server.allow_insecure is true")
+		}
+		if !c.Server.HTTPTLS.Enabled {
+			return fmt.Errorf("server.http_tls.enabled must be true unless server.allow_insecure is true")
+		}
+	}
+
+	maxQueryRange, err := time.ParseDuration(c.API.MaxQueryRange)
+	if err != nil {
+		return fmt.Errorf("api.max_query_range: %w", err)
+	}
+	if maxQueryRange <= 0 {
+		return fmt.Errorf("api.max_query_range must be > 0")
+	}
+	queryTimeout, err := time.ParseDuration(c.API.QueryTimeout)
+	if err != nil {
+		return fmt.Errorf("api.query_timeout: %w", err)
+	}
+	if queryTimeout <= 0 {
+		return fmt.Errorf("api.query_timeout must be > 0")
+	}
+	streamMaxDuration, err := time.ParseDuration(c.API.StreamMaxDuration)
+	if err != nil {
+		return fmt.Errorf("api.stream_max_duration: %w", err)
+	}
+	if streamMaxDuration <= 0 {
+		return fmt.Errorf("api.stream_max_duration must be > 0")
+	}
+	streamPollInterval, err := time.ParseDuration(c.API.StreamPollInterval)
+	if err != nil {
+		return fmt.Errorf("api.stream_poll_interval: %w", err)
+	}
+	if streamPollInterval <= 0 {
+		return fmt.Errorf("api.stream_poll_interval must be > 0")
+	}
+	if streamPollInterval > streamMaxDuration {
+		return fmt.Errorf("api.stream_poll_interval must be <= api.stream_max_duration")
+	}
 
 	// Validate SSH connections
 	names := make(map[string]bool)
@@ -300,11 +363,11 @@ func (c *Config) WarnSecurityIssues(logger func(format string, args ...any)) {
 		}
 	}
 
-	// Warn if TLS is disabled
-	if !c.Server.TLS.Enabled {
+	// Warn if TLS is disabled and insecure mode is explicitly allowed.
+	if c.Server.AllowInsecure && !c.Server.TLS.Enabled {
 		logger("SECURITY WARNING: TLS is disabled for gRPC. Agent-server communication is not encrypted.")
 	}
-	if !c.Server.HTTPTLS.Enabled {
+	if c.Server.AllowInsecure && !c.Server.HTTPTLS.Enabled {
 		logger("SECURITY WARNING: HTTP TLS is disabled for the API. Enable HTTPS or terminate TLS at a trusted proxy.")
 	}
 

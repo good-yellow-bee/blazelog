@@ -3,6 +3,7 @@
 
 .PHONY: all build build-agent build-server build-cli test lint clean install help \
 	proto proto-deps proto-lint proto-generate proto-clean \
+	proto-check \
 	templ-generate templ-watch web-build web-watch dev-web \
 	docker-build docker-push install-systemd benchmark
 
@@ -82,7 +83,7 @@ build-all-platforms:
 	GOOS=windows GOARCH=amd64 $(SQLCIPHER_FLAGS) $(GOBUILD) $(SQLCIPHER_TAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI)-windows-amd64.exe ./$(CMD_DIR)/blazectl
 
 ## test: Run all tests
-test:
+test: proto-check
 	@echo "Running tests..."
 	$(GOTEST) -v -race -coverprofile=coverage.out ./...
 
@@ -189,6 +190,14 @@ proto-lint:
 proto-generate:
 	@echo "Generating Go code from protos..."
 	@cd $(PROTO_DIR) && buf generate
+
+## proto-check: Verify generated proto files exist
+proto-check:
+	@if [ ! -d internal/proto/blazelog/v1 ]; then \
+		echo "ERROR: generated protobuf files are missing."; \
+		echo "Run: make proto"; \
+		exit 1; \
+	fi
 
 ## proto: Lint and generate proto files
 proto: proto-lint proto-generate

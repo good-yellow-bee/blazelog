@@ -111,7 +111,12 @@ func (s *Server) setupRouter() *chi.Mux {
 			r.Use(hybridAuth)
 			r.Use(middleware.RateLimitByUser(userLimiter))
 
-			logsHandler := logs.NewHandlerWithStorage(s.logStorage, s.storage)
+			logsHandler := logs.NewHandlerWithStorageAndConfig(s.logStorage, s.storage, logs.HandlerConfig{
+				MaxQueryRange:      s.config.MaxQueryRange,
+				QueryTimeout:       s.config.QueryTimeout,
+				StreamMaxDuration:  s.config.StreamMaxDuration,
+				StreamPollInterval: s.config.StreamPollInterval,
+			})
 
 			r.Get("/", logsHandler.Query)
 			r.Get("/stats", logsHandler.Stats)

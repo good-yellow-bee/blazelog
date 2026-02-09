@@ -2,11 +2,11 @@ package storage
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,6 +20,8 @@ import (
 // bcryptCost mirrors auth.BcryptCost to avoid import cycle.
 // Both values must remain synchronized.
 const bcryptCost = 12
+
+const bootstrapAdminPasswordEnv = "BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD"
 
 // SQLiteStorage implements Storage using SQLite.
 type SQLiteStorage struct {
@@ -127,11 +129,14 @@ func (s *SQLiteStorage) EnsureAdminUser() error {
 		return nil // Users exist, skip
 	}
 
-	// Generate random password
-	password, err := generateRandomPassword(16)
-	if err != nil {
-		return fmt.Errorf("generate password: %w", err)
+	password := strings.TrimSpace(os.Getenv(bootstrapAdminPasswordEnv))
+	if password == "" {
+		return fmt.Errorf("%s environment variable is required for first-time admin bootstrap", bootstrapAdminPasswordEnv)
 	}
+	if len(password) < 12 {
+		return fmt.Errorf("%s must be at least 12 characters", bootstrapAdminPasswordEnv)
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
@@ -151,14 +156,8 @@ func (s *SQLiteStorage) EnsureAdminUser() error {
 		return fmt.Errorf("create admin user: %w", err)
 	}
 
-	fmt.Printf("\n")
-	fmt.Printf("===========================================\n")
-	fmt.Printf("  DEFAULT ADMIN USER CREATED\n")
-	fmt.Printf("  Username: admin\n")
-	fmt.Printf("  Password: %s\n", password)
-	fmt.Printf("  CHANGE THIS PASSWORD IMMEDIATELY!\n")
-	fmt.Printf("===========================================\n")
-	fmt.Printf("\n")
+	fmt.Printf("default admin user created (username: admin)\n")
+	fmt.Printf("rotate the bootstrap password after first login\n")
 
 	return nil
 }
@@ -191,13 +190,4 @@ func (s *SQLiteStorage) Tokens() TokenRepository {
 // AlertHistory returns the alert history repository.
 func (s *SQLiteStorage) AlertHistory() AlertHistoryRepository {
 	return s.alertHistory
-}
-
-// generateRandomPassword generates a random password of the specified length.
-func generateRandomPassword(length int) (string, error) {
-	b := make([]byte, length)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("read random bytes: %w", err)
-	}
-	return base64.URLEncoding.EncodeToString(b)[:length], nil
 }

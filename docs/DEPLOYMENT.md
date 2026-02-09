@@ -211,6 +211,7 @@ echo "BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)" >> .env
 echo "BLAZELOG_DB_KEY=$(openssl rand -base64 32)" >> .env
 echo "BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)" >> .env
 echo "BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)" >> .env
+echo "BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD=ChangeMeNow123!" >> .env
 
 # 3. Start server (SQLite mode)
 docker compose --profile dev up -d
@@ -219,7 +220,8 @@ docker compose --profile dev up -d
 open http://localhost:8080
 ```
 
-First run prints a random admin password to server logs (change immediately).
+On first run, `BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD` is used to create the initial `admin` user.
+Rotate this password immediately after first login.
 
 ### Production Deployment (ClickHouse)
 
@@ -235,6 +237,7 @@ BLAZELOG_MASTER_KEY=$(openssl rand -base64 32)
 BLAZELOG_DB_KEY=$(openssl rand -base64 32)
 BLAZELOG_JWT_SECRET=$(openssl rand -base64 32)
 BLAZELOG_CSRF_SECRET=$(openssl rand -base64 32)
+BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD=ChangeMeNow123!
 CLICKHOUSE_PASSWORD=$(openssl rand -base64 32)
 EOF
 
@@ -259,6 +262,7 @@ docker compose ps
 | `BLAZELOG_MASTER_KEY` | Yes | - | Encryption key for sensitive data |
 | `BLAZELOG_DB_KEY` | Yes | - | SQLite SQLCipher database key |
 | `BLAZELOG_JWT_SECRET` | Yes | - | JWT signing secret |
+| `BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD` | First run | - | Initial admin bootstrap password (min 12 chars) |
 | `BLAZELOG_CSRF_SECRET` | No | - | Web UI CSRF protection |
 | `CLICKHOUSE_PASSWORD` | Prod | - | ClickHouse password |
 | `BLAZELOG_HTTP_PORT` | No | 8080 | HTTP API port |

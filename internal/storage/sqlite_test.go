@@ -486,6 +486,7 @@ func TestEnsureAdminUser(t *testing.T) {
 	store, cleanup := setupTestDB(t)
 	defer cleanup()
 	ctx := context.Background()
+	t.Setenv("BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD", "TestBootstrapPassword123!")
 
 	// First call should create admin
 	err := store.EnsureAdminUser()
@@ -514,6 +515,17 @@ func TestEnsureAdminUser(t *testing.T) {
 	count2, _ := store.Users().Count(ctx)
 	if count1 != count2 {
 		t.Errorf("user count changed from %d to %d", count1, count2)
+	}
+}
+
+func TestEnsureAdminUser_MissingBootstrapPassword(t *testing.T) {
+	store, cleanup := setupTestDB(t)
+	defer cleanup()
+	t.Setenv("BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD", "")
+
+	err := store.EnsureAdminUser()
+	if err == nil {
+		t.Fatal("expected error when bootstrap password env is missing")
 	}
 }
 

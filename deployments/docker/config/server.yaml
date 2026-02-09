@@ -9,6 +9,7 @@ server:
 
   # HTTP listen address for REST API and Web UI
   http_address: ":8080"
+  allow_insecure: true
 
   # TLS configuration for mTLS (mutual TLS)
   # Uncomment to enable secure agent communication
@@ -34,6 +35,12 @@ auth:
   rate_limit_per_user: 1000
   lockout_threshold: 5
   lockout_duration: "15m"
+
+api:
+  max_query_range: "24h"
+  query_timeout: "10s"
+  stream_max_duration: "30m"
+  stream_poll_interval: "1s"
 
 # SSH security settings (for agentless log collection)
 ssh:

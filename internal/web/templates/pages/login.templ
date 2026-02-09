@@ -6,8 +6,8 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
 )
 
-templ Login(csrfToken, errorMsg string) {
-	@layouts.Auth("Sign In") {
+templ Login(csrfToken, errorMsg, cspNonce string) {
+	@layouts.Auth("Sign In", cspNonce) {
 		<div class="sm:mx-auto sm:w-full sm:max-w-md">
 			<h2 class="mt-6 text-center text-3xl font-semibold tracking-tight text-slate-900">
 				Sign in to BlazeLog

@@ -1,6 +1,6 @@
 package layouts
 
-templ Auth(title string) {
+templ Auth(title string, cspNonce string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -9,8 +9,8 @@ templ Auth(title string) {
 			<title>{ title } - BlazeLog</title>
 			<link rel="icon" href="/static/favicon.ico"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
-			<script src="https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js"></script>
-			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+			<script nonce={ cspNonce } src="/static/vendor/htmx.min.js"></script>
+			<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.15.4/dist/cdn.min.js"></script>
 		</head>
 		<body class="min-h-screen text-slate-900">
 			<main class="flex items-center justify-center min-h-screen px-4 page-enter">
