@@ -72,9 +72,6 @@ temp/
 *.prof
 __debug_bin*
 
-# Generated proto files
-internal/proto/
-
 # SQLite database files
 data/*.db
 data/*.db-shm

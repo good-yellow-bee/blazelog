@@ -112,6 +112,10 @@ sudo systemctl enable --now blazelog-agent
 
 ## Configuration
 
+Server startup requires these environment variables: `BLAZELOG_MASTER_KEY`, `BLAZELOG_DB_KEY`, `BLAZELOG_JWT_SECRET`.
+On first startup (when no users exist), also set `BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD` (minimum 12 chars).
+If TLS is disabled for local development, set `server.allow_insecure: true` in `server.yaml`.
+
 ### Agent (agent.yaml)
 
 ```yaml

@@ -3,6 +3,7 @@ package logs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -113,11 +114,11 @@ type mockLogStorage struct {
 	repo *mockLogRepository
 }
 
-func (m *mockLogStorage) Open() error                           { return nil }
-func (m *mockLogStorage) Close() error                          { return nil }
-func (m *mockLogStorage) Migrate() error                        { return nil }
-func (m *mockLogStorage) Ping(ctx context.Context) error        { return nil }
-func (m *mockLogStorage) Logs() storage.LogRepository           { return m.repo }
+func (m *mockLogStorage) Open() error                    { return nil }
+func (m *mockLogStorage) Close() error                   { return nil }
+func (m *mockLogStorage) Migrate() error                 { return nil }
+func (m *mockLogStorage) Ping(ctx context.Context) error { return nil }
+func (m *mockLogStorage) Logs() storage.LogRepository    { return m.repo }
 
 func newMockLogStorage() (*mockLogStorage, *mockLogRepository) {
 	repo := &mockLogRepository{}
@@ -381,7 +382,7 @@ func TestStats_Success(t *testing.T) {
 
 	handler := NewHandler(mockStorage)
 
-	startTime := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	startTime := now.Add(-23 * time.Hour).Format(time.RFC3339)
 	req := httptest.NewRequest("GET", "/api/v1/logs/stats?start="+url.QueryEscape(startTime), nil)
 	rec := httptest.NewRecorder()
 
@@ -450,6 +451,27 @@ func TestStats_InvalidInterval(t *testing.T) {
 	}
 }
 
+func TestStats_ExceedsMaxQueryRange(t *testing.T) {
+	mockStorage, mockRepo := newMockLogStorage()
+	mockRepo.errorRates = &storage.ErrorRateResult{}
+
+	handler := NewHandlerWithStorageAndConfig(mockStorage, nil, HandlerConfig{
+		MaxQueryRange: 2 * time.Hour,
+		QueryTimeout:  5 * time.Second,
+	})
+
+	startTime := time.Now().Add(-3 * time.Hour).Format(time.RFC3339)
+	endTime := time.Now().Format(time.RFC3339)
+	req := httptest.NewRequest("GET", "/api/v1/logs/stats?start="+url.QueryEscape(startTime)+"&end="+url.QueryEscape(endTime), nil)
+	rec := httptest.NewRecorder()
+
+	handler.Stats(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
 func TestStats_NoLogStorage(t *testing.T) {
 	handler := NewHandler(nil)
 
@@ -482,6 +504,23 @@ func TestStream_InvalidSearchMode(t *testing.T) {
 	handler := NewHandler(mockStorage)
 
 	req := httptest.NewRequest("GET", "/api/v1/logs/stream?search_mode=invalid", nil)
+	rec := httptest.NewRecorder()
+
+	handler.Stream(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestStream_StartTooOld(t *testing.T) {
+	mockStorage, _ := newMockLogStorage()
+	handler := NewHandlerWithStorageAndConfig(mockStorage, nil, HandlerConfig{
+		MaxQueryRange: 10 * time.Minute,
+	})
+
+	start := time.Now().Add(-11 * time.Minute).Format(time.RFC3339)
+	req := httptest.NewRequest("GET", "/api/v1/logs/stream?start="+url.QueryEscape(start), nil)
 	rec := httptest.NewRecorder()
 
 	handler.Stream(rec, req)
@@ -651,7 +690,7 @@ func TestSSEWriter_SendRetry(t *testing.T) {
 
 func TestQuery_StorageError(t *testing.T) {
 	mockStorage, mockRepo := newMockLogStorage()
-	mockRepo.queryError = context.DeadlineExceeded
+	mockRepo.queryError = errors.New("storage unavailable")
 
 	handler := NewHandler(mockStorage)
 
@@ -668,7 +707,7 @@ func TestQuery_StorageError(t *testing.T) {
 
 func TestStats_StorageError(t *testing.T) {
 	mockStorage, mockRepo := newMockLogStorage()
-	mockRepo.statsError = context.DeadlineExceeded
+	mockRepo.statsError = errors.New("stats failed")
 
 	handler := NewHandler(mockStorage)
 
@@ -683,11 +722,67 @@ func TestStats_StorageError(t *testing.T) {
 	}
 }
 
+func TestQuery_Timeout(t *testing.T) {
+	mockStorage, mockRepo := newMockLogStorage()
+	mockRepo.queryError = context.DeadlineExceeded
+
+	handler := NewHandler(mockStorage)
+
+	startTime := time.Now().Add(-time.Hour).Format(time.RFC3339)
+	req := httptest.NewRequest("GET", "/api/v1/logs?start="+url.QueryEscape(startTime), nil)
+	rec := httptest.NewRecorder()
+
+	handler.Query(rec, req)
+
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusGatewayTimeout)
+	}
+}
+
+func TestQuery_ExceedsMaxQueryRange(t *testing.T) {
+	mockStorage, mockRepo := newMockLogStorage()
+	mockRepo.entries = []*storage.LogRecord{}
+	mockRepo.total = 0
+
+	handler := NewHandlerWithStorageAndConfig(mockStorage, nil, HandlerConfig{
+		MaxQueryRange: 2 * time.Hour,
+		QueryTimeout:  5 * time.Second,
+	})
+
+	startTime := time.Now().Add(-3 * time.Hour).Format(time.RFC3339)
+	endTime := time.Now().Format(time.RFC3339)
+	req := httptest.NewRequest("GET", "/api/v1/logs?start="+url.QueryEscape(startTime)+"&end="+url.QueryEscape(endTime), nil)
+	rec := httptest.NewRecorder()
+
+	handler.Query(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestStats_Timeout(t *testing.T) {
+	mockStorage, mockRepo := newMockLogStorage()
+	mockRepo.statsError = context.DeadlineExceeded
+
+	handler := NewHandler(mockStorage)
+
+	startTime := time.Now().Add(-time.Hour).Format(time.RFC3339)
+	req := httptest.NewRequest("GET", "/api/v1/logs/stats?start="+url.QueryEscape(startTime), nil)
+	rec := httptest.NewRecorder()
+
+	handler.Stats(rec, req)
+
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusGatewayTimeout)
+	}
+}
+
 func TestQuery_SearchModes(t *testing.T) {
 	tests := []struct {
-		name       string
-		mode       string
-		wantMode   storage.SearchMode
+		name     string
+		mode     string
+		wantMode storage.SearchMode
 	}{
 		{"token mode", "token", storage.SearchModeToken},
 		{"substring mode", "substring", storage.SearchModeSubstring},

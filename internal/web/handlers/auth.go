@@ -21,7 +21,7 @@ func (h *Handler) ShowLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := csrf.Token(r)
-	pages.Login(csrfToken, "").Render(r.Context(), w)
+	pages.Login(csrfToken, "", middleware.GetCSPNonce(r.Context())).Render(r.Context(), w)
 }
 
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
@@ -143,5 +143,5 @@ func renderLoginError(w http.ResponseWriter, r *http.Request, message string) {
 		return
 	}
 	// Non-HTMX: return full login page with error
-	pages.Login(csrf.Token(r), message).Render(r.Context(), w)
+	pages.Login(csrf.Token(r), message, middleware.GetCSPNonce(r.Context())).Render(r.Context(), w)
 }

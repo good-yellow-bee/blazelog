@@ -36,7 +36,7 @@ func (h *Handler) ShowLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pages.Logs(sess, csrf.Token(r)).Render(r.Context(), w)
+	pages.Logs(sess, csrf.Token(r), middleware.GetCSPNonce(r.Context())).Render(r.Context(), w)
 }
 
 // LogsDataResponse wraps paginated log list for JSON response

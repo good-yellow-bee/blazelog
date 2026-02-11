@@ -6,14 +6,18 @@
 server:
   grpc_address: ":9443"
   http_address: ":8080"
+  allow_insecure: false
 
   # Enable mTLS for production
   tls:
-    enabled: false
-    # Uncomment and configure for mTLS:
-    # cert_file: "/etc/blazelog/certs/server.crt"
-    # key_file: "/etc/blazelog/certs/server.key"
-    # client_ca_file: "/etc/blazelog/certs/ca.crt"
+    enabled: true
+    cert_file: "/etc/blazelog/certs/server.crt"
+    key_file: "/etc/blazelog/certs/server.key"
+    client_ca_file: "/etc/blazelog/certs/ca.crt"
+  http_tls:
+    enabled: true
+    cert_file: "/etc/blazelog/certs/server.crt"
+    key_file: "/etc/blazelog/certs/server.key"
 
 # Database configuration
 database:
@@ -29,6 +33,13 @@ auth:
   rate_limit_per_user: 1000
   lockout_threshold: 5
   lockout_duration: "15m"
+  use_secure_cookies: true
+
+api:
+  max_query_range: "24h"
+  query_timeout: "10s"
+  stream_max_duration: "30m"
+  stream_poll_interval: "1s"
 
 # SSH security settings
 ssh:

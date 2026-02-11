@@ -91,6 +91,9 @@ func TestRecoverer_NoPanic(t *testing.T) {
 
 func TestSecurityHeaders(t *testing.T) {
 	handler := SecurityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if nonce := GetCSPNonce(r.Context()); nonce == "" {
+			t.Error("expected CSP nonce in request context")
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -117,9 +120,19 @@ func TestSecurityHeaders(t *testing.T) {
 		}
 	}
 
-	// CSP header should be set (just check it exists)
-	if rec.Header().Get("Content-Security-Policy") == "" {
+	// CSP header should be set and hardened
+	csp := rec.Header().Get("Content-Security-Policy")
+	if csp == "" {
 		t.Error("Content-Security-Policy header not set")
+	}
+	if !strings.Contains(csp, "script-src 'self' 'nonce-") {
+		t.Errorf("expected nonce-based script-src, got %q", csp)
+	}
+	if strings.Contains(csp, "'unsafe-eval'") {
+		t.Errorf("CSP should not include unsafe-eval, got %q", csp)
+	}
+	if strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
+		t.Errorf("script-src should not include unsafe-inline by default, got %q", csp)
 	}
 
 	// Permissions-Policy should be set

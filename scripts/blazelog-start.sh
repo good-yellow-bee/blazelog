@@ -16,6 +16,7 @@ missing_vars=""
 [ -z "$BLAZELOG_DB_KEY" ] && missing_vars="$missing_vars BLAZELOG_DB_KEY"
 [ -z "$BLAZELOG_JWT_SECRET" ] && missing_vars="$missing_vars BLAZELOG_JWT_SECRET"
 [ -z "$BLAZELOG_CSRF_SECRET" ] && missing_vars="$missing_vars BLAZELOG_CSRF_SECRET"
+[ -z "$BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD" ] && missing_vars="$missing_vars BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD"
 
 if [ -n "$missing_vars" ]; then
     echo "ERROR: Required environment variables not set:$missing_vars"
@@ -25,6 +26,7 @@ if [ -n "$missing_vars" ]; then
     echo "  export BLAZELOG_DB_KEY=\$(openssl rand -base64 32)"
     echo "  export BLAZELOG_JWT_SECRET=\$(openssl rand -base64 32)"
     echo "  export BLAZELOG_CSRF_SECRET=\$(openssl rand -base64 32)"
+    echo "  export BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD='<strong-password>'"
     exit 1
 fi
 

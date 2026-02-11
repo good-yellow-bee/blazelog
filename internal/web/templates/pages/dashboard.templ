@@ -14,9 +14,9 @@ type DashboardStats struct {
 	ActiveAlerts int
 }
 
-templ Dashboard(user *session.Session, stats DashboardStats, csrfToken string) {
-	@layouts.Base("Dashboard", user, csrfToken) {
-		<div x-data="dashboardController()" x-init="init()" class="space-y-6">
+templ Dashboard(user *session.Session, stats DashboardStats, csrfToken string, cspNonce string) {
+	@layouts.Base("Dashboard", user, csrfToken, cspNonce) {
+		<div x-data="dashboardController" x-init="init()" class="space-y-6">
 			<!-- Header with Controls -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 				<h1 class="page-title">Dashboard</h1>
@@ -47,15 +47,17 @@ templ Dashboard(user *session.Session, stats DashboardStats, csrfToken string) {
 		</div>
 
 		<!-- ECharts CDN -->
-		<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-		@DashboardScript()
+		<script nonce={ cspNonce } src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+		@DashboardScript(cspNonce)
 	}
 }
 
 templ TimeRangeSelector() {
 	<div class="flex items-center space-x-2">
-		<span class="text-sm text-slate-500">Range:</span>
+		<label for="dashboard-time-range" class="text-sm text-slate-500">Range:</label>
 		<select
+			id="dashboard-time-range"
+			name="dashboard_time_range"
 			x-model="$store.dashboard.timeRange"
 			@change="refreshDashboard()"
 			class="select-field text-sm"
@@ -72,8 +74,10 @@ templ TimeRangeSelector() {
 
 templ AutoRefreshToggle() {
 	<div class="flex items-center space-x-2">
-		<span class="text-sm text-slate-500">Refresh:</span>
+		<label for="dashboard-refresh-interval" class="text-sm text-slate-500">Refresh:</label>
 		<select
+			id="dashboard-refresh-interval"
+			name="dashboard_refresh_interval"
 			x-model="$store.dashboard.refreshInterval"
 			@change="setRefreshInterval()"
 			class="select-field text-sm"
@@ -170,8 +174,8 @@ templ HTTPStatusChart() {
 	</div>
 }
 
-templ DashboardScript() {
-	<script>
+templ DashboardScript(cspNonce string) {
+	<script nonce={ cspNonce }>
 	// Alpine.js store for dashboard state
 	document.addEventListener('alpine:init', () => {
 		Alpine.store('dashboard', {
@@ -179,10 +183,8 @@ templ DashboardScript() {
 			refreshInterval: 30,
 			refreshTimer: null
 		});
-	});
 
-	function dashboardController() {
-		return {
+		Alpine.data('dashboardController', () => ({
 			charts: {},
 
 			init() {
@@ -343,8 +345,8 @@ templ DashboardScript() {
 					store.refreshTimer = setInterval(() => this.loadData(), store.refreshInterval * 1000);
 				}
 			}
-		};
-	}
+		}));
+	});
 
 	// Handle chart resize on window resize
 	window.addEventListener('resize', () => {

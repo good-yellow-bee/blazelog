@@ -16,7 +16,7 @@ type Storage interface {
 	Close() error
 	// Migrate runs database migrations.
 	Migrate() error
-	// EnsureAdminUser creates default admin if no users exist.
+	// EnsureAdminUser creates default admin if no users exist using secure bootstrap credentials.
 	EnsureAdminUser() error
 
 	// Repository accessors

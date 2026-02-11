@@ -130,6 +130,7 @@ export BLAZELOG_DB_KEY="<generated-key>"
 | `BLAZELOG_DB_KEY` | Environment only | Never logged |
 | `BLAZELOG_JWT_SECRET` | Environment only | Never logged |
 | `BLAZELOG_CSRF_SECRET` | Environment only | Never logged |
+| `BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD` | Environment only (first startup) | Never logged |
 | SSH keys | Encrypted files | Decrypted in memory |
 
 ---
@@ -142,10 +143,12 @@ All HTTP responses include:
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 X-XSS-Protection: 1; mode=block
-Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'
+Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-<random>' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
 Referrer-Policy: strict-origin-when-cross-origin
 Strict-Transport-Security: max-age=31536000; includeSubDomains (HTTPS only)
 ```
+
+`script-src` uses a per-request nonce for inline scripts and does not allow `unsafe-eval`.
 
 ---
 

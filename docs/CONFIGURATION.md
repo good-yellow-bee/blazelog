@@ -9,6 +9,7 @@
 | `BLAZELOG_MASTER_KEY` | Encryption key for sensitive data | `openssl rand -base64 32` |
 | `BLAZELOG_DB_KEY` | SQLCipher database key | `openssl rand -base64 32` |
 | `BLAZELOG_JWT_SECRET` | JWT signing secret | `openssl rand -base64 32` |
+| `BLAZELOG_BOOTSTRAP_ADMIN_PASSWORD` | Initial admin password (first startup only) | strong password (min 12 chars) |
 
 ### Optional
 
@@ -49,6 +50,9 @@ server:
   # HTTP listen address for REST API and Web UI
   http_address: ":8080"  # default
 
+  # Explicitly allow non-TLS operation (development only)
+  allow_insecure: true
+
   # HTTPS configuration for HTTP API
   http_tls:
     enabled: false
@@ -68,6 +72,19 @@ server:
 
     # CA certificate for client verification
     client_ca_file: "/etc/blazelog/certs/ca.crt"
+
+api:
+  # Maximum allowed query range for /api/v1/logs and /api/v1/logs/stats
+  max_query_range: "24h"
+
+  # Timeout for storage-backed queries
+  query_timeout: "10s"
+
+  # Maximum SSE stream duration for /api/v1/logs/stream
+  stream_max_duration: "30m"
+
+  # SSE poll interval
+  stream_poll_interval: "1s"
 
 # Metrics endpoint configuration
 metrics:
@@ -292,6 +309,7 @@ blazelog-agent -c /etc/blazelog/agent.yaml validate
 server:
   grpc_address: ":9443"
   http_address: ":8080"
+  allow_insecure: true
   tls:
     enabled: false
 
@@ -305,6 +323,11 @@ database:
 server:
   grpc_address: ":9443"
   http_address: ":8080"
+  allow_insecure: false
+  http_tls:
+    enabled: true
+    cert_file: "/etc/blazelog/certs/http.crt"
+    key_file: "/etc/blazelog/certs/http.key"
   tls:
     enabled: true
     cert_file: "/etc/blazelog/certs/server.crt"

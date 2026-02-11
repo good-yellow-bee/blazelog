@@ -47,7 +47,7 @@ templ Sidebar(user *session.Session, csrfToken string) {
 
 	<!-- Sidebar -->
 	<aside
-		x-data="sidebarNav()"
+		x-data="sidebarNav"
 		:class="$store.sidebar.open ? 'translate-x-0' : '-translate-x-full'"
 		class="fixed top-0 bottom-0 left-0 h-screen z-50 w-64 bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200/70 dark:border-slate-700/70 shadow-[0_12px_32px_rgba(15,23,42,0.08)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.3)] transform transition-transform duration-200 ease-in-out flex flex-col"
 	>
@@ -95,7 +95,7 @@ templ Sidebar(user *session.Session, csrfToken string) {
 				class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors"
 			>
 				<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
 				</svg>
 				<span class="ml-3">Dashboard</span>
 			</a>
@@ -201,8 +201,8 @@ templ Sidebar(user *session.Session, csrfToken string) {
 	</aside>
 }
 
-templ SidebarScript() {
-	<script>
+templ SidebarScript(cspNonce string) {
+	<script nonce={ cspNonce }>
 		// Initialize sidebar and theme stores
 		document.addEventListener('alpine:init', () => {
 			const desktopQuery = window.matchMedia('(min-width: 768px)');
@@ -222,11 +222,8 @@ templ SidebarScript() {
 					localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
 				}
 			});
-		});
 
-		// Sidebar navigation component
-		function sidebarNav() {
-			return {
+			Alpine.data('sidebarNav', () => ({
 				settingsOpen: window.location.pathname.startsWith('/settings'),
 				currentPath: window.location.pathname,
 				isActive(path) {
@@ -235,10 +232,10 @@ templ SidebarScript() {
 					}
 					return this.currentPath === path || this.currentPath.startsWith(path + '/');
 				}
-			};
-		}
+			}));
+		});
 	</script>
-	<style>
+	<style nonce={ cspNonce }>
 		[x-cloak] { display: none !important; }
 	</style>
 }

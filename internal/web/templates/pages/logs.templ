@@ -6,9 +6,9 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/web/session"
 )
 
-templ Logs(user *session.Session, csrfToken string) {
-	@layouts.Base("Logs", user, csrfToken) {
-		<div x-data="logsController()" x-init="init()" class="space-y-6">
+templ Logs(user *session.Session, csrfToken string, cspNonce string) {
+	@layouts.Base("Logs", user, csrfToken, cspNonce) {
+		<div x-data="logsController" x-init="init()" class="space-y-6">
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 				<h1 class="page-title">Log Viewer</h1>
@@ -45,7 +45,7 @@ templ Logs(user *session.Session, csrfToken string) {
 			@ExportModal()
 		</div>
 
-		@LogsScript()
+		@LogsScript(cspNonce)
 	}
 }
 
@@ -54,9 +54,11 @@ templ LogFilters() {
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<!-- Search -->
 			<div class="lg:col-span-2">
-				<label class="label">Search</label>
+				<label for="logs-search-query" class="label">Search</label>
 				<div class="relative">
 					<input
+						id="logs-search-query"
+						name="logs_search_query"
 						type="text"
 						x-model="filters.q"
 						@input.debounce.300ms="applyFilters()"
@@ -71,8 +73,10 @@ templ LogFilters() {
 
 			<!-- Time Range -->
 			<div>
-				<label class="label">Time Range</label>
+				<label for="logs-time-range" class="label">Time Range</label>
 				<select
+					id="logs-time-range"
+					name="logs_time_range"
 					x-model="filters.range"
 					@change="applyFilters()"
 					class="select-field"
@@ -88,8 +92,10 @@ templ LogFilters() {
 
 			<!-- Level Filter -->
 			<div>
-				<label class="label">Level</label>
+				<label for="logs-level-filter" class="label">Level</label>
 				<select
+					id="logs-level-filter"
+					name="logs_level_filter"
 					x-model="filters.level"
 					@change="applyFilters()"
 					class="select-field"
@@ -107,8 +113,10 @@ templ LogFilters() {
 		<!-- Second row: Project filter -->
 		<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
 			<div>
-				<label class="label">Project</label>
+				<label for="logs-project-filter" class="label">Project</label>
 				<select
+					id="logs-project-filter"
+					name="logs_project_filter"
 					x-model="filters.project_id"
 					@change="applyFilters()"
 					class="select-field"
@@ -125,7 +133,7 @@ templ LogFilters() {
 		<div x-show="showAdvanced" x-collapse class="mt-4 pt-4 border-t border-slate-200/70">
 			<!-- Filter Expression -->
 			<div class="mb-4">
-				<label class="label flex items-center gap-2">
+				<label for="logs-advanced-filter" class="label flex items-center gap-2">
 					Advanced Filter
 					<button
 						@click="showFilterHelp = !showFilterHelp"
@@ -138,6 +146,8 @@ templ LogFilters() {
 					</button>
 				</label>
 				<input
+					id="logs-advanced-filter"
+					name="logs_advanced_filter"
 					type="text"
 					x-model="filters.filter"
 					@input.debounce.500ms="applyFilters()"
@@ -161,8 +171,10 @@ templ LogFilters() {
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 				<!-- Source -->
 				<div>
-					<label class="label">Source</label>
+					<label for="logs-source-filter" class="label">Source</label>
 					<input
+						id="logs-source-filter"
+						name="logs_source_filter"
 						type="text"
 						x-model="filters.source"
 						@input.debounce.300ms="applyFilters()"
@@ -173,8 +185,10 @@ templ LogFilters() {
 
 				<!-- Log Type -->
 				<div>
-					<label class="label">Type</label>
+					<label for="logs-type-filter" class="label">Type</label>
 					<select
+						id="logs-type-filter"
+						name="logs_type_filter"
 						x-model="filters.type"
 						@change="applyFilters()"
 						class="select-field"
@@ -190,8 +204,10 @@ templ LogFilters() {
 
 				<!-- Search Mode -->
 				<div>
-					<label class="label">Search Mode</label>
+					<label for="logs-search-mode" class="label">Search Mode</label>
 					<select
+						id="logs-search-mode"
+						name="logs_search_mode"
 						x-model="filters.search_mode"
 						@change="applyFilters()"
 						class="select-field"
@@ -280,12 +296,15 @@ templ LogTable() {
 			<div>
 				<p class="text-sm text-slate-600">
 					Showing <span x-text="((page - 1) * perPage) + 1"></span> to
-					<span x-text="Math.min(page * perPage, total)"></span> of
+					<span x-text="pageEnd()"></span> of
 					<span x-text="total"></span> results
 				</p>
 			</div>
 			<div class="flex items-center gap-4">
 				<select
+					id="logs-per-page"
+					name="logs_per_page"
+					aria-label="Logs per page"
 					x-model="perPage"
 					@change="applyFilters()"
 					class="select-field text-sm"
@@ -357,60 +376,60 @@ templ LogDetailModal() {
 						<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
 							<div>
 								<span class="text-slate-500">Timestamp</span>
-								<p class="font-mono" x-text="selectedLog?.timestamp"></p>
+								<p class="font-mono" x-text="selectedLogField('timestamp')"></p>
 							</div>
 							<div>
 								<span class="text-slate-500">Level</span>
 								<p>
 									<span
 										class="badge"
-										:class="levelClass(selectedLog?.level)"
-										x-text="selectedLog?.level?.toUpperCase()"
+										:class="levelClass(selectedLogField('level'))"
+										x-text="selectedLogLevelText()"
 									></span>
 								</p>
 							</div>
 							<div>
 								<span class="text-slate-500">Source</span>
-								<p x-text="selectedLog?.source || '-'"></p>
+								<p x-text="selectedLogField('source', '-')"></p>
 							</div>
 							<div>
 								<span class="text-slate-500">Type</span>
-								<p x-text="selectedLog?.type || '-'"></p>
+								<p x-text="selectedLogField('type', '-')"></p>
 							</div>
 							<div>
 								<span class="text-slate-500">Agent ID</span>
-								<p class="font-mono text-xs" x-text="selectedLog?.agent_id || '-'"></p>
+								<p class="font-mono text-xs" x-text="selectedLogField('agent_id', '-')"></p>
 							</div>
 							<div>
 								<span class="text-slate-500">File Path</span>
-								<p class="font-mono text-xs truncate" x-text="selectedLog?.file_path || '-'"></p>
+								<p class="font-mono text-xs truncate" x-text="selectedLogField('file_path', '-')"></p>
 							</div>
 							<div>
 								<span class="text-slate-500">Line</span>
-								<p x-text="selectedLog?.line_number || '-'"></p>
+								<p x-text="selectedLogField('line_number', '-')"></p>
 							</div>
 							<div>
 								<span class="text-slate-500">ID</span>
-								<p class="font-mono text-xs truncate" x-text="selectedLog?.id"></p>
+								<p class="font-mono text-xs truncate" x-text="selectedLogField('id', '-')"></p>
 							</div>
 						</div>
 
 						<!-- HTTP Info (if present) -->
-						<template x-if="selectedLog?.http_status">
+						<template x-if="hasSelectedLogHTTP()">
 							<div class="mb-4 p-3 panel-soft">
 								<h4 class="text-sm font-semibold text-slate-700 mb-2">HTTP Request</h4>
 								<div class="grid grid-cols-3 gap-4 text-sm">
 									<div>
 										<span class="text-slate-500">Method</span>
-										<p class="font-mono" x-text="selectedLog?.http_method"></p>
+										<p class="font-mono" x-text="selectedLogField('http_method', '-')"></p>
 									</div>
 									<div>
 										<span class="text-slate-500">Status</span>
-										<p class="font-mono" x-text="selectedLog?.http_status"></p>
+										<p class="font-mono" x-text="selectedLogField('http_status', '-')"></p>
 									</div>
 									<div>
 										<span class="text-slate-500">URI</span>
-										<p class="font-mono text-xs truncate" x-text="selectedLog?.uri"></p>
+										<p class="font-mono text-xs truncate" x-text="selectedLogField('uri', '-')"></p>
 									</div>
 								</div>
 							</div>
@@ -419,11 +438,11 @@ templ LogDetailModal() {
 						<!-- Message -->
 						<div class="mb-4">
 							<h4 class="text-sm font-semibold text-slate-700 mb-2">Message</h4>
-							<pre id="log-message-display" class="bg-slate-950 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap" x-text="selectedLog?.message"></pre>
+							<pre id="log-message-display" class="bg-slate-950 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap" x-text="selectedLogField('message')"></pre>
 						</div>
 
 						<!-- Fields (if any) -->
-						<template x-if="selectedLog?.fields && Object.keys(selectedLog.fields).length > 0">
+						<template x-if="hasSelectedLogFields()">
 							<div class="mb-4">
 								<h4 class="text-sm font-semibold text-slate-700 mb-2">Fields</h4>
 								<pre class="bg-slate-50/70 p-4 rounded-lg overflow-x-auto text-sm font-mono" x-text="JSON.stringify(selectedLog.fields, null, 2)"></pre>
@@ -431,7 +450,7 @@ templ LogDetailModal() {
 						</template>
 
 						<!-- Labels (if any) -->
-						<template x-if="selectedLog?.labels && Object.keys(selectedLog.labels).length > 0">
+						<template x-if="hasSelectedLogLabels()">
 							<div>
 								<h4 class="text-sm font-semibold text-slate-700 mb-2">Labels</h4>
 								<div id="log-labels-container" class="flex flex-wrap gap-2">
@@ -521,15 +540,15 @@ templ LogDetailModal() {
 								<div class="flex items-start justify-between">
 									<div class="flex-1 min-w-0">
 										<div class="flex items-center gap-2 mb-1">
-											<span class="font-mono text-xs text-slate-500" x-text="formatTimestamp(contextPanel.anchorLog?.timestamp)"></span>
+											<span class="font-mono text-xs text-slate-500" x-text="formatTimestamp(anchorLogField('timestamp'))"></span>
 											<span
 												class="badge"
-												:class="levelClass(contextPanel.anchorLog?.level)"
-												x-text="(contextPanel.anchorLog?.level || 'unknown').toUpperCase()"
+												:class="levelClass(anchorLogField('level'))"
+												x-text="anchorLogLevelText()"
 											></span>
 											<span class="text-xs text-teal-700 font-semibold">ANCHOR</span>
 										</div>
-										<p class="text-sm text-slate-900 whitespace-pre-wrap break-words" x-text="contextPanel.anchorLog?.message"></p>
+										<p class="text-sm text-slate-900 whitespace-pre-wrap break-words" x-text="anchorLogField('message')"></p>
 									</div>
 								</div>
 							</div>
@@ -608,8 +627,10 @@ templ ExportModal() {
 
 					<div class="space-y-4">
 						<div>
-							<label class="label">Format</label>
+							<label for="logs-export-format" class="label">Format</label>
 							<select
+								id="logs-export-format"
+								name="logs_export_format"
 								x-model="exportFormat"
 								class="select-field"
 							>
@@ -619,8 +640,10 @@ templ ExportModal() {
 						</div>
 
 						<div>
-							<label class="label">Max Records</label>
+							<label for="logs-export-limit" class="label">Max Records</label>
 							<select
+								id="logs-export-limit"
+								name="logs_export_limit"
 								x-model="exportLimit"
 								class="select-field"
 							>
@@ -663,10 +686,10 @@ templ ExportModal() {
 	</div>
 }
 
-templ LogsScript() {
-	<script>
-	function logsController() {
-		return {
+templ LogsScript(cspNonce string) {
+	<script nonce={ cspNonce }>
+	document.addEventListener('alpine:init', () => {
+		Alpine.data('logsController', () => ({
 			// State
 			logs: [],
 			projects: [],
@@ -896,6 +919,45 @@ templ LogsScript() {
 				}
 			},
 
+			selectedLogField(field, fallback = '') {
+				if (!this.selectedLog || typeof this.selectedLog !== 'object') {
+					return fallback;
+				}
+				const value = this.selectedLog[field];
+				return value === null || value === undefined || value === '' ? fallback : value;
+			},
+
+			selectedLogLevelText() {
+				const level = this.selectedLogField('level');
+				return level ? String(level).toUpperCase() : '';
+			},
+
+			hasSelectedLogHTTP() {
+				return Boolean(this.selectedLogField('http_status'));
+			},
+
+			hasSelectedLogFields() {
+				return this.selectedLog && this.selectedLog.fields && Object.keys(this.selectedLog.fields).length > 0;
+			},
+
+			hasSelectedLogLabels() {
+				return this.selectedLog && this.selectedLog.labels && Object.keys(this.selectedLog.labels).length > 0;
+			},
+
+			anchorLogField(field, fallback = '') {
+				const anchor = this.contextPanel.anchorLog;
+				if (!anchor || typeof anchor !== 'object') {
+					return fallback;
+				}
+				const value = anchor[field];
+				return value === null || value === undefined || value === '' ? fallback : value;
+			},
+
+			anchorLogLevelText() {
+				const level = this.anchorLogField('level', 'unknown');
+				return String(level).toUpperCase();
+			},
+
 		selectLog(index) {
 			this.selectedLog = this.logs[index];
 			this.modalView = 'detail';
@@ -939,6 +1001,14 @@ templ LogsScript() {
 					this.page++;
 					this.loadLogs();
 				}
+			},
+
+			pageEnd() {
+				const page = Number(this.page) || 0;
+				const perPage = Number(this.perPage) || 0;
+				const total = Number(this.total) || 0;
+				const end = page * perPage;
+				return end < total ? end : total;
 			},
 
 			toggleLive() {
@@ -1261,7 +1331,7 @@ templ LogsScript() {
 					container.appendChild(div);
 				});
 			}
-		};
-	}
+		}));
+	});
 	</script>
 }

@@ -144,6 +144,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 	cfg.Verbose = verbose
 
+	// Validate the effective configuration (including defaults and CLI overrides).
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("validate config: %w", err)
+	}
+
 	// Log security warnings for insecure configuration
 	cfg.WarnSecurityIssues(log.Printf)
 
@@ -331,25 +336,45 @@ func initAPIServer(cfg *Config, store storage.Storage, logStore storage.LogStora
 	if err != nil {
 		return nil, fmt.Errorf("parse lockout_duration: %w", err)
 	}
+	maxQueryRange, err := time.ParseDuration(cfg.API.MaxQueryRange)
+	if err != nil {
+		return nil, fmt.Errorf("parse api.max_query_range: %w", err)
+	}
+	queryTimeout, err := time.ParseDuration(cfg.API.QueryTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("parse api.query_timeout: %w", err)
+	}
+	streamMaxDuration, err := time.ParseDuration(cfg.API.StreamMaxDuration)
+	if err != nil {
+		return nil, fmt.Errorf("parse api.stream_max_duration: %w", err)
+	}
+	streamPollInterval, err := time.ParseDuration(cfg.API.StreamPollInterval)
+	if err != nil {
+		return nil, fmt.Errorf("parse api.stream_poll_interval: %w", err)
+	}
 
 	apiConfig := &api.Config{
-		Address:          cfg.Server.HTTPAddress,
-		JWTSecret:        []byte(jwtSecret),
-		CSRFSecret:       csrfSecret,
-		TrustedOrigins:   cfg.Auth.TrustedOrigins,
-		TrustedProxies:   cfg.Auth.TrustedProxies,
-		WebUIEnabled:     webUIEnabled,
-		UseSecureCookies: cfg.Auth.UseSecureCookies,
-		HTTPTLSEnabled:   cfg.Server.HTTPTLS.Enabled,
-		HTTPTLSCertFile:  cfg.Server.HTTPTLS.CertFile,
-		HTTPTLSKeyFile:   cfg.Server.HTTPTLS.KeyFile,
-		AccessTokenTTL:   accessTTL,
-		RefreshTokenTTL:  refreshTTL,
-		RateLimitPerIP:   cfg.Auth.RateLimitPerIP,
-		RateLimitPerUser: cfg.Auth.RateLimitPerUser,
-		LockoutThreshold: cfg.Auth.LockoutThreshold,
-		LockoutDuration:  lockoutDuration,
-		Verbose:          cfg.Verbose,
+		Address:            cfg.Server.HTTPAddress,
+		JWTSecret:          []byte(jwtSecret),
+		CSRFSecret:         csrfSecret,
+		TrustedOrigins:     cfg.Auth.TrustedOrigins,
+		TrustedProxies:     cfg.Auth.TrustedProxies,
+		WebUIEnabled:       webUIEnabled,
+		UseSecureCookies:   cfg.Auth.UseSecureCookies,
+		HTTPTLSEnabled:     cfg.Server.HTTPTLS.Enabled,
+		HTTPTLSCertFile:    cfg.Server.HTTPTLS.CertFile,
+		HTTPTLSKeyFile:     cfg.Server.HTTPTLS.KeyFile,
+		AccessTokenTTL:     accessTTL,
+		RefreshTokenTTL:    refreshTTL,
+		RateLimitPerIP:     cfg.Auth.RateLimitPerIP,
+		RateLimitPerUser:   cfg.Auth.RateLimitPerUser,
+		LockoutThreshold:   cfg.Auth.LockoutThreshold,
+		LockoutDuration:    lockoutDuration,
+		MaxQueryRange:      maxQueryRange,
+		QueryTimeout:       queryTimeout,
+		StreamMaxDuration:  streamMaxDuration,
+		StreamPollInterval: streamPollInterval,
+		Verbose:            cfg.Verbose,
 	}
 
 	return api.New(apiConfig, store, logStore)

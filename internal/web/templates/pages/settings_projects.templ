@@ -7,9 +7,9 @@ import (
 	"github.com/good-yellow-bee/blazelog/internal/web/templates/components"
 )
 
-templ SettingsProjects(user *session.Session, csrfToken string) {
-	@layouts.Base("Projects", user, csrfToken) {
-		<div x-data="projectsController()" x-init="init()" class="space-y-6">
+templ SettingsProjects(user *session.Session, csrfToken string, cspNonce string) {
+	@layouts.Base("Projects", user, csrfToken, cspNonce) {
+		<div x-data="projectsController" x-init="init()" class="space-y-6">
 			<!-- Header -->
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 				<div>
@@ -91,11 +91,11 @@ templ SettingsProjects(user *session.Session, csrfToken string) {
 				"showDeleteModal",
 				"deleteProject()",
 				"'Delete Project'",
-				"'Are you sure you want to delete \"' + (selectedProject?.name || '') + '\"? This action cannot be undone.'",
+				"deleteProjectConfirmText()",
 			)
 		</div>
 
-		@ProjectsScript()
+		@ProjectsScript(cspNonce)
 	}
 }
 
@@ -146,7 +146,7 @@ templ ProjectFormModal() {
 }
 
 templ ProjectMembersModal() {
-	@components.ModalWithFooter("showMembersModal", "'Members: ' + (selectedProject?.name || '')") {
+	@components.ModalWithFooter("showMembersModal", "membersModalTitle()") {
 		@components.ModalBody() {
 			<div class="space-y-4">
 				<!-- Members list -->
@@ -224,10 +224,10 @@ templ ProjectMembersModal() {
 	}
 }
 
-templ ProjectsScript() {
-	<script>
-		function projectsController() {
-			return {
+templ ProjectsScript(cspNonce string) {
+	<script nonce={ cspNonce }>
+		document.addEventListener('alpine:init', () => {
+			Alpine.data('projectsController', () => ({
 				// Data
 				projects: [],
 				filteredProjects: [],
@@ -264,6 +264,18 @@ templ ProjectsScript() {
 				get availableUsers() {
 					const memberIds = this.members.map(m => m.user_id);
 					return this.allUsers.filter(u => !memberIds.includes(u.id));
+				},
+
+				selectedProjectName() {
+					return this.selectedProject && this.selectedProject.name ? this.selectedProject.name : '';
+				},
+
+				membersModalTitle() {
+					return 'Members: ' + this.selectedProjectName();
+				},
+
+				deleteProjectConfirmText() {
+					return 'Are you sure you want to delete "' + this.selectedProjectName() + '"? This action cannot be undone.';
 				},
 
 				init() {
@@ -524,7 +536,7 @@ templ ProjectsScript() {
 						alert('Network error. Please try again.');
 					}
 				}
-			};
-		}
+			}));
+		});
 	</script>
 }

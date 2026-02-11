@@ -2,6 +2,7 @@
 package logs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,7 +37,12 @@ const (
 	errCodeBadRequest    = "BAD_REQUEST"
 	errCodeForbidden     = "FORBIDDEN"
 	errCodeInternalError = "INTERNAL_ERROR"
+	errCodeTimeout       = "TIMEOUT"
 	maxFilterLength      = 1000
+	defaultMaxQueryRange = 24 * time.Hour
+	defaultQueryTimeout  = 10 * time.Second
+	defaultStreamMaxDur  = 30 * time.Minute
+	defaultStreamPoll    = time.Second
 )
 
 func jsonError(w http.ResponseWriter, status int, code, message string) {
@@ -57,18 +63,84 @@ func jsonOK(w http.ResponseWriter, data interface{}) {
 
 // Handler handles log query and streaming endpoints.
 type Handler struct {
-	logStorage storage.LogStorage
-	store      storage.Storage // For project access checks
+	logStorage         storage.LogStorage
+	store              storage.Storage // For project access checks
+	maxQueryRange      time.Duration
+	queryTimeout       time.Duration
+	streamMaxDuration  time.Duration
+	streamPollInterval time.Duration
+}
+
+// HandlerConfig configures API safety limits for logs handlers.
+type HandlerConfig struct {
+	MaxQueryRange      time.Duration
+	QueryTimeout       time.Duration
+	StreamMaxDuration  time.Duration
+	StreamPollInterval time.Duration
 }
 
 // NewHandler creates a new logs handler.
 func NewHandler(logStore storage.LogStorage) *Handler {
-	return &Handler{logStorage: logStore}
+	return NewHandlerWithStorageAndConfig(logStore, nil, HandlerConfig{})
 }
 
 // NewHandlerWithStorage creates a new logs handler with full storage access for project filtering.
 func NewHandlerWithStorage(logStore storage.LogStorage, store storage.Storage) *Handler {
-	return &Handler{logStorage: logStore, store: store}
+	return NewHandlerWithStorageAndConfig(logStore, store, HandlerConfig{})
+}
+
+// NewHandlerWithStorageAndConfig creates a new logs handler with storage and safety limits.
+func NewHandlerWithStorageAndConfig(logStore storage.LogStorage, store storage.Storage, cfg HandlerConfig) *Handler {
+	if cfg.MaxQueryRange <= 0 {
+		cfg.MaxQueryRange = defaultMaxQueryRange
+	}
+	if cfg.QueryTimeout <= 0 {
+		cfg.QueryTimeout = defaultQueryTimeout
+	}
+	if cfg.StreamMaxDuration <= 0 {
+		cfg.StreamMaxDuration = defaultStreamMaxDur
+	}
+	if cfg.StreamPollInterval <= 0 {
+		cfg.StreamPollInterval = defaultStreamPoll
+	}
+	return &Handler{
+		logStorage:         logStore,
+		store:              store,
+		maxQueryRange:      cfg.MaxQueryRange,
+		queryTimeout:       cfg.QueryTimeout,
+		streamMaxDuration:  cfg.StreamMaxDuration,
+		streamPollInterval: cfg.StreamPollInterval,
+	}
+}
+
+func (h *Handler) validateRange(startTime, endTime time.Time) error {
+	if startTime.After(endTime) {
+		return fmt.Errorf("start time must be before end time")
+	}
+	if h.maxQueryRange > 0 && endTime.Sub(startTime) > h.maxQueryRange {
+		return fmt.Errorf("time range too large (max %s)", h.maxQueryRange)
+	}
+	return nil
+}
+
+func (h *Handler) newQueryContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if h.queryTimeout <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, h.queryTimeout)
+}
+
+func isTimeoutError(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded)
+}
+
+func handleStorageError(w http.ResponseWriter, err error, contextMsg string) {
+	if isTimeoutError(err) {
+		jsonError(w, http.StatusGatewayTimeout, errCodeTimeout, "request timed out")
+		return
+	}
+	log.Printf("%s: %v", contextMsg, err)
+	jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
 }
 
 // LogResponse represents a log entry in API responses.
@@ -189,8 +261,8 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate time range
-	if startTime.After(endTime) {
-		jsonError(w, http.StatusBadRequest, errCodeBadRequest, "start time must be before end time")
+	if err := h.validateRange(startTime, endTime); err != nil {
+		jsonError(w, http.StatusBadRequest, errCodeBadRequest, err.Error())
 		return
 	}
 
@@ -351,10 +423,11 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute query
-	result, err := h.logStorage.Logs().Query(ctx, filter)
+	queryCtx, cancel := h.newQueryContext(ctx)
+	defer cancel()
+	result, err := h.logStorage.Logs().Query(queryCtx, filter)
 	if err != nil {
-		log.Printf("log query error: %v", err)
-		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		handleStorageError(w, err, "log query error")
 		return
 	}
 
@@ -410,6 +483,10 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if err := h.validateRange(startTime, endTime); err != nil {
+		jsonError(w, http.StatusBadRequest, errCodeBadRequest, err.Error())
+		return
+	}
 
 	// Parse interval
 	interval := "hour"
@@ -461,7 +538,9 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 		httpStats  *storage.HTTPStatsResult
 	)
 
-	g, gCtx := errgroup.WithContext(ctx)
+	queryCtx, cancel := h.newQueryContext(ctx)
+	defer cancel()
+	g, gCtx := errgroup.WithContext(queryCtx)
 
 	g.Go(func() error {
 		var err error
@@ -500,7 +579,7 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err := g.Wait(); err != nil {
-		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		handleStorageError(w, err, "stats query error")
 		return
 	}
 
@@ -582,6 +661,10 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if h.maxQueryRange > 0 && time.Since(startTime) > h.maxQueryRange {
+		jsonError(w, http.StatusBadRequest, errCodeBadRequest, fmt.Sprintf("start time too old (max lookback %s)", h.maxQueryRange))
+		return
+	}
 
 	// Parse search mode
 	searchMode := storage.SearchModeToken
@@ -660,19 +743,15 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 	// Track last seen timestamp
 	lastTimestamp := startTime
 
-	// Polling interval
-	pollInterval := time.Second
-
 	// Heartbeat interval
 	heartbeatInterval := 15 * time.Second
 	lastHeartbeat := time.Now()
 
-	// Stream timeout (30 minutes)
-	streamTimeout := 30 * time.Minute
-	deadline := time.Now().Add(streamTimeout)
+	// Stream timeout
+	deadline := time.Now().Add(h.streamMaxDuration)
 
 	// Main loop
-	ticker := time.NewTicker(pollInterval)
+	ticker := time.NewTicker(h.streamPollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -694,8 +773,13 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 			filter.EndTime = time.Now()
 
 			// Query for new logs
-			result, err := h.logStorage.Logs().Query(ctx, &filter)
+			queryCtx, cancel := h.newQueryContext(ctx)
+			result, err := h.logStorage.Logs().Query(queryCtx, &filter)
+			cancel()
 			if err != nil {
+				if isTimeoutError(err) {
+					sse.SendEvent("error", `{"code":"TIMEOUT","message":"stream query timed out"}`)
+				}
 				log.Printf("stream query error: %v", err)
 				continue
 			}
@@ -758,10 +842,11 @@ func (h *Handler) Context(w http.ResponseWriter, r *http.Request) {
 	afterCursor := q.Get("after_cursor")
 
 	// Get anchor log first
-	anchor, err := h.logStorage.Logs().GetByID(ctx, id)
+	queryCtx, cancel := h.newQueryContext(ctx)
+	defer cancel()
+	anchor, err := h.logStorage.Logs().GetByID(queryCtx, id)
 	if err != nil {
-		log.Printf("get log by id error: %v", err)
-		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		handleStorageError(w, err, "get log by id error")
 		return
 	}
 	if anchor == nil {
@@ -787,7 +872,7 @@ func (h *Handler) Context(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch context
-	result, err := h.logStorage.Logs().GetContext(ctx, &storage.ContextFilter{
+	result, err := h.logStorage.Logs().GetContext(queryCtx, &storage.ContextFilter{
 		TargetID:     id,
 		ProjectID:    anchor.ProjectID,
 		AgentID:      anchor.AgentID,
@@ -798,8 +883,7 @@ func (h *Handler) Context(w http.ResponseWriter, r *http.Request) {
 		AfterCursor:  afterCursor,
 	})
 	if err != nil {
-		log.Printf("get context error: %v", err)
-		jsonError(w, http.StatusInternalServerError, errCodeInternalError, "internal server error")
+		handleStorageError(w, err, "get context error")
 		return
 	}
 	if result == nil || result.Target == nil {
